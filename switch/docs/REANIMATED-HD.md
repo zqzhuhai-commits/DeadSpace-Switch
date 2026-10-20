@@ -45,4 +45,20 @@ python3 switch/tests/reanimated_hd_test.py
 
 工具锁定该发布版 SHA256，拒绝错误包、异常 KTX、重复/危险文件名及已存在的目标目录。失败时清理暂存内容，不发布半成品。它完成提取和映射，**尚未接入 Switch 游戏运行时**。公开仓库仅保存工具与元数据，不包含材质文件。
 
+## 0.3.2 基线：与实际 PSV 数据比对并准备内置资源
+
+`--donor-data` 会先检查导入目录的原版库白名单，再扫描该目录的 M3G；不会用 APK 自带资源代替 PSV 数据做兼容性结论：
+
+```sh
+python3 switch/tools/reanimated_hd.py /path/to/DeadSpaceReanimated-1.3.apk \
+  --donor-data /path/to/imported-gamedata --report /path/to/donor-hd.json
+python3 switch/tools/prepare_romfs.py /path/to/PSV-data /path/to/new-romfs \
+  --hd-apk /path/to/DeadSpaceReanimated-1.3.apk
+python3 switch/tests/hd_romfs_test.py
+```
+
+RomFS 准备工具在 `gamedata/` 中保留受支持的游戏库和原始资源，另将高清 KTX 放在 `texture_hd/`，两者都纳入顶层逐文件 SHA256 清单。高清目录另含 `donor-compatibility.json`，记录实际匹配数量、对应对象和未匹配键。零匹配时拒绝发布整个 RomFS 暂存目录；部分匹配时明确记录数量，不能据此认定全部 222 张都可用。不会导入 APK 的 Android 运行库。
+
+此工具更新只准备内置数据，**尚无游戏纹理替换入口，亦不生成 NSP**。清单保持 `runtime_integrated: false`。当前 PSV 原版数据未在本工作区找到，因此尚未运行实际 PSV 对照；使用 APK 自带的 265 个 M3G 对扫描器做回归，222 个高清键全部匹配，该结果仅验证扫描器。
+
 格式名称核对：[Khronos ATC 扩展规范](https://github.com/KhronosGroup/OpenGL-Registry/blob/main/extensions/AMD/AMD_compressed_ATC_texture.txt)。

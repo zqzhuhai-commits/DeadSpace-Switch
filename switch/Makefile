@@ -14,7 +14,7 @@ CPPFLAGS := -D__SWITCH__ -D_REENTRANT -Iinclude -isystem $(NX)/include -isystem 
 CXXFLAGS := -std=gnu++17 -O2 -g -Wall -Wextra -Werror $(ARCH) -fPIC -ffunction-sections -fdata-sections
 LDFLAGS := $(ARCH) -fPIC -specs=$(NX)/switch.specs -Wl,-Map,build/deadspace-switch.map -Wl,--gc-sections -L$(NX)/lib -L$(PORT)/lib
 LIBS := -lSDL2 -lGLESv2 -lEGL -lglapi -ldrm_nouveau -lnx -lm -lpthread
-APP_VERSION := 0.3.0
+APP_VERSION := 0.3.2
 ifeq ($(CPU_PROBE),1)
 CPU_BUILD_DIR ?= build/cpu
 CPPFLAGS += -DDS_CPU_PROBE -Iruntime

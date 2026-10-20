@@ -201,7 +201,7 @@ def inspect(apk, output=None, map_originals=False):
     return result
 
 
-def extract(apk, output, map_originals=False):
+def extract(apk, output, map_originals=False, donor_assets=None):
     output = Path(output).absolute()
     if output.exists() or output.is_symlink():
         raise ValueError("Output already exists; use a new directory")
@@ -209,6 +209,8 @@ def extract(apk, output, map_originals=False):
     stage = Path(tempfile.mkdtemp(prefix=".reanimated-hd-", dir=output.parent))
     try:
         result = inspect(apk, stage, map_originals)
+        if donor_assets is not None:
+            result["donor_compatibility"] = match_assets(result, donor_assets)
         (stage / "manifest.json").write_text(json.dumps(result, indent=2) + "\n")
         stage.rename(output)
         return result
@@ -217,15 +219,63 @@ def extract(apk, output, map_originals=False):
             shutil.rmtree(stage)
 
 
+def match_assets(report, assets):
+    """Compare HD keys to the actual imported donor, never to APK substitutes.
+
+    A match proves identity of a base texture, not that the renderer replaces it.
+    Unknown M3G signatures are reported rather than counted as matching assets.
+    """
+    assets = Path(assets)
+    if not assets.is_dir() or assets.is_symlink():
+        raise ValueError("Expected an imported donor assets directory")
+    by_key = {Path(f["name"]).stem: f for f in report["files"]}
+    mappings, unsupported = [], []
+    scanned = 0
+    for path in sorted(assets.rglob("*")):
+        if path.suffix.lower() != ".m3g":
+            continue
+        if path.is_symlink() or any(p.is_symlink() for p in path.parents):
+            raise ValueError("Donor M3G symlinks are not accepted")
+        if not path.is_file() or path.stat().st_size > MAX_M3G:
+            raise ValueError("Donor M3G file type/size bound")
+        name = path.relative_to(assets).as_posix()
+        raw = path.read_bytes()
+        if raw[:12] not in [b"\xabJSR184\xbb\r\n\x1a\n", b"\xabIM-M3G\xbb\r\n\x1a\n"]:
+            unsupported.append(name)
+            continue
+        scanned += 1
+        for image in images(raw):
+            if image["key"] not in by_key:
+                continue
+            hd = by_key[image["key"]]
+            w, h = image["base_dimensions"]
+            if hd["width"] <= w or hd["width"] % w or hd["height"] % h or hd["width"] // w != hd["height"] // h:
+                raise ValueError("HD/base scale mismatch: " + name)
+            mappings.append({**image, "source": name, "hd_dimensions": [hd["width"], hd["height"]]})
+    matched = {m["key"] for m in mappings}
+    return {"mapping_scope": "supplied donor assets; exact base texture key",
+            "scanned_m3g_files": scanned, "unsupported_m3g_files": unsupported,
+            "mapped_texture_count": len(matched), "mappings": mappings,
+            "unmatched_hd_keys": sorted(set(by_key) - matched),
+            "runtime_integrated": False, "switch_hardware_tested": False}
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("apk", type=Path)
     p.add_argument("--extract", type=Path, help="New HD-only output directory")
     p.add_argument("--map-originals", action="store_true", help="Match HD keys against the APK's M3G Image2D objects")
     p.add_argument("--report", type=Path)
+    p.add_argument("--donor-data", type=Path, help="Compare against a validated Xperia Play/Vita data root")
     args = p.parse_args()
     try:
-        report = extract(args.apk, args.extract, args.map_originals) if args.extract else inspect(args.apk, map_originals=args.map_originals)
+        if args.donor_data:
+            from prepare_data import validate
+            validate(args.donor_data)
+        donor_assets = args.donor_data / "assets" if args.donor_data else None
+        report = extract(args.apk, args.extract, args.map_originals, donor_assets) if args.extract else inspect(args.apk, map_originals=args.map_originals)
+        if args.donor_data and not args.extract:
+            report["donor_compatibility"] = match_assets(report, args.donor_data / "assets")
         if args.report:
             args.report.write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps({k: v for k, v in report.items() if k not in ["files", "mappings"]}, indent=2))

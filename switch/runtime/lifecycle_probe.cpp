@@ -628,6 +628,7 @@ public:
 
     std::string report() const {
         std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
+        out+="Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
         for(const auto& kv:service_counts)if(kv.second)out+="  svc "+kv.first+" "+std::to_string(kv.second)+"\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;

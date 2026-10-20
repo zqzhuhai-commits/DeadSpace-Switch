@@ -22,7 +22,7 @@ static void record(const std::string& s) {
 static void draw_report() {
     consoleClear();
     std::puts("Dead Space Mobile " DS_APP_VERSION " - DEVELOPMENT DIAGNOSTICS\n");
-    std::puts("Game lifecycle is NOT implemented. This is not a playable port.\n");
+    std::puts("Lifecycle probe uses mock GL. This is not a playable port.\n");
     const auto r=ds::preflight(root);
     std::printf("Data: %s\n",root);
     record("--- donor preflight ---");
@@ -30,11 +30,12 @@ static void draw_report() {
     std::puts("\nA: rescan  X: GPU/PVRTC/audio  Y: GLES1 compatibility  +: exit");
 #ifdef DS_CPU_PROBE
     std::puts("B: ARM32 functions + game constructors (not gameplay)");
+    std::puts("L: JNI lifecycle diagnostics (mock GL, not gameplay)");
 #endif
     std::puts("Touch and left/right stick values appear below.");
     std::printf("Log: %s\n",ds::paths::log_file);
     if (!logfile) std::puts("WARNING: log file could not be opened; check SD card space/access.");
-    record(r.ready()?"Donor preflight passed; game lifecycle unavailable":"Donor preflight failed");
+    record(r.ready()?"Donor preflight passed; playable runtime unavailable":"Donor preflight failed");
 }
 int main() {
     consoleInit(nullptr);
