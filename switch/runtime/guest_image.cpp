@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 namespace ds {
+namespace { constexpr uint32_t image_hi_base=0x10000000; }
 bool GuestImage::load(const std::string& path,std::string& error) {
     memory.clear();exports.clear();segments.clear();imports.clear();constructors.clear();pending.clear();bound=false;relative_relocations=0;
     try {
@@ -27,11 +28,17 @@ bool GuestImage::load(const std::string& path,std::string& error) {
             for(const auto& s:segments)if(va<uint64_t(s.start)+s.size && uint64_t(va)+size>s.start)throw std::runtime_error("Overlapping LOAD segments");
             segments.push_back({va,size,u32(p+24)});
         }
-        memory.resize(end,0);
+        memory.resize(std::max<uint64_t>(end,uint64_t(image_hi_base)+end),0);
         for(unsigned i=0;i<u16(44);++i) {
             const uint64_t p=u32(28)+uint64_t(i)*32;
             if(u32(p)==1)std::memcpy(memory.data()+u32(p+8),raw.data()+u32(p+4),u32(p+16));
         }
+        // Old Android images hard-code a 0x10000000 load bias inside code (absolute
+        // function pointers via movw/movt or data tables). Mirror every LOAD segment
+        // at bias+va so those absolute jumps land on the same bytes.
+        const auto lo_segments=segments;
+        for(const auto& s:lo_segments)std::memcpy(memory.data()+uint64_t(s.start)+image_hi_base,memory.data()+s.start,s.size);
+        for(const auto& s:lo_segments)segments.push_back({s.start+image_hi_base,s.size,s.flags});
         if(u16(46)!=40)throw std::runtime_error("Invalid section header size");
         auto section=[&](unsigned index)->uint64_t {if(index>=u16(48))throw std::runtime_error("Invalid section index");const uint64_t p=u32(32)+uint64_t(index)*40;if(p+40>raw.size())throw std::runtime_error("Truncated sections");return p;};
         for(unsigned i=0;i<u16(48);++i) {
@@ -78,6 +85,7 @@ bool GuestImage::load(const std::string& path,std::string& error) {
                     uint32_t addend=v[0]|uint32_t(v[1])<<8|uint32_t(v[2])<<16|uint32_t(v[3])<<24;
                     const uint32_t result=base+addend;
                     for(unsigned k=0;k<4;++k)memory[target+k]=result>>(8*k);
+                    for(unsigned k=0;k<4;++k)memory[target+image_hi_base+k]=result>>(8*k);
                     ++relative_relocations;
                 }
             }
@@ -122,6 +130,7 @@ bool GuestImage::bind_imports(const std::function<uint32_t(const Import&)>& reso
         }
         // Only the loader writes text relocations; guest writes retain segment protection.
         for(const auto& w:writes)for(unsigned k=0;k<4;++k)memory[w.first+k]=w.second>>(8*k);
+        for(const auto& w:writes)for(unsigned k=0;k<4;++k)memory[w.first+image_hi_base+k]=w.second>>(8*k);
         bound=true;error.clear();return true;
     } catch(const std::exception& e) {error=e.what();return false;}
 }

@@ -56,17 +56,25 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
     std::string data_root;
     uint32_t next=heap,brk=arena,mmap_top=arena_end;
     uint32_t pending=0,errno_address=0,env_addr=0,vm_addr=0,jni_table=0,vm_table=0;
-    uint32_t ext_string=0;
+    uint32_t ext_string=0,asset_manager_ref=0;
     bool returned=false;
     uint64_t budget=0;
     std::string fault;
     unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0;
+    std::map<std::string,uint64_t> service_counts;
 
     bool mapped(uint32_t a) const {
         return (a>=stack && a-stack<2*1024*1024) || (a>=heap && a<next) ||
                (a>=arena && a<brk) || (a>=mmap_top && a<arena_end);
     }
-    void fail(const std::string& message) {if(fault.empty())fault=message;if(cpu)cpu->HaltExecution();budget=0;}
+    void fail(const std::string& message) {
+        if(fault.empty()){
+            std::string ctx=message;
+            if(cpu){ctx+=" pc="+to_hex(cpu->Regs()[15]);for(int i=0;i<13;++i)ctx+=" r"+std::to_string(i)+"="+to_hex(cpu->Regs()[i]);}
+            fault=ctx;
+        }
+        if(cpu)cpu->HaltExecution();budget=0;
+    }
     uint32_t alloc(uint32_t size) {
         const uint64_t n=(uint64_t(size)+15)&~uint64_t(15);
         if(n>32*1024*1024 || uint64_t(next)+std::max<uint64_t>(n,16)>heap+heap_limit)throw std::runtime_error("Guest heap limit");
@@ -107,22 +115,28 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
         const std::string& cls=objects[obj].cls;
         trace.push_back("Java "+cls+"."+m.name+m.sig);
         if(cls=="com/ea/blast/MainActivity"){
-            if(m.name=="GetInstance")return singleton("com/ea/blast/MainActivity");
-            if(m.name=="getAssets")return singleton("android/content/res/AssetManager");
+            if(m.name=="GetInstance"){const uint32_t r=singleton("com/ea/blast/MainActivity");trace.push_back("  GetInstance -> "+to_hex(r));return r;}
+            if(m.name=="getAssets"){const uint32_t r=singleton("android/content/res/AssetManager");asset_manager_ref=r;trace.push_back("  getAssets -> "+to_hex(r));return r;}
         }
         if(cls=="android/content/res/AssetManager"){
             if(m.name=="open"||m.name=="openFd"||m.name=="list"){
-                std::string name=objects[uint32_t(values[0])].text;
+                uint32_t v0=uint32_t(values[0]);
+                if(objects[v0].text.empty()&&objects[v0].cls.empty()){
+                    const uint32_t deref=MemoryRead32(v0);
+                    if(!objects[deref].text.empty()){trace.push_back("  Asset deref "+to_hex(v0)+" -> "+to_hex(deref));v0=deref;}
+                }
+                std::string name=objects[v0].text;
+                trace.push_back("  Asset "+m.name+" name='"+name+"' v0="+to_hex(v0)+" cls='"+objects[v0].cls+"'");
                 if(name.rfind("appbundle:",0)==0)name=name.substr(10);
                 const std::string path=data_root+"/assets/"+name;
                 if(m.name=="list"){
                     const auto ref=alloc(4);objects[ref].cls="[Ljava/lang/String;";objects[ref].length=0;return ref;
                 }
                 std::FILE* fp=std::fopen(path.c_str(),"rb");
-                if(!fp)throw std::runtime_error("Missing asset: "+path);
+                if(!fp)return 0;
                 std::fseek(fp,0,SEEK_END);const long sz=std::ftell(fp);std::fseek(fp,0,SEEK_SET);
                 std::vector<uint8_t> bytes(size_t(sz>0?sz:0));
-                if(!bytes.empty()&&std::fread(bytes.data(),1,bytes.size(),fp)!=bytes.size()){std::fclose(fp);throw std::runtime_error("Asset read failed: "+path);}
+                if(!bytes.empty()&&std::fread(bytes.data(),1,bytes.size(),fp)!=bytes.size()){std::fclose(fp);return 0;}
                 std::fclose(fp);
                 const auto ref=alloc(4);
                 objects[ref].cls=m.name=="open"?"java/io/InputStream":"android/content/res/AssetFileDescriptor";
@@ -133,14 +147,22 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
         }
         if(cls=="java/io/InputStream"||cls=="android/content/res/AssetFileDescriptor"){
             auto& o=objects[obj];
+            trace.push_back("Java "+cls+"."+m.name+m.sig+" pos="+std::to_string(o.position)+" size="+std::to_string(o.bytes.size()));
             if(o.closed)throw std::runtime_error("Use of closed asset stream");
             if(m.name=="close"){o.closed=true;return 0;}
             if(m.name=="getLength")return uint32_t(o.bytes.size()&0xffffffffu);
             if(m.name=="skip"){const uint32_t n=uint32_t(std::min<uint64_t>(values[0],o.bytes.size()-o.position));o.position+=n;return n;}
             if(m.name=="read"&&m.sig=="([BII)I"){
-                const uint32_t array=uint32_t(values[0]),offset=uint32_t(values[1]),length=uint32_t(values[2]);
-                if(offset+length>objects[array].length)throw std::runtime_error("Asset read outside Java array");
-                const uint32_t n=std::min<uint32_t>(length,uint32_t(o.bytes.size()-o.position));
+                uint32_t array=uint32_t(values[0]),offset=uint32_t(values[1]),length=uint32_t(values[2]);
+                if(objects[array].cls.empty()){
+                    const uint32_t deref=MemoryRead32(array);
+                    if(!objects[deref].cls.empty()){trace.push_back("  read deref "+to_hex(array)+" -> "+to_hex(deref));array=deref;}
+                }
+                trace.push_back("  read array="+to_hex(array)+" len="+std::to_string(objects[array].length)+" off="+std::to_string(offset)+" n="+std::to_string(length)+" pos="+std::to_string(o.position));
+                const uint32_t avail=uint32_t(o.bytes.size()-o.position);
+                const uint32_t want=std::min<uint32_t>(length,avail);
+                const uint32_t room=objects[array].length>offset?objects[array].length-offset:0;
+                const uint32_t n=std::min<uint32_t>(want,room);
                 for(uint32_t i=0;i<n;++i)MemoryWrite8(objects[array].elements[0]+offset+i,o.bytes[o.position+i]);
                 o.position+=n;return n?n:0xffffffffu;
             }
@@ -148,7 +170,8 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
         if(cls=="com/ea/EAIO/EAIO"&&m.name=="Startup"){
             const auto it=image.exports.find("Java_com_ea_EAIO_EAIO_Startup");
             if(it==image.exports.end())throw std::runtime_error("EAIO Startup export missing");
-            return guest_call(it->second,{env_addr,0,uint32_t(values[0])},"EAIO_Startup");
+            const uint32_t am=asset_manager_ref?asset_manager_ref:uint32_t(values[0]);
+            return guest_call(it->second,{env_addr,0,am},"EAIO_Startup");
         }
         if(cls=="com/ea/blast/SystemAndroidDelegate"){
             static const std::map<std::string,std::string> props={
@@ -190,10 +213,17 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
         throw std::runtime_error("Unsupported Java "+cls+"."+m.name+m.sig);
     }
 
-    uint32_t guest_call(uint32_t address,const std::vector<uint32_t>& args,const std::string& label) {
-        cpu->Reset();cpu->Regs().fill(0);cpu->Regs()[13]=stack+2*1024*1024-256;
+    uint32_t guest_call(uint32_t address,const std::vector<uint32_t>& args,const std::string& label,bool top_level=false) {
+        const auto saved_regs=cpu->Regs();
+        const std::array<uint32_t,64> saved_ext=cpu->ExtRegs();
+        const uint32_t saved_cpsr=cpu->Cpsr(),saved_fpscr=cpu->Fpscr();
+        const bool saved_returned=returned;const uint32_t saved_pending=pending;
+        const uint64_t saved_budget=budget;const std::string saved_fault=fault;
+        cpu->Reset();if(!top_level)cpu->Regs().fill(0);
+        cpu->Regs()[0]=args.size()>0?args[0]:0;cpu->Regs()[1]=args.size()>1?args[1]:0;
+        cpu->Regs()[2]=args.size()>2?args[2]:0;cpu->Regs()[3]=args.size()>3?args[3]:0;
+        cpu->Regs()[13]=stack+2*1024*1024-256;
         cpu->Regs()[14]=stop;cpu->Regs()[15]=address&~1u;cpu->SetCpsr((address&1)?0x30:0x10);cpu->SetFpscr(0);
-        for(unsigned i=0;i<args.size()&&i<4;++i)cpu->Regs()[i]=args[i];
         for(unsigned i=4;i<args.size();++i)MemoryWrite32(cpu->Regs()[13]+4*(i-4),args[i]);
         budget=30000000;returned=false;pending=0;
         unsigned calls=0;
@@ -203,7 +233,21 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
         }
         if(!fault.empty())throw std::runtime_error(label+": "+fault);
         if(!returned)throw std::runtime_error(label+": instruction budget exhausted");
-        return cpu->Regs()[0];
+        const uint32_t result=cpu->Regs()[0];
+        if(label=="EAIO_Startup"||label=="NativeOnDrawFrame")trace.push_back("RET "+label+" pc=0x"+to_hex(cpu->Regs()[14]-8));
+        if(top_level){
+            // Boot-probe semantics: leave the guest's own registers (r4-r12 etc.)
+            // in place across top-level calls; the game relies on that residue.
+            // Keep only internal bookkeeping clean for the next call.
+        } else {
+            // 恢复外层状态，但保留内层 caller-saved 残留（r1-r3/r12），游戏依赖其 UB 语义
+            const uint32_t g1=cpu->Regs()[1],g2=cpu->Regs()[2],g3=cpu->Regs()[3],g12=cpu->Regs()[12];
+            const std::array<uint32_t,64> saved_ext2=saved_ext;
+            cpu->Regs()=saved_regs;cpu->ExtRegs()=saved_ext2;cpu->SetCpsr(saved_cpsr);cpu->SetFpscr(saved_fpscr);
+            cpu->Regs()[0]=result;cpu->Regs()[1]=g1;cpu->Regs()[2]=g2;cpu->Regs()[3]=g3;cpu->Regs()[12]=g12;
+        }
+        returned=saved_returned;pending=saved_pending;budget=saved_budget;fault=saved_fault;
+        return result;
     }
 
     void write_stat(uint32_t p,long size){
@@ -219,9 +263,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
     }
 
     void service(const std::string& name) {
+        ++service_counts[name];
         const auto a=arg(0),b=arg(1),c=arg(2),d=arg(3);
         uint32_t result=0;
-        const std::string base=name.size()&&name.back()=='f'?name.substr(0,name.size()-1):name;
+        const std::string base=name.size()>1&&name.back()=='f'&&name!="pthread_self"?name.substr(0,name.size()-1):name;
         if(base=="memset"){bounded(c);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,b);result=a;}
         else if(base=="memcpy"||base=="memmove"){bounded(c);std::vector<uint8_t> v(c);for(uint32_t i=0;i<c;++i)v[i]=MemoryRead8(b+i);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,v[i]);result=a;}
         else if(base=="memcmp"){bounded(c);int cmp=0;for(uint32_t i=0;i<c;++i){uint8_t x=MemoryRead8(a+i),y=MemoryRead8(b+i);if(x!=y){cmp=x>y?1:-1;break;}}result=cmp;}
@@ -243,6 +288,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
         else if(base=="__aeabi_atexit")destructors.insert(destructors.end(),{a,b,c});
         else if(base=="__cxa_guard_acquire")result=MemoryRead8(a)==0;
         else if(base=="__cxa_guard_release")MemoryWrite8(a,1);
+        else if(base=="pthread_self")result=1;
         else if(base=="pthread_mutexattr_init")attrs[a]=0;
         else if(base=="pthread_mutexattr_settype"){if(b>2||!attrs.count(a))throw std::runtime_error("Invalid mutex attribute");attrs[a]=b;}
         else if(base=="pthread_mutexattr_setpshared"){if(b||!attrs.count(a))throw std::runtime_error("Shared mutex unsupported");}
@@ -320,29 +366,40 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
         if(op=="FindClass"){const std::string key=guest_text(b);trace.push_back("FindClass "+key);return find_class(key);}
         if(op=="GetMethodID"||op=="GetStaticMethodID"){
             MethodKey k{b,guest_text(c),guest_text(arg(3))};
-            auto& m=methods[k];if(!m){m=alloc(4);method_info[m]=k;}trace.push_back(op+" "+objects[b].cls+"."+k.name+k.sig);return m;
+            auto& m=methods[k];if(!m){m=alloc(4);method_info[m]=k;}trace.push_back(op+" clazz="+to_hex(b)+"('"+objects[b].cls+"') ."+k.name+k.sig);return m;
         }
-        if(op=="NewGlobalRef"||op=="NewLocalRef")return b;
-        if(op=="DeleteGlobalRef"||op=="DeleteLocalRef"||op=="ExceptionClear")return 0;
+        if(op=="NewGlobalRef"||op=="NewLocalRef"){trace.push_back("JNI:"+op);return b;}
+        if(op=="DeleteGlobalRef"||op=="DeleteLocalRef"||op=="ExceptionClear"){trace.push_back("JNI:"+op);return 0;}
         if(op=="ExceptionCheck"||op=="ExceptionOccurred")return 0;
-        if(op=="GetObjectClass")return find_class(objects[b].cls);
+        if(op=="GetObjectClass"){
+            uint32_t obj=b;
+            if(objects[obj].cls.empty()){
+                const uint32_t deref=MemoryRead32(obj);
+                trace.push_back("JNI:GetObjectClass obj="+to_hex(b)+" cls='' deref="+to_hex(deref)+"("+objects[deref].cls+")");
+                if(!objects[deref].cls.empty())obj=deref;
+            }
+            const uint32_t r=find_class(objects[obj].cls);
+            trace.push_back("JNI:GetObjectClass obj="+to_hex(b)+" cls='"+objects[obj].cls+"' -> "+to_hex(r));
+            return r;
+        }
         if(op=="IsSameObject")return a==b;
-        if(op=="GetJavaVM"){MemoryWrite32(b,vm_addr);return 0;}
+        if(op=="GetJavaVM"){trace.push_back("JNI:GetJavaVM");MemoryWrite32(b,vm_addr);return 0;}
         if(op=="PushLocalFrame"||op=="EnsureLocalCapacity")return 0;
         if(op=="PopLocalFrame")return b;
         if(op=="MonitorEnter"||op=="MonitorExit")return 0;
-        if(op=="NewStringUTF")return java_string(guest_text(b));
+        if(op=="NewStringUTF"){const std::string s=guest_text(b);trace.push_back("JNI:NewStringUTF '"+s+"'");return java_string(s);}
         if(op=="NewString"){std::string s;for(uint32_t i=0;i<c;++i)s+=char(MemoryRead16(b+2*i)&255);return java_string(s);}
         if(op=="GetStringUTFLength"||op=="GetStringLength")return uint32_t(objects[a].text.size());
         if(op=="GetStringUTFChars"||op=="GetStringChars"){
             const auto p=guest_string(objects[a].text);return p;
         }
         if(op=="ReleaseStringUTFChars"||op=="ReleaseStringChars")return 0;
-        if(op=="NewObject"||op=="NewObjectV"||op=="NewObjectA"){const auto ref=alloc(4);objects[ref].cls=objects[a].cls;return ref;}
+        if(op=="NewObject"||op=="NewObjectV"||op=="NewObjectA"){trace.push_back("JNI:"+op);const auto ref=alloc(4);objects[ref].cls=objects[a].cls;return ref;}
         if(op=="GetArrayLength")return objects[a].length;
         if(op=="GetObjectArrayElement")return objects[a].elements[b];
         if(op=="NewObjectArray"){const auto ref=alloc(4);objects[ref].cls="[Ljava/lang/String;";objects[ref].length=b;objects[ref].elements.assign(b,0);return ref;}
         if(op=="NewBooleanArray"||op=="NewByteArray"||op=="NewCharArray"||op=="NewShortArray"||op=="NewIntArray"||op=="NewLongArray"||op=="NewFloatArray"||op=="NewDoubleArray"){
+            trace.push_back("JNI:"+op+" len="+std::to_string(b));
             const std::string abbr=op=="NewBooleanArray"?"[Z":op=="NewByteArray"?"[B":op=="NewCharArray"?"[C":op=="NewShortArray"?"[S":op=="NewIntArray"?"[I":op=="NewLongArray"?"[J":op=="NewFloatArray"?"[F":"[D";
             const uint32_t stride=abbr=="[B"||abbr=="[Z"?1:abbr=="[S"||abbr=="[C"?2:abbr=="[I"||abbr=="[F"?4:8;
             const auto ref=alloc(4);objects[ref].cls=abbr;objects[ref].length=b;objects[ref].elements={alloc(b*stride)};return ref;
@@ -369,11 +426,18 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks {
             std::vector<uint64_t> values;
             if(isA||isV){
                 const std::string& sig=m.sig;size_t i=1,paren=sig.find(')');uint32_t p=arg(3);
+                if(m.name=="open"||m.name=="openFd")trace.push_back("  CallV r3="+to_hex(p)+" [0]="+to_hex(MemoryRead32(p))+" [4]="+to_hex(MemoryRead32(p+4))+" sig="+sig);
                 while(i<paren){
                     if(sig[i]=='L'||sig[i]=='['){while(i<paren&&sig[i]!=';')++i;if(i<paren)++i;values.push_back(MemoryRead32(p));p+=4;}
                     else{char t=sig[i++];bool wide=t=='J'||t=='D';values.push_back(wide?MemoryRead64(p):MemoryRead32(p));p+=wide?8:4;}
                 }
-            } else for(int i=0;i<6;++i)values.push_back(arg(4+i));
+            } else {
+                const std::string& sig=m.sig;size_t i=1,paren=sig.find(')');unsigned p=3;
+                while(i<paren){
+                    if(sig[i]=='L'||sig[i]=='['){while(i<paren&&sig[i]!=';')++i;if(i<paren)++i;values.push_back(arg(p++));}
+                    else{char t=sig[i++];bool wide=t=='J'||t=='D';values.push_back(wide?MemoryRead64(cpu->Regs()[13]+4*(p-4)):arg(p));p+=wide?2:1;}
+                }
+            }
             return java_delegate(uint32_t(m.cls),m,values);
         }
         throw std::runtime_error("Unsupported JNI: "+op);
@@ -410,10 +474,14 @@ public:
         if(mapped(a)){const auto it=pages.find(a>>12);return it==pages.end()?0:it->second[a&4095];}
         if(a>=thunks && uint64_t(a)-thunks<functions.size()*4) return uint8_t((0xef000001u+((a-thunks)/4))>>(8*((a-thunks)%4)));
         if(a>=stop && a-stop<4)return uint8_t(0xef00ffffu>>(8*(a-stop)));
-        uint8_t v=0;if(!image.read(a,&v,1))fail("Unmapped guest read at "+std::to_string(a));return v;
+        uint8_t v=0;if(!image.read(a,&v,1))fail("Unmapped guest read at "+std::to_string(a)+" img="+std::to_string(image.memory.size()));return v;
     }
     uint16_t MemoryRead16(uint32_t a) override {return MemoryRead8(a)|uint16_t(MemoryRead8(a+1))<<8;}
-    uint32_t MemoryRead32(uint32_t a) override {return MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;}
+    uint32_t MemoryRead32(uint32_t a) override {
+        const uint32_t v=MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;
+        if(v==0x1031e5a4u&&trace.size()<6000)trace.push_back("  GOT 0x1031e5a4 read @"+to_hex(cpu->Regs()[15]));
+        return v;
+    }
     uint64_t MemoryRead64(uint32_t a) override {return MemoryRead32(a)|uint64_t(MemoryRead32(a+4))<<32;}
     std::optional<uint32_t> MemoryReadCode(uint32_t a) override {
         if(a!=stop && !(a>=thunks && uint64_t(a)-thunks+4<=functions.size()*4) && !image.executable(a,4)){fail("Unmapped guest execution");return std::nullopt;}
@@ -517,7 +585,7 @@ public:
     void run_constructors() {
         for(const auto fn:image.constructors){
             if(!image.executable(fn&~1u,4))throw std::runtime_error("Invalid constructor address");
-            guest_call(fn,{},"constructor");
+            guest_call(fn,{},"constructor",true);
             ++constructors_completed;
         }
     }
@@ -526,31 +594,31 @@ public:
         trace.push_back("Constructors returned: "+std::to_string(constructors_completed));
         const auto onload=image.exports.find("JNI_OnLoad");
         if(onload==image.exports.end())throw std::runtime_error("JNI_OnLoad export missing");
-        const uint32_t version=guest_call(onload->second,{vm_addr,0},"JNI_OnLoad");
+        const uint32_t version=guest_call(onload->second,{vm_addr,0},"JNI_OnLoad",true);
         trace.push_back("JNI_OnLoad returned: 0x"+to_hex(version));
         if(version!=0x10004)throw std::runtime_error("Unexpected JNI version");
         const auto audio=image.exports.find("Java_com_ea_EAAudioCore_AndroidEAAudioCore_Init");
         if(audio==image.exports.end())throw std::runtime_error("Audio init export missing");
         const uint32_t track=alloc(4);objects[track].cls="android/media/AudioTrack";
-        guest_call(audio->second,{env_addr,0x42424242,track,1024*1024,2,44100},"EAAudioCore_Init");
+        guest_call(audio->second,{env_addr,0x42424242,track,1024*1024,2,44100},"EAAudioCore_Init",true);
         trace.push_back("EAAudioCore_Init returned");
         const auto create=image.exports.find("Java_com_ea_blast_MainActivity_NativeOnCreate");
         if(create==image.exports.end())throw std::runtime_error("NativeOnCreate export missing");
-        guest_call(create->second,{},"NativeOnCreate");
+        guest_call(create->second,{},"NativeOnCreate",true);
         trace.push_back("NativeOnCreate returned");
         const auto surface=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnSurfaceCreated");
         if(surface==image.exports.end())throw std::runtime_error("NativeOnSurfaceCreated export missing");
-        guest_call(surface->second,{},"NativeOnSurfaceCreated");
+        guest_call(surface->second,{},"NativeOnSurfaceCreated",true);
         trace.push_back("NativeOnSurfaceCreated returned");
         const auto visibility=image.exports.find("Java_com_ea_blast_KeyboardAndroid_NativeOnVisibilityChanged");
         if(visibility!=image.exports.end()){
-            guest_call(visibility->second,{env_addr,0x42424242,600,1},"NativeOnVisibilityChanged");
+            guest_call(visibility->second,{env_addr,0x42424242,600,1},"NativeOnVisibilityChanged",true);
             trace.push_back("NativeOnVisibilityChanged returned");
         }
         const auto frame=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
         for(unsigned i=0;i<frames;++i){
-            guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]");
+            guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
             trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
         }
         frames_done=frames;
@@ -560,6 +628,7 @@ public:
 
     std::string report() const {
         std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
+        for(const auto& kv:service_counts)if(kv.second)out+="  svc "+kv.first+" "+std::to_string(kv.second)+"\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;
     }
@@ -576,6 +645,7 @@ std::string lifecycle_probe(const std::string& library,const std::string& data_r
     LifecycleRuntime env;
     try {
         std::string error;if(!env.image.load(library,error))throw std::runtime_error(error);
+        //env.trace.push_back("image memory bytes="+std::to_string(env.image.memory.size()));
         env.initialize(data_root);
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
         conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
