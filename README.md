@@ -4,6 +4,8 @@
 
 [0.3.2 源码审查和 NSP 阻塞项](switch/docs/REVIEW-0.3.2.md)。高清资源准备现支持与实际 PSV 数据匹配，并纳入内置 RomFS 校验；尚未接入游戏渲染。
 
+[后续 JNI 修复](switch/docs/PROGRESS-JNI-0.3.2.md)：已修正函数表、参数解码、实例接收者、字符串/数组和真实资源读取，通过主机 ASan/UBSan 回归；尚未重跑真实 PSV 库或验证游戏画面。
+
 0.2.1 源码已按实机日志修正路径与版本标识：开发目录改为 `deadspacemobile`，增加完整库路径提示、CPU探测开始/结束日志及包内 RomFS 数据源选择。基础图形/PVRTC实机通过；CPU尚无实机结果，4个矩阵调色板入口缺失。详见 [实机日志分析](switch/docs/DEVICE-LOG-20261020.md)。
 
 基于 EapRules/deadspace-native-arm 提交 `cc8fd2c8a16530936aa3c2ce205ef4cffc2814e9`。上游目录保留；原 Linux/PortMaster 说明见 `README.portmaster.md`。Switch 新代码位于 `switch/`。Vita 版作为补丁和操作参考。Reanimated 当前没有公开核心运行时代码，本项目不包含该运行时。

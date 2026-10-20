@@ -23,6 +23,12 @@ def run():
                         str(ROOT.parent / "third_party/powervr/PVRTDecompress.cpp"),
                         "-o", str(exe)], check=True)
         subprocess.run([str(exe)], check=True)
+        jni_exe = work / "jni-test"
+        subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                        "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
+                        "-I" + str(ROOT / "runtime"), str(ROOT / "runtime/guest_jni.cpp"),
+                        str(ROOT / "tests/guest_jni_test.cpp"), "-o", str(jni_exe)], check=True)
+        subprocess.run([str(jni_exe)], check=True)
         # The real donor SHA1 gate is never relaxed. Synthetic archives must fail.
         for name, contents in [
             ("vpk", {"eboot.bin": b"not a game library"}),
