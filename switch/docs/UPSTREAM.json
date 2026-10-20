@@ -1,0 +1,12 @@
+{
+  "base_repository": "https://github.com/EapRules/deadspace-native-arm",
+  "base_commit": "cc8fd2c8a16530936aa3c2ce205ef4cffc2814e9",
+  "reference_repository": "https://github.com/v-atamanenko/deadspace-vita",
+  "closed_runtime_reference": "https://github.com/GINESTR0/DeadSpaceReanimated",
+  "target": "Nintendo Switch Horizon / libnx AArch64",
+  "milestone": "0.1.0 platform diagnostics",
+  "game_execution_implemented": false,
+  "hardware_tested": false,
+  "donor_files_available": true,
+  "data_source_status": "User-supplied direct RAR downloaded and hash verified; supported donor imported successfully"
+}

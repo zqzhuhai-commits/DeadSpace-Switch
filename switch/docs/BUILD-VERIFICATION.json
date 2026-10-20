@@ -1,0 +1,36 @@
+{
+  "version": "0.1.0",
+  "artifact_kind": "Switch native diagnostics only",
+  "game_playable": false,
+  "hardware_tested": false,
+  "donor_verified": true,
+  "upstream_commit": "cc8fd2c8a16530936aa3c2ce205ef4cffc2814e9",
+  "nro": {
+    "size": 6629573,
+    "sha256": "cf377b57f92e5a3aa13722055b515ff7c19024624c93b94e19784aca7ead03ba",
+    "magic": "NRO0",
+    "segment_bounds": "pass"
+  },
+  "elf": {
+    "architecture": "AArch64",
+    "text_relocations": false,
+    "external_shared_dependencies": false
+  },
+  "host_tests": {
+    "sha1_known_vectors": "pass",
+    "elf_bounds_and_truncation": "pass",
+    "pvrtc_white_fixture": "pass",
+    "bad_archive_and_donor_rejection": "pass",
+    "address_sanitizer": "pass",
+    "undefined_behavior_sanitizer": "pass",
+    "leak_sanitizer": "not run; container proc access unavailable"
+  },
+  "switch_runtime": {
+    "gpu": "not tested",
+    "gles1": "not tested",
+    "audio": "not tested",
+    "input": "not tested",
+    "game_execution_backend": "not implemented"
+  },
+  "donor_verification_scope": "Host SHA1/ELF/assets/import/dry-run relocation only; not gameplay"
+}
