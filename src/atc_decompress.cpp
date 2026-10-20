@@ -146,4 +146,29 @@ bool decode_rgba_explicit(const void *data, std::size_t image_size,
                         });
 }
 
+bool decode_rgba_interpolated(const void *data, std::size_t image_size,
+                              int width, int height, std::uint8_t *rgba)
+{
+    return decode_image(data, image_size, width, height, rgba, 16,
+                        [](const std::uint8_t *src, std::uint8_t *block) {
+                            decode_color_block(src + 8, block);
+                            std::uint8_t alpha[8] = {src[0], src[1], 0, 0, 0, 0, 0, 0};
+                            if (alpha[0] > alpha[1]) {
+                                for (unsigned i = 1; i <= 6; ++i)
+                                    alpha[i + 1] = ((7 - i) * alpha[0] + i * alpha[1]) / 7;
+                            } else {
+                                for (unsigned i = 1; i <= 4; ++i)
+                                    alpha[i + 1] = ((5 - i) * alpha[0] + i * alpha[1]) / 5;
+                                alpha[7] = 255;
+                            }
+                            std::uint64_t selectors = 0;
+                            for (unsigned i = 0; i < 6; ++i)
+                                selectors |= std::uint64_t(src[i + 2]) << (8 * i);
+                            for (unsigned i = 0; i < 16; ++i) {
+                                block[i * 4 + 3] = alpha[selectors & 7];
+                                selectors >>= 3;
+                            }
+                        });
+}
+
 } // namespace atc

@@ -1,0 +1,6015 @@
+{
+  "format": 1,
+  "source": "DeadSpaceReanimated-1.3.apk",
+  "apk_sha256": "dbd94ee54fc3fefdddb101fac4eba1e2058a5db7cfcf30ac41ad96e88b285a3a",
+  "runtime_integrated": false,
+  "switch_hardware_tested": false,
+  "files": [
+    {
+      "name": "011a5236e63cb4f0.ktx",
+      "bytes": 43804,
+      "sha256": "323d4d68c7540a93cbb6c6c05d77fa3c96a4b847b4a63c67867fdb89ba886ef3",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "01b7f36b60db1c8c.ktx",
+      "bytes": 349656,
+      "sha256": "04b97b0cae03524b03cf9460c0c5fd93eabf92898f8a83eccf86289592012de5",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "03cb153ca357438e.ktx",
+      "bytes": 11032,
+      "sha256": "4d8ef60ddb1f9c7836bdc6fb199f1277728bdebeb16a41749f705102e2e527f3",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "05b1aafdd066eb10.ktx",
+      "bytes": 1398236,
+      "sha256": "bc0341b5f5079b32f2764786be4dfde3fbb7f49fabb403fa8704eaa05fe5f3c6",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "070313df3d31cbfe.ktx",
+      "bytes": 87508,
+      "sha256": "297fa45b45949c801f0e5228999b5b975f17ee6fc171ed0d2a67e8a9fca5f496",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "074ef9f3b4e63e91.ktx",
+      "bytes": 5592544,
+      "sha256": "8df9874beb25b34d142cde2cf583cb44b051ac49d5f7ded969e9b4b451fadb73",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "084d580c5e9f6258.ktx",
+      "bytes": 174880,
+      "sha256": "e001cf87cc59f9985c8d4df7bc50391a38d5cfa6e437cb476f4518f99ce12d5d",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "0a4eae1cbc7671ea.ktx",
+      "bytes": 2796328,
+      "sha256": "925283b2dbaf664d0f3987d6d6cd5f13a6e096d3e2dff67a05b5d026297c6a9c",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "0b55a5972bc79958.ktx",
+      "bytes": 2796328,
+      "sha256": "3e2d78d3e291689a6ecfc090c683f7aad33570ddf577690b5a5daf700388df2b",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "0b9d91d8bccd868c.ktx",
+      "bytes": 5592544,
+      "sha256": "69d1aff4c7d9c17d19914ae3a64de311d5d85328e8ce6f6466733f4283ac3dde",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "0d24fd861f531f93.ktx",
+      "bytes": 174880,
+      "sha256": "661da753d328588f36d71e3493e682a20b21bac3164f51f82af4d90cfdc69b2e",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "0e4a1b0dc8442c6b.ktx",
+      "bytes": 699172,
+      "sha256": "6bd2c83c8683dd031266052ff2670e33716465e7e10c4816fe11821da6d36faf",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "0fcc5787a3f26dae.ktx",
+      "bytes": 1398236,
+      "sha256": "6f487c3b4f99c987f448e49662e9724c52a36cf96b3b81d8f88a4eac27d68870",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "100d9d606878630a.ktx",
+      "bytes": 2836,
+      "sha256": "e10287929329df12e330c5d8f00a049399ed1f543a572c746541636986df97da",
+      "width": 64,
+      "height": 64,
+      "mip_levels": 7,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "109cc006946d5bd3.ktx",
+      "bytes": 349656,
+      "sha256": "ce4bff4a4a16def0504c4df9a09bd055eb4aeacc0ef6e41bbeecda53f030361e",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "1107772b1227e2e4.ktx",
+      "bytes": 2796328,
+      "sha256": "5c9c2607815db1f2393cac39dfdc1dff930d11460a3bb65bd78ca1321ba7e47b",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "1280ea37a32dd212.ktx",
+      "bytes": 2796328,
+      "sha256": "5418dbaaf9492f1a05cba5a7a9d6233d766cd88e3efe10ad884a8e9fa6090e86",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "13a8d137a152fe34.ktx",
+      "bytes": 349656,
+      "sha256": "29b2e7a0d931f6209720f57f0e3cbd1dea30b846375a6de9a1873ed37d4b1482",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "13af87191a536990.ktx",
+      "bytes": 5592544,
+      "sha256": "226fba394f647fbf7ac53010f95f15ff89b582c64374f079b9c2b0fd6e40f606",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "142bbaf1af294cd5.ktx",
+      "bytes": 2796328,
+      "sha256": "cd1b8f6253f62cc95198006e2aa30785d584c7a3b32ded4bc08cdd6dc2da51d9",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "14613c6680b6d7d7.ktx",
+      "bytes": 2796328,
+      "sha256": "a0b0784f3b8381158e3474601dedce5db6091b6714c94bcc86a5fc216dff13ad",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "1581a6f44c53d866.ktx",
+      "bytes": 5592544,
+      "sha256": "a776333e84fbb7fee29116bb54086d72410615cbd6fd5a2fa06d971bd3a9d307",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "15dcbf287640cd15.ktx",
+      "bytes": 1398236,
+      "sha256": "96962ec5d3116d381faecbacf40400cde27012e506c910d8a5c7fe0b39cb1c30",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "161dc9bfbe7566c2.ktx",
+      "bytes": 1398236,
+      "sha256": "e72423e26b7e7ced3ee7b710c6c3d44c97c8992e43efca03e4b33b29ab718a81",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "167ebc8aa6c55e2b.ktx",
+      "bytes": 43804,
+      "sha256": "2835f0268149b4bf31a7af712b5ce9213145fcc675cab6d0358167638e8ef8d8",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "18b24978e4053a8a.ktx",
+      "bytes": 5592544,
+      "sha256": "efd5d28f894a16770c1eca2f9121f1c1e14924a3a73f7756f5c4768b16b9f7c3",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "1927ddb1dafe00ac.ktx",
+      "bytes": 21968,
+      "sha256": "a83471e254741170625e166cd06f32dc1a2742e1d75ac66509caffc521caabf0",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "19e52420a3ca7010.ktx",
+      "bytes": 1398236,
+      "sha256": "21e65aafc589fc11b11a9b9c8e5132b97841252663cd45643fc998fe420928e8",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "1a0686e8291b3641.ktx",
+      "bytes": 11032,
+      "sha256": "862a2a993f632b4b4614b3a8b99ab2724e486839b708267786428fbfea2c0366",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "1e2675e6b03f4bde.ktx",
+      "bytes": 11032,
+      "sha256": "ff8fdb41f66ff477c45cb9c1a02693c8cfccaccab2b31d5e11f634b48634d9da",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "1e7df1d04234be3d.ktx",
+      "bytes": 21968,
+      "sha256": "12a595de603cb14fd16f7f9b44beb2d7c33a80c1600428ebdcbac7302019a78e",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "21f0061da6c89e21.ktx",
+      "bytes": 174880,
+      "sha256": "6b1bd8435bc81c53b4d67658066cb34d746216f63be8babdd2c81cafe36b14b5",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "22ead286177424d1.ktx",
+      "bytes": 87508,
+      "sha256": "8e9dc4ab704b82c287ca80a3eef8126bf6cb0bfb69ea78837af2aa8db3d2e6bc",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "23793092fc620111.ktx",
+      "bytes": 1398236,
+      "sha256": "db1a4d242c538f0a25a23071701bdcf13ac28f6e4bf53f9ad4d682cdc5ee9359",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "28219b36cb5598e1.ktx",
+      "bytes": 349656,
+      "sha256": "7057131f61b84f28ba5e7b287c0839803b4645c5c27cf1fa78ae29db89570469",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "28d9300f1f52efdb.ktx",
+      "bytes": 87508,
+      "sha256": "54d2ee79643903a4fcd032ac74d871bcfba8faf87bea454b9449a8a02b402d96",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "29e19aa9c3c3f469.ktx",
+      "bytes": 87508,
+      "sha256": "f934e8b734f915d836c6ff75a2bd8e36c9423c04828f37419fa0dafddc756c7e",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "2a30a8a22b65fa23.ktx",
+      "bytes": 349692,
+      "sha256": "462febe5b5db368dd9eccb909645137939007edfced6bd790f2c9b74776606ea",
+      "width": 1024,
+      "height": 256,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "2a9a7205935d70b9.ktx",
+      "bytes": 349656,
+      "sha256": "4e3e2b3c2d4493702dd3b7e371354c1a6bbbe862221638e2b31c7ae83293c212",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "2bbe60a933474a8a.ktx",
+      "bytes": 5592580,
+      "sha256": "fdab57d7a893e58f859cbecbca2a55c5202451df736ff70edd938f5b63458289",
+      "width": 4096,
+      "height": 1024,
+      "mip_levels": 13,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "2d55b69d324f0318.ktx",
+      "bytes": 699172,
+      "sha256": "5dfa80fac10fef0a45e7b3334d30aa9fc7fdf8893bde14a388a6f9106d365b4f",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "2d847876e94163b4.ktx",
+      "bytes": 1398236,
+      "sha256": "138675790fc65b93560d8b3edb19d8f1fd181f0db6c5aa2fb4df553d6f7e92c4",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "30139d129e8f0c5c.ktx",
+      "bytes": 174880,
+      "sha256": "2608159df3ce6706f32a59c8421e262d35d57548982b3058c3f55f5f0d830799",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "302275db81d1ed94.ktx",
+      "bytes": 1398272,
+      "sha256": "58d9fb5ea883aaa7bf03de8d8a7e8e07b94405400f6a0fd3648816cbeb8d98a7",
+      "width": 2048,
+      "height": 512,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "3342b03ffd78f218.ktx",
+      "bytes": 2796328,
+      "sha256": "cc04a4817bce0b2de6239ddeaf19a348186776ccd9be26b7408501ccc28236da",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "35531b717f920001.ktx",
+      "bytes": 1398236,
+      "sha256": "1bf51461ee71e79cea085fd28b175e7fef716750c2a754483a6b538d281dc9e2",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "35ac99836800828e.ktx",
+      "bytes": 43804,
+      "sha256": "1207519610c4c487baa2be53db9ab7eb25a48e67a1d14e076504d7553b28a2fd",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "36cecadf06a53109.ktx",
+      "bytes": 2796328,
+      "sha256": "7588b0b80e7875552fd8f572778b1d2417ae4142e08c3b6b27aa0a076204fb4d",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "3848cddda6dfc675.ktx",
+      "bytes": 349656,
+      "sha256": "a535442809b0e37e3dcfab5d1d7f5f30ef1b83143977f1f60b22d500d73d0b08",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "3892133c32e0a6f4.ktx",
+      "bytes": 87508,
+      "sha256": "eafe4954ad282e8fd9937fd1b80585d0ebc638ad6e6ab46461a42b2b67740f61",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "38f103e4d4c2b32b.ktx",
+      "bytes": 2796328,
+      "sha256": "44afd9658ccc7572cd308cd1b4fad92e54dfc51fe0244920afbc49b036bf1c75",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "39432af15a65f425.ktx",
+      "bytes": 174880,
+      "sha256": "aa32e32f4fdd5bdc5ef2db0731dc022e04c87a3477861359cc55b2edb85a76b7",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "39fcd27732e48ad5.ktx",
+      "bytes": 1398236,
+      "sha256": "bfdd1a7fa4875e537578847df5b62090d9410d9ac6df9b227878826db608a38d",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "3dd95bb59382b14b.ktx",
+      "bytes": 2796328,
+      "sha256": "f09d9e876740b02ff5c624c2a45d18c3187ba8f476060d80e16cdd4560d8a8a4",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "3e6072f1c2456cdd.ktx",
+      "bytes": 11032,
+      "sha256": "3dc23405f9529c981d917c16d830ca002ccb4e43b234c603759f9443be5a4d51",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "3e7beea21c32314b.ktx",
+      "bytes": 2796328,
+      "sha256": "b58391effdc8f61e0eb8c6660be050a188d909757a336c9fa268ae24ef5cc5cc",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "40e8306cf2ed61b2.ktx",
+      "bytes": 43804,
+      "sha256": "153e867335dc84e9939700730c83508b058efa54242594d49f4ab4d2ed097017",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "4231c2e8d3a73246.ktx",
+      "bytes": 5592544,
+      "sha256": "e6a732ebd6799d564cc34c91b52d60771d52b328d6197691423fdfd8b24772d6",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "435a51631ce054aa.ktx",
+      "bytes": 699172,
+      "sha256": "444fa6a5180ba37145456a1cf5cfc927c5d1a91b8026ac399049c819623086e8",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "45771e790f6cc6f1.ktx",
+      "bytes": 11032,
+      "sha256": "03df70e1a7dd50222657f95df8b6c720b476770b7e33b4d2e5cad57000b4a2e8",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "4591ae8fe0c29a64.ktx",
+      "bytes": 699172,
+      "sha256": "cf59eb26a7c6bbf9680f96670a1fe68d687dbf8150ae2e7f95f92cc8996696f1",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "459f1c2425f71616.ktx",
+      "bytes": 1398236,
+      "sha256": "35721417fe7abbc5ee0e1cddd53f06ecc06f2bab8585d21374e4351004ae8212",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "47e669d719262b12.ktx",
+      "bytes": 43804,
+      "sha256": "8a070dd6f0707608a4a6eb6ebbc566c9d8e56888e77205e149e16e90b5de488b",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "4839e6e96b4080e6.ktx",
+      "bytes": 21968,
+      "sha256": "2ec1fefb8eb92df9ced2b6f99d9dab6fb3225be368346e5f1325ad6f9eaa6a70",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "4df7773d0e3c630a.ktx",
+      "bytes": 5592544,
+      "sha256": "ba7a33dbe4933ef9c67bbdf67f3b2a8dbee3e394d594dc4090d272e3a7fdcf98",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "4e581f4700efeaab.ktx",
+      "bytes": 2796328,
+      "sha256": "fa657bc87ee729dc86aeab700718b23caf6862a9fbbf2f66b47114b12a91fd63",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "4e67a185c0b8b1d8.ktx",
+      "bytes": 43804,
+      "sha256": "3d4d12a0ed278b523519e1c8631d40a70062e18d57747bd98c2df3de48fc572b",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "51564dd36a679d13.ktx",
+      "bytes": 349656,
+      "sha256": "60f1c77aa949bd05e8100b2ef33accf8539d28ebc6121265e9d94978569ef227",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "52b4b1884cc0a899.ktx",
+      "bytes": 699172,
+      "sha256": "598fb85dc1f7617f8f8c91a77a39dd344eb099996c0f41976321264125ec7d27",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "532396a82fab633e.ktx",
+      "bytes": 11032,
+      "sha256": "02ca6baf4e99608db4c94561bc77b7326c0c6085973e4cf94df1bb3f1584dd36",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "54042fa501ec0091.ktx",
+      "bytes": 349656,
+      "sha256": "e3cc5f55e949ba2760cf5c7daa3e7b73791c0f0810e083eff6ee5504c08cc6f8",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "54257c7e58a7851f.ktx",
+      "bytes": 174880,
+      "sha256": "0e74342c5be66aa0051622c0b1a03f8811dc50cf6760a453053afde393592a9e",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "543ca73ab635ca5a.ktx",
+      "bytes": 11032,
+      "sha256": "236d749d684cc6b24e2dd4ad119836e37ef52773f405052748e5197d8978de59",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "560db5019eecceec.ktx",
+      "bytes": 174880,
+      "sha256": "ed74ef0a4b1f494811ced366033c59a0863dac8472720c00d3f2c9858ee01e67",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "5a5614baf6cb857c.ktx",
+      "bytes": 2796328,
+      "sha256": "7c6754824bf3a58f27dc3c4d0e8bd8b1cdec87497cf4c994a5e4655cb07a34cc",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "5aa1cdded7631928.ktx",
+      "bytes": 1398236,
+      "sha256": "801dcf54a057039947ec12958fb662f809b753cace1fbabb6118dd260b810e70",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "5cd8684884409250.ktx",
+      "bytes": 2796328,
+      "sha256": "6306e15ad2ddb4b3388318abded4348d59fe7747f76995a04d783c9f8d714d87",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "5cf7d8705368220c.ktx",
+      "bytes": 349656,
+      "sha256": "d10bae5d4dbc098ac223988297b0d6b0efc6d53f63c07860419961c3f7ed1de0",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "612b0d0db94d1c93.ktx",
+      "bytes": 87508,
+      "sha256": "1334f7ad6dd1f72d31074df383239704760e1a62b8e0a01d4fe38436cae8a647",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "632720c3a5d4fced.ktx",
+      "bytes": 5592544,
+      "sha256": "d2cb0a1e2fe25a798667780a1f8ca1ac3506b4781eb3c9021ad70ab64b32971c",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "637afd6d901e7a28.ktx",
+      "bytes": 5592544,
+      "sha256": "1d32f741f6b074345558fe8ece2fa87224e86e83543696b1f520cb014e02c540",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "63cf227af145f97d.ktx",
+      "bytes": 87504,
+      "sha256": "ab5ae3f5cc86008f45fea23707acc38fa8de36e2bfd74bd53422518404bb2152",
+      "width": 512,
+      "height": 256,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "6437e7a1d7224635.ktx",
+      "bytes": 174880,
+      "sha256": "8e47e2d638ab708dfca50212fa319b50d4d24454585561391ba6fd70e7bf2771",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "654a8b6061b899f2.ktx",
+      "bytes": 1398236,
+      "sha256": "1b1f89b9d015baa9ead65a1d4b6114e9f9270636c220faf0b39e58b65985007c",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "65f5c2309258abb2.ktx",
+      "bytes": 699172,
+      "sha256": "22f14ff4047ede52f5ec5f19bca2ab5ec825ca188634c855ab2208a495591d9f",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "65fb5363a446baa4.ktx",
+      "bytes": 174880,
+      "sha256": "d6ed708515ae1416f0ad0dcef3324f8d170971f3302eb23109ba775fe2f0cff0",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "66200bc404bc639a.ktx",
+      "bytes": 2796328,
+      "sha256": "2fca4a29b54b25abb87873a0cd12387632d120b6b315ec1f98b78ff8eaf43ef4",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "66837ba37b8c73fe.ktx",
+      "bytes": 11032,
+      "sha256": "e4c8355461cba9436748fb6e3e962eccb4bf5b2098c86b632ec787955c8b4dc5",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "668628ce818f1c22.ktx",
+      "bytes": 11032,
+      "sha256": "5a44ce3b1d3742ff3191818f9e71ecb8e818d125018085f8f9b4344e2199283f",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "6826dd98752f4ea5.ktx",
+      "bytes": 87508,
+      "sha256": "396fa36d27fa2ae212d789fe2b55dcb9cfa9959bb07674019ab20ad49cde3911",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "6886b3db8ca9cf47.ktx",
+      "bytes": 699172,
+      "sha256": "f3300c2c146fa66b67ec6cb7727f3e696d981774d5ff058641ea5d97e44c6202",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "695decf10b4083dc.ktx",
+      "bytes": 11056,
+      "sha256": "c746373c14423138c63c9a0bff25065280491d38eacab123193a0e7267dd7f01",
+      "width": 64,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "69fac8f847641e69.ktx",
+      "bytes": 699196,
+      "sha256": "ede7cea6f77d5439189ddb8ccdc631c856b408105137da2c3696eba5e0d6fe15",
+      "width": 1024,
+      "height": 512,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "6cb6799c29ca1d73.ktx",
+      "bytes": 22369764,
+      "sha256": "2e839196daf0237e92f166619ab7bd36c2f5d0c9bc54aa9264122f7b51604db5",
+      "width": 4096,
+      "height": 4096,
+      "mip_levels": 13,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "6e119284c0ba2731.ktx",
+      "bytes": 699172,
+      "sha256": "15011c42796ee4f6218154fafe2c251b5eab79bf35d0a11afd8b99f26561ae1f",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "6f2f7744f880cdec.ktx",
+      "bytes": 2796328,
+      "sha256": "5f33d6381ce8783982d4c20c0fe3932f3980316ed80d2406e33b0eedd3104951",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "71c1a45cdeb15819.ktx",
+      "bytes": 2796328,
+      "sha256": "4dd0c8eec6b5ab5211be161fc8fe2a3644bcbbd53834f546788f2f16c3af5dd3",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "73b60b387b4133ee.ktx",
+      "bytes": 5592544,
+      "sha256": "018332b3454f2e20322146178f27621b3e897123d7cab45438772eceb52de781",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "760dc84e1c265bd9.ktx",
+      "bytes": 2796328,
+      "sha256": "e47a5cdc5becaf2117e2670bf499f1ad0e9762f23a5b775195efeac326df7e06",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "787cb90ec5621b00.ktx",
+      "bytes": 1398236,
+      "sha256": "f153f309c2f045a7fea96473f5915ec4b9a63a844d8c925d38c5e1532ebbe630",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "7bd975da9b9e2b17.ktx",
+      "bytes": 87508,
+      "sha256": "1c60e482b6c7b34be8a21faf6e35bbbf0b65928336090919a387ec6f16623ed8",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "7cb8e06b01534603.ktx",
+      "bytes": 5592544,
+      "sha256": "21386b7f97ca514c69a1a30b5f9c07fd03e70cd4de9a57d9952dc254a20824e1",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "7d90bf938bc0f030.ktx",
+      "bytes": 349656,
+      "sha256": "0a849317c1256a80a8a27b26075d91e299c0cbcc2645cf6242f7b701dcdc5ca4",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "801da591efff9d12.ktx",
+      "bytes": 5592544,
+      "sha256": "43e36b00c96114da2348dfa24cfd164c4c520f41b77921864b916f652a317ca4",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "80d53f249c255b77.ktx",
+      "bytes": 349656,
+      "sha256": "cbc64463f087598ca69848d21f9ebc6f0161bd2abb8716a87a0ba01b2885dd8c",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "82897c4304e31f7e.ktx",
+      "bytes": 43828,
+      "sha256": "b065dc40d034b40ee847943d687cbfdf27dc99a3e4ec673f4a456d031a4f7892",
+      "width": 256,
+      "height": 128,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "85c39fd35d661411.ktx",
+      "bytes": 174880,
+      "sha256": "aef425395655e933bee11bf744fed5fa0ef6d2134e7df4ebc2c596b20f3958d6",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "8639ee31adcd49f4.ktx",
+      "bytes": 699172,
+      "sha256": "9b7f566fea1aad53ed993356ab0d697cca11821faae78c8583b60076a4ba47df",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "869e72048c202c84.ktx",
+      "bytes": 1398236,
+      "sha256": "c0d5b44f37bd712b305462df7bc54c466da19fec64593613e2bef017dffda7ac",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "8727b0191e17c497.ktx",
+      "bytes": 5592544,
+      "sha256": "de46d615ea3f8c58bd99611b010b2726b8f6691ee3a42aec620f42499713ca61",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "88ac44db50214885.ktx",
+      "bytes": 21964,
+      "sha256": "6a27b34e03a1fe889db0cf8ea592787f7eacd69c08f18baed72f6826ad444689",
+      "width": 256,
+      "height": 128,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "8bf31b10c242d00e.ktx",
+      "bytes": 1398236,
+      "sha256": "9f8735033310f2d9e788666a1b22d148ad24146330b80a983fe5eb5496217c64",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "8c8348f77786738a.ktx",
+      "bytes": 11056,
+      "sha256": "b75cee41ca04af866ba3787986d598d35c3754ba7433f7c8e7c41e1cbb71e305",
+      "width": 64,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "8cd4ad6255713931.ktx",
+      "bytes": 2796328,
+      "sha256": "997fd43e442d295c0ad4e95f70b78f7a3560c94d386378de6b1b1188ec4c2cd8",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "8dc928f237211c4d.ktx",
+      "bytes": 174880,
+      "sha256": "d06ee3e69e96f42d9ea5823bd3e47359abe85d3a3659e9739dac65e1e545de1e",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "8ec898430b284deb.ktx",
+      "bytes": 1398236,
+      "sha256": "67d2e195bff335a0258e575402237702b8f9c0f55d726df7833c71a73768bdec",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "90120befc8cc0c60.ktx",
+      "bytes": 2796328,
+      "sha256": "101e6bb827b84c7b376285e387e9c0ba8985ef1b347b66bb279c8a0033d5c3d4",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "912594e38bb15992.ktx",
+      "bytes": 699172,
+      "sha256": "0a5e679598d3f5cebd3358f4d896846983fce3bddf37cbdc294ff4615e71e6c6",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "91497b3f64121630.ktx",
+      "bytes": 2796328,
+      "sha256": "08e2c7e3c2d90683f74fc32cc64c0174e1bdc0f877bc891d3eef59b873bf2e3a",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "91fa30a7c80d5552.ktx",
+      "bytes": 1398236,
+      "sha256": "7021b593f9ca7f2a5aaae5fbe024166a0a4551d4cc838044af60d29fe2b509f9",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "92267f661a97e70d.ktx",
+      "bytes": 349656,
+      "sha256": "2b68c274ad8c4eee6156c328faea1a2790bdaefd0cc3f2c477f4325a22bcc40d",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "93a73609291de81a.ktx",
+      "bytes": 1398236,
+      "sha256": "3f454856bc08f4519acd6405c9ec64bc3cf30ff93f6d6470e367ec634ae014ad",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "954f97ea0cc2e313.ktx",
+      "bytes": 699172,
+      "sha256": "ab5dfae44201e847e3f965737eecee4db7f8634b69350d192491a027f7e44271",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "958b89ad4a7dc0f3.ktx",
+      "bytes": 1398236,
+      "sha256": "b7b7d50a3675e548a8ab42d104b40d74d65311104c6e974c27b25a7b2e5e212d",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "967075eed12d6f21.ktx",
+      "bytes": 1398236,
+      "sha256": "a9e5553276c6fe83195e8d9e4ff2add1ab52ae414d6c1707fda8c80f348de182",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "97566c48ac72cbce.ktx",
+      "bytes": 5592544,
+      "sha256": "6f1e5903a312a55fa556cf86c9d39297115bd5de222d031ea7d2807ae561b38d",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "992e224a8e956b48.ktx",
+      "bytes": 2796328,
+      "sha256": "675347ca6a0fa929e516229d7c545736ae784651927fc14ed3ad152e8742b7bf",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "9b2528b6cfc8670e.ktx",
+      "bytes": 1398236,
+      "sha256": "a99a49a7ccac085898e361152124b38c71a8c34c74bff6cf104f15aaf47eae74",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "9caf5a5c018e1f05.ktx",
+      "bytes": 174880,
+      "sha256": "9f3fa27134a9537d10f6c3e14f2686ef9d6715f1275c934e0df855cb16672fab",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "9cfb9aa38ef3af9f.ktx",
+      "bytes": 1398236,
+      "sha256": "ec35b507029f619fe749b8d4663f2bf26ab3922ac562f599db1d7b4f33d53b68",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "9fe8b67d17c35abb.ktx",
+      "bytes": 87508,
+      "sha256": "4040296e08f90c24f66c1c2186af4c0d68454edfc8dc238606aa25ea2fd26baa",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "a06eb8088a831e4c.ktx",
+      "bytes": 43804,
+      "sha256": "4de19200278223fceed3cbe1442a1b94247f2c254665cad40efc45e2a50b152a",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "a090eb37d44a9e2b.ktx",
+      "bytes": 699172,
+      "sha256": "b605b8cdf25e84d9a1c489165d8515c72ad3989fb3b0a3d21616cf655e209e6a",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "a0f0ec7d86432322.ktx",
+      "bytes": 21968,
+      "sha256": "9510e64d17c4a738a2685f58a4850d7ca8cdb5244d098bdfb8962a95e38aed0e",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "a1153a8f548c7dcb.ktx",
+      "bytes": 11032,
+      "sha256": "04602f55b865b156684cd956b73c942d7cfeb25ce0b41798e87a48f0cb182517",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "a1f790258b44496d.ktx",
+      "bytes": 11032,
+      "sha256": "2ba70c0e73f735eda4945c48182db22e70f583ae270bf0989ab2f02a1a789c0a",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "a3210bd7f8160164.ktx",
+      "bytes": 2796328,
+      "sha256": "8750218405c7bd072f90d1e9bb30b60c5c76282524de5bcc92f5e3c7fac22046",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "a7f160bfc685da5a.ktx",
+      "bytes": 174880,
+      "sha256": "bc08baf78040e5e082217cb80eb543727063ddb69b9ae31c9c1bdfceadc64f7c",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "a903dec698e148b6.ktx",
+      "bytes": 21968,
+      "sha256": "301d2629f064b74bc50a6336b77bf4f5c1900ab138804c9c7b8c29eb01968d13",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "aa1435f33c119019.ktx",
+      "bytes": 349652,
+      "sha256": "16de3fc13ec1afb9426061f7f6f0f793d1b57f019cda641e1a82740678bc11c1",
+      "width": 1024,
+      "height": 512,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "aa3c4351debf8c5d.ktx",
+      "bytes": 87508,
+      "sha256": "c2769b2ab7ad3b1e0f71e02a530388df9c7d2ca987dd1e8459c0baf303e412ca",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ab26ca285cb123d5.ktx",
+      "bytes": 11032,
+      "sha256": "a90f9b82a4663770d772776881199dde7bff8d23c3017cd25a638eceaec256f5",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ab8aba48e17442d4.ktx",
+      "bytes": 5592544,
+      "sha256": "0bd405237177e34895535b8f07535e84f453c8fbf0304c33c8cf5daf49729628",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ad4a4a07c7e4d099.ktx",
+      "bytes": 699172,
+      "sha256": "d437ea5115d0bd4d96937bfb8f1556cfbb79f73114c0443a3f655c69dc584e48",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "aec165eee3f43ffa.ktx",
+      "bytes": 349656,
+      "sha256": "82a8f982a65ddce9c72357b6e9aa57d388c4a6f9e6f9a79ac3b6ec1beb564376",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "b0b306d8bce6e600.ktx",
+      "bytes": 43804,
+      "sha256": "91c9763980b9c583a49dbb14e5918d425894e09f0db8f8f859d2b9e2de9d5794",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "b5bc7f55cbc976aa.ktx",
+      "bytes": 1398236,
+      "sha256": "864cfa8b9b52d547dc44a7537de9d1714557d481f0c16790510d628fe0c2a7c9",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "b83f9b17fb0e23e9.ktx",
+      "bytes": 2796328,
+      "sha256": "1828938354b08f8203c11a7cbefa2b5fac08d7367779b3398ee2f99a11f2b82a",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "b9303636c78b25a5.ktx",
+      "bytes": 5592544,
+      "sha256": "bf47ad671bea7fb4222053d7809ebb3fcb09dff9800982c66a6f0ffc756bbfb4",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "b950aa57617f6de9.ktx",
+      "bytes": 174880,
+      "sha256": "b966ecc18324bb90d6cf81c6ee6f67a7ca35bcb2701b9afc1feca9558392c2bf",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "bb47f5ae4bf96594.ktx",
+      "bytes": 2796328,
+      "sha256": "205be2de9f5ed13f0c638588557e0892cc6d7e09fab288e93324813b25140bf5",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "bb752a36c5343335.ktx",
+      "bytes": 43804,
+      "sha256": "e57ab4d029209b81fbdcce23039a8300fc95d2659073ced7d50d72262daca763",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "bc28120a91d76786.ktx",
+      "bytes": 349692,
+      "sha256": "f6f066e0c100b52dbd11f35d7d5df42a0b82e87d07a4aa4d6e3a9ccbc944eb5a",
+      "width": 1024,
+      "height": 256,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "bcb9579848989b74.ktx",
+      "bytes": 43828,
+      "sha256": "897744ca57c4aac0e695e70962774c27446d323e3657371379a265b542b1d550",
+      "width": 256,
+      "height": 128,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "bfe2457466d87049.ktx",
+      "bytes": 43804,
+      "sha256": "734dced47eaa17f5bcd6f9fd49034178c9b827c5e57c582a02ea33b8be4d524a",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c155c0542eb04560.ktx",
+      "bytes": 2796328,
+      "sha256": "1b98de8cd49767f1726a0e3e190904861f0637eac972a96952890cf372a844b8",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c30508766f681c61.ktx",
+      "bytes": 87508,
+      "sha256": "1e24081786de64f7ccf881711bbfe7074454f6b2c085a1368915e681537f5aff",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c46b5ef3c7d41782.ktx",
+      "bytes": 1398236,
+      "sha256": "760e973775f921f7111c2f6493deacb9dff8adc53a1e1afa74698d97fa435130",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c50fec9eab2d292d.ktx",
+      "bytes": 11032,
+      "sha256": "39237f1afdd5fa3dd2f9e7e42db0b489fe7ff0bdce1a9ee911806c11ec6a07ba",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c5e054a12ba91990.ktx",
+      "bytes": 1398236,
+      "sha256": "a1561ad02ada234bb02a9e0edb2fe7afd4a61fa193cb684f34ca59f76cf955ca",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c6c25c9d4fb4bc0b.ktx",
+      "bytes": 2796328,
+      "sha256": "df4ea568878f2cdc650fc528efd07024a8faa2a45032e7c197d7a85b25b9ab85",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c6dd53be315f7aab.ktx",
+      "bytes": 11056,
+      "sha256": "33eaee92809439e55543865c878c104f654694c867c2a4d34eab29b3b396966d",
+      "width": 64,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c72bc990d29ebcfe.ktx",
+      "bytes": 174880,
+      "sha256": "b24cc592ebf237a8537fb2c38132e7ba643ecde4337c4ede281295f06bc31347",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c907825b8f711e5e.ktx",
+      "bytes": 2796328,
+      "sha256": "66bebffbf5f74e98b094dc0da5f3bf9d13b82376c88c2713850266d5297ae1a6",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "c93db1f937663064.ktx",
+      "bytes": 349656,
+      "sha256": "480ba612d32be5b98918d7a8c1fc25c87c1a281bcaaf8391bc9f7a12725b5d1d",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ca84c8965243491e.ktx",
+      "bytes": 21964,
+      "sha256": "60a001718f75b5bae0c20d71fac158dff21da3008ae90ae0a132e7c11e299daa",
+      "width": 256,
+      "height": 128,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "cb7e583256f8fffc.ktx",
+      "bytes": 11032,
+      "sha256": "1d870057b6bb1b4748748283ed6b7635961a0f36a926255ef1a3639a61211b8a",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ccbdf541a5b823aa.ktx",
+      "bytes": 174880,
+      "sha256": "3c1a637c4ea47d1595416900424739bf459bc5947701e471c444ee0680c2b81b",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "cddb92e631c5ad8a.ktx",
+      "bytes": 11184940,
+      "sha256": "b0f1479a33b09a2a906d3aebb85192abb1fa6f9c27a77c5dd1374b8ac1104fc0",
+      "width": 4096,
+      "height": 4096,
+      "mip_levels": 13,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "cf8ba0e1774c2d4a.ktx",
+      "bytes": 87508,
+      "sha256": "40e34d524e5923f095e1c74dd6a00e1247126c598252dde16bc6bef518d6b683",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "cf9f8afd872206c9.ktx",
+      "bytes": 699196,
+      "sha256": "97a2c5934c61703bc0fdd362d0b6d9750c2f6f3604a1ad51f6daace3f8979335",
+      "width": 1024,
+      "height": 512,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "cfb659e746329292.ktx",
+      "bytes": 1398236,
+      "sha256": "ef6983664fad73e46ea91ce5bdf90ef5d68678cec5b419e7d6271055a1671772",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d2b9f2f2c072ae72.ktx",
+      "bytes": 5592544,
+      "sha256": "2e9a41b369d78acec73c70b1428496f547eebee89061baf6d1d2d9f79c1e03ad",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d3f4b929c559757c.ktx",
+      "bytes": 174880,
+      "sha256": "0f27330e8753b632cf92f6df10086c6bb8d612bd4bb43d522ed7c255bf17872e",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d4517d529ade0ac4.ktx",
+      "bytes": 11032,
+      "sha256": "a1ecb0e76d4d250351206032cd2466188b97a8d4788f108450314eb6b2dd6d2e",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d5a035ab2b244e8c.ktx",
+      "bytes": 1398272,
+      "sha256": "ef6470656dc73f9e138d9b08764478863b10ea9e9dffa8365954625b01fa4c87",
+      "width": 2048,
+      "height": 512,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d61e8aba9757400c.ktx",
+      "bytes": 5592544,
+      "sha256": "975c9b256a2e292e431f7a15c9d22506394d6e98f1d67b86a735103103663452",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d69943e4295389f1.ktx",
+      "bytes": 174880,
+      "sha256": "1082ea0a084740ae3030eaa7317e8cfc03110104a9880bf77bae6ecc6f06f2c0",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d699cc3007795377.ktx",
+      "bytes": 5592544,
+      "sha256": "9132e674c15b2aa6dcab65ec0a1fa9e4da42233df4fa2221153e97ea11e8adb3",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d77ae6c1a9508cf3.ktx",
+      "bytes": 5592544,
+      "sha256": "ca96539773c9b5766f983ad5390f5bf685094737ef9902d60de63271bffd490c",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "d8814d1098f0f7ee.ktx",
+      "bytes": 174880,
+      "sha256": "b2becdf45da1860e86d3a1a6861d5c43b38d05dcf82bbd249f9fa4a4141c97dc",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "dbaa13cca494fd6a.ktx",
+      "bytes": 43804,
+      "sha256": "0e0cb43fee77793834dbe29535f9de5c36f8775b6b69c67be1e019c133da8404",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "dc2e75b92d892246.ktx",
+      "bytes": 5580,
+      "sha256": "2d57d4e56a999c7b8cd2f52782fa3747a8a7fa2921353166890d61fe2c364ad5",
+      "width": 64,
+      "height": 64,
+      "mip_levels": 7,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "dd353268bc49dc9b.ktx",
+      "bytes": 1398236,
+      "sha256": "199caa223b36f7fccb7c57747249d52790f5906a348d5a27fe73bd68b4734314",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ddded9b4d0e2bfed.ktx",
+      "bytes": 174880,
+      "sha256": "f83d55cfedb64e9ffd16dfa501b02541c4029d708a0347bca5d5314854420a25",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "dfedf6c5b4eeee4b.ktx",
+      "bytes": 349656,
+      "sha256": "f9cdae92cb33389ab01c0bfeb0598b386eb0e2c2c5a2bb48fbde5fd1720a695d",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "e05a96697de37e12.ktx",
+      "bytes": 349656,
+      "sha256": "25917e1cd47c6e015ce0ea2d6d43760806fcc83fa96dfaa87499740636318bbc",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "e0bf70e4618c5d93.ktx",
+      "bytes": 2796328,
+      "sha256": "db4bdba2b0d74f174d9cf7d4322f2739e7f6db83ed7413cdfde53a9f3d3f71fe",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "e0dc65ce3ed55e58.ktx",
+      "bytes": 11032,
+      "sha256": "89d3cdfe2f67fd641702d9b3447cf8d211e2c547846b214a4641844ae6a2c7c9",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "e22dd5d199298a29.ktx",
+      "bytes": 174880,
+      "sha256": "a5a00af808f06e21c8825c37be9059600db6ee60d78a9e2c86f52241660c55f3",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "e28b2458c61103d5.ktx",
+      "bytes": 87508,
+      "sha256": "42b686a750d71c1a8ab340af2703689fecc69233bf1294b52d58eabfe5f93452",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "e338ee0c3092075c.ktx",
+      "bytes": 174880,
+      "sha256": "22962906a2ffbb6d38f6c16579b386183c7b17b8bf5685729eda1da9bbcee0a1",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "e461f3c0e60d583b.ktx",
+      "bytes": 87508,
+      "sha256": "d0de0b71a11251303be72adf774db6fcd96bb59862f535fbb78fdbb76bec75d6",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ea3542681a84bec7.ktx",
+      "bytes": 2796328,
+      "sha256": "99cc25bc1fc4fdb132e235286b395cb17af9e09e973b8a7169bf38b09035c6e6",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ea37123f43407214.ktx",
+      "bytes": 5592580,
+      "sha256": "8c6f4c337cf42d33b8c00cdcc36e7500ba3b2ecc4b324f5c91b1f03d4f3ef80b",
+      "width": 1024,
+      "height": 4096,
+      "mip_levels": 13,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ea636132a2bd8adb.ktx",
+      "bytes": 699172,
+      "sha256": "3116568610592d25d6426f7c8f4df8da228d9111619debbeae0d93be165b8995",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ea8a1e13130d4f41.ktx",
+      "bytes": 699172,
+      "sha256": "b2e6dc398a42def16292fe40df3b4f577b413235bf9bb2cf108f0884a5e675f6",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ea9bf7c78521f41a.ktx",
+      "bytes": 5592544,
+      "sha256": "83036fe9b9f6cc90b2801e947e16f2e3510315d9c3e86c4c857f7837eac0a095",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "eacc0468fc9fffc0.ktx",
+      "bytes": 2796328,
+      "sha256": "9261db7a630a37fcc5361d1963b42cc396df6a152e851a89756c157b85457ccc",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "eaf4ef410dbfe5ab.ktx",
+      "bytes": 11032,
+      "sha256": "82506e791aa66734e3c1918ca9f29202d8825f1fa2a6566bff9f06a4848d2a37",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ed33078152e45a64.ktx",
+      "bytes": 43804,
+      "sha256": "14130c08b5233da34db2c37d1f6ca34dfaa2a5e5b3f9cc41bae3f8518d95b3a4",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ed95df50006ce4c8.ktx",
+      "bytes": 2796328,
+      "sha256": "c1ca88d5a0fd019fb926f639e1b54043c9c6451e5f99b0161d30f0df7d97e235",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "eeaa2586d8f9272b.ktx",
+      "bytes": 43804,
+      "sha256": "515995c5ae1d24a6d5395fa67f2830d2a981bdcf076920bd235916ed7079009f",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "eec0aac3c01d21fd.ktx",
+      "bytes": 2796328,
+      "sha256": "31f83ffdcc6554a681c96ef9c698ed22d22917ee5931c509d97451d7f86596f7",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "ef986670aaaf253b.ktx",
+      "bytes": 87508,
+      "sha256": "85fd66406b24e5306219b4d2e303deb2cb3d0e72cc5642a1d735c23edfc62676",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "efa46b54d1fe2100.ktx",
+      "bytes": 11032,
+      "sha256": "aa8e31febb22d3b9e546db909353425e45ce81080e42bee3b08d0fdcbeba1bf1",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "efe36415f2c19087.ktx",
+      "bytes": 11032,
+      "sha256": "299808235d09395289d579b1250f3a8b7f2f3f260d0e975299802ebcedadf192",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f290828e6dd0b5e9.ktx",
+      "bytes": 5592544,
+      "sha256": "24c4d9e15a275227ab83a5c51d57c431943ccc5a0bf98b4e6e6430cf98f72143",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f3bc39ce30ac8190.ktx",
+      "bytes": 174880,
+      "sha256": "81631774a58fc5731ff683b25a1e6bed3b8f8a93e47b8a8273bfd0a917d1fde0",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f4d2ad82007e4494.ktx",
+      "bytes": 2796328,
+      "sha256": "a33844397380869ded07e231d631c130ac61ef730001f1969d909f8238aecdce",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f51a042d7a432eee.ktx",
+      "bytes": 1398236,
+      "sha256": "468a31a9cb6761947f6e20b44579d4d7a5bd63a41e3030575cfa876e7049aff7",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f5386752bbf98f29.ktx",
+      "bytes": 699172,
+      "sha256": "6fb8df36af99c946ca2be58033d8df7f53bc0f680c50ad3efe1538becfd86416",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f56eb9d913e36fe1.ktx",
+      "bytes": 349656,
+      "sha256": "70167a405121be89acdbed1eba794cd7665ebe0c8411abae0471ce9965aa550f",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f5a30904f774eb63.ktx",
+      "bytes": 1398236,
+      "sha256": "612c7fd8aa7cf1f3f0c833b5b280c323e83d7bfab95df30fa552c6bc37657dc9",
+      "width": 1024,
+      "height": 1024,
+      "mip_levels": 11,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f71a9f40969fb78d.ktx",
+      "bytes": 2796328,
+      "sha256": "e68b850459ad402773b2791516370264ab0747de359c83a19c1e422a2ecc5b18",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f71c76c298205476.ktx",
+      "bytes": 349652,
+      "sha256": "c416903966ab72b0c7c245fcae97bb9a8aea70349b08559b474b2bca3eebfb57",
+      "width": 1024,
+      "height": 512,
+      "mip_levels": 11,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f8345d2b768b6628.ktx",
+      "bytes": 1398272,
+      "sha256": "4cb51e48c009312d25934fa4f8c45b0d8fad0d04d3d09b3e7118f67b6b1f5e54",
+      "width": 2048,
+      "height": 512,
+      "mip_levels": 12,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "f9973f7d6252e134.ktx",
+      "bytes": 87508,
+      "sha256": "3654f7e68f0b896dd27153910cb8e74587efa718a20cb4b22e68579d2f4ab1bb",
+      "width": 256,
+      "height": 256,
+      "mip_levels": 9,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "fbde742c62fb2db2.ktx",
+      "bytes": 174880,
+      "sha256": "901aed6a7c447a5b93de5a71633e2e23a159c76d58644b88da43651024112ddb",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "fd62e3f42e8304fc.ktx",
+      "bytes": 2796328,
+      "sha256": "7f977edb82ffcb90a771c8721f3a9975684e6ea197d8b753257bf38517ada8ba",
+      "width": 2048,
+      "height": 2048,
+      "mip_levels": 12,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "fe2da8d7a1441925.ktx",
+      "bytes": 11032,
+      "sha256": "e73d33b3c1acf808c74da5572a704f49d433425663b402b2aa99d0e1a7f9964e",
+      "width": 128,
+      "height": 128,
+      "mip_levels": 8,
+      "gl_internal_format": "0x8d64",
+      "encoding": "ETC1_RGB8_OES",
+      "gl_base_format": "0x1908"
+    },
+    {
+      "name": "fe7f99eee6155136.ktx",
+      "bytes": 349656,
+      "sha256": "6f882567b9581d895d4977bf8e8bcc68f588bd7f20e0791d29fae49521945578",
+      "width": 512,
+      "height": 512,
+      "mip_levels": 10,
+      "gl_internal_format": "0x87ee",
+      "encoding": "ATC_RGBA_INTERPOLATED_ALPHA_AMD",
+      "gl_base_format": "0x1908"
+    }
+  ],
+  "file_count": 222,
+  "total_bytes": 340222792,
+  "encoding_counts": {
+    "ETC1_RGB8_OES": 116,
+    "ATC_RGBA_INTERPOLATED_ALPHA_AMD": 106
+  },
+  "apk_game_library_sha1": "64a3323cd3cc0c483a645b62af8508624163ba9b",
+  "matches_current_donor_whitelist": false,
+  "mappings": [
+    {
+      "key": "7d90bf938bc0f030",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/ParticleBaseTextures/texture_Burst06.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "6826dd98752f4ea5",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/ParticleBaseTextures/texture_Burst09.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "1e7df1d04234be3d",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 16384,
+      "source": "published/ParticleBaseTextures/texture_Burstl03.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "dc2e75b92d892246",
+      "object": 3,
+      "base_dimensions": [
+        32,
+        32
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4096,
+      "source": "published/ParticleBaseTextures/texture_GlowDot.m3g",
+      "hd_dimensions": [
+        64,
+        64
+      ]
+    },
+    {
+      "key": "a903dec698e148b6",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 16384,
+      "source": "published/ParticleBaseTextures/texture_Mist01.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "e28b2458c61103d5",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/ParticleBaseTextures/texture_basic2.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "c6dd53be315f7aab",
+      "object": 3,
+      "base_dimensions": [
+        32,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 8192,
+      "source": "published/ParticleBaseTextures/texture_cyl_shadowcharge.m3g",
+      "hd_dimensions": [
+        64,
+        128
+      ]
+    },
+    {
+      "key": "695decf10b4083dc",
+      "object": 3,
+      "base_dimensions": [
+        32,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 8192,
+      "source": "published/ParticleBaseTextures/texture_cyl_streak_3.m3g",
+      "hd_dimensions": [
+        64,
+        128
+      ]
+    },
+    {
+      "key": "8c8348f77786738a",
+      "object": 3,
+      "base_dimensions": [
+        32,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 8192,
+      "source": "published/ParticleBaseTextures/texture_cyl_sunbeams.m3g",
+      "hd_dimensions": [
+        64,
+        128
+      ]
+    },
+    {
+      "key": "612b0d0db94d1c93",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/ParticleBaseTextures/texture_smoke2.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "80d53f249c255b77",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/ParticleBaseTextures/texture_smoke_cloud_custom_01a.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "cf8ba0e1774c2d4a",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/ParticleBaseTextures/texture_spatter_01.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "c30508766f681c61",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/ParticleBaseTextures/texture_spatter_02.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "ef986670aaaf253b",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/ParticleBaseTextures/texture_spatter_globs_01.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "aec165eee3f43ffa",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/ParticleBaseTextures/texture_spatter_paint_01.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "f56eb9d913e36fe1",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/ParticleBaseTextures/texture_spatter_paint_02.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "cddb92e631c5ad8a",
+      "object": 2,
+      "base_dimensions": [
+        2048,
+        2048
+      ],
+      "base_image_format": 125,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2097152,
+      "source": "published/models/texture_env_main_menu_01.m3g",
+      "hd_dimensions": [
+        4096,
+        4096
+      ]
+    },
+    {
+      "key": "4e581f4700efeaab",
+      "object": 2,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 125,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/models/texture_env_main_menu_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "142bbaf1af294cd5",
+      "object": 2,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 124,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/models/texture_env_main_menu_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "6f2f7744f880cdec",
+      "object": 2,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 124,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/models/texture_env_main_menu_starfield.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "d5a035ab2b244e8c",
+      "object": 2,
+      "base_dimensions": [
+        1024,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/achievements.m3g",
+      "hd_dimensions": [
+        2048,
+        512
+      ]
+    },
+    {
+      "key": "302275db81d1ed94",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/texturepacks_ui/achievements_small.m3g",
+      "hd_dimensions": [
+        2048,
+        512
+      ]
+    },
+    {
+      "key": "f8345d2b768b6628",
+      "object": 2,
+      "base_dimensions": [
+        1024,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/checkpoints.m3g",
+      "hd_dimensions": [
+        2048,
+        512
+      ]
+    },
+    {
+      "key": "a7f160bfc685da5a",
+      "object": 2,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/texturepacks_ui/dementia_face01.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "e338ee0c3092075c",
+      "object": 2,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/texturepacks_ui/dementia_face02.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "aa1435f33c119019",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 524288,
+      "source": "published/texturepacks_ui/fx_lensflare.m3g",
+      "hd_dimensions": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "f71c76c298205476",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 524288,
+      "source": "published/texturepacks_ui/fx_lensflare_boss.m3g",
+      "hd_dimensions": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "cf9f8afd872206c9",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 524288,
+      "source": "published/texturepacks_ui/fx_lensflare_sun.m3g",
+      "hd_dimensions": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "3848cddda6dfc675",
+      "object": 2,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/texturepacks_ui/fx_lensflare_tall.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "2a30a8a22b65fa23",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/texturepacks_ui/gbr.m3g",
+      "hd_dimensions": [
+        1024,
+        256
+      ]
+    },
+    {
+      "key": "69fac8f847641e69",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 524288,
+      "source": "published/texturepacks_ui/headphones.m3g",
+      "hd_dimensions": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "bc28120a91d76786",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/texturepacks_ui/splash_deadspace.m3g",
+      "hd_dimensions": [
+        1024,
+        256
+      ]
+    },
+    {
+      "key": "fe7f99eee6155136",
+      "object": 2,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/texturepacks_ui/splash_ea.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "7cb8e06b01534603",
+      "object": 2,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/texturepacks_ui/ui_frontend.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "73b60b387b4133ee",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/texturepacks_ui/ui_frontend.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "6cb6799c29ca1d73",
+      "object": 2,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/texturepacks_ui/ui_ingame.m3g",
+      "hd_dimensions": [
+        4096,
+        4096
+      ]
+    },
+    {
+      "key": "ea37123f43407214",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/ui_ingame.m3g",
+      "hd_dimensions": [
+        1024,
+        4096
+      ]
+    },
+    {
+      "key": "2bbe60a933474a8a",
+      "object": 2,
+      "base_dimensions": [
+        1024,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/ui_loader.m3g",
+      "hd_dimensions": [
+        4096,
+        1024
+      ]
+    },
+    {
+      "key": "787cb90ec5621b00",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper00.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "9cfb9aa38ef3af9f",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper01.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "459f1c2425f71616",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper02.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "8ec898430b284deb",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper03.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "b5bc7f55cbc976aa",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper04.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "869e72048c202c84",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper05.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "dd353268bc49dc9b",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper06.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "15dcbf287640cd15",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper07.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "967075eed12d6f21",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper08.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "9b2528b6cfc8670e",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper09.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "8bf31b10c242d00e",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper10.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "23793092fc620111",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper11.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "39fcd27732e48ad5",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper12.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "5aa1cdded7631928",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper13.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "958b89ad4a7dc0f3",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper14.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "05b1aafdd066eb10",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper15.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "c5e054a12ba91990",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper16.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "f51a042d7a432eee",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper17.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "cfb659e746329292",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper18.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "f5a30904f774eb63",
+      "object": 2,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/texturepacks_ui/wallpaper19.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "a0f0ec7d86432322",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 16384,
+      "source": "published/textures/texture_FX_D_logo_Grey.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "e05a96697de37e12",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_FX_Dash.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "6437e7a1d7224635",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_FX_Flare.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "d8814d1098f0f7ee",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_FX_GenBorder.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "167ebc8aa6c55e2b",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_FX_HoloBackPanel.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "bfe2457466d87049",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_FX_HoloBackPanel_02.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "40e8306cf2ed61b2",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_FX_InteractDoorBacking.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "543ca73ab635ca5a",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_FX_airStreaks.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "8639ee31adcd49f4",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_FX_animated.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "560db5019eecceec",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_FX_holographic_display_01.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "084d580c5e9f6258",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_FX_holographic_display_02.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "ddded9b4d0e2bfed",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_FX_holographic_display_03.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "5cd8684884409250",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_boss_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "0a4eae1cbc7671ea",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_boss_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "9caf5a5c018e1f05",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_boss_03.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "aa3c4351debf8c5d",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures/texture_boss_drool.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "161dc9bfbe7566c2",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_brute.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "c46b5ef3c7d41782",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_brute_uber.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "2d55b69d324f0318",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_carrie_face.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "93a73609291de81a",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_carrie_hair.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "01b7f36b60db1c8c",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_corer.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "d69943e4295389f1",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_corruption.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "912594e38bb15992",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_dementia_face.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "eacc0468fc9fffc0",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_crossover_tube_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "8cd4ad6255713931",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_crossover_tube_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "3e7beea21c32314b",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_crossover_tube_03.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "0b55a5972bc79958",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_crossover_tube_04.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "8727b0191e17c497",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_crossover_tube_cinematic.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "f290828e6dd0b5e9",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_crossover_tube_objects_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "ed95df50006ce4c8",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_crossover_tube_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "ad4a4a07c7e4d099",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_crossover_tube_sky.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "954f97ea0cc2e313",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_dynamic_scroll.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "f71a9f40969fb78d",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_exterior_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "f4d2ad82007e4494",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_exterior_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "91497b3f64121630",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_exterior_03.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "4231c2e8d3a73246",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_exterior_04.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "4df7773d0e3c630a",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_exterior_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "5a5614baf6cb857c",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_exterior_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "dfedf6c5b4eeee4b",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_env_exterior_wind.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "e0bf70e4618c5d93",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_flesh_processing_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "c6c25c9d4fb4bc0b",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_flesh_processing_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "632720c3a5d4fced",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_flesh_processing_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "760dc84e1c265bd9",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_flesh_processing_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "b83f9b17fb0e23e9",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_generic_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "1581a6f44c53d866",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_generic_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "435a51631ce054aa",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_generic_decals.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "0d24fd861f531f93",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_env_generic_fog_01.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "b9303636c78b25a5",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_generic_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "97566c48ac72cbce",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_generic_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "6886b3db8ca9cf47",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_generic_starfield.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "18b24978e4053a8a",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_gov_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "992e224a8e956b48",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_gov_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "d77ae6c1a9508cf3",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_gov_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "90120befc8cc0c60",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_gov_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "eeaa2586d8f9272b",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_env_gov_uv_01.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "e461f3c0e60d583b",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures/texture_env_gov_window.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "0b9d91d8bccd868c",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_main_menu_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "d2b9f2f2c072ae72",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_main_menu_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "66200bc404bc639a",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_main_menu_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "ea3542681a84bec7",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_main_menu_starfield.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "bb47f5ae4bf96594",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_mines_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "1280ea37a32dd212",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_mines_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "0e4a1b0dc8442c6b",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_mines_03.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "d61e8aba9757400c",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_mines_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "3dd95bb59382b14b",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_mines_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "28d9300f1f52efdb",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures/texture_env_mines_window.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "c155c0542eb04560",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_reactor_core_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "ea9bf7c78521f41a",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_reactor_core_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "801da591efff9d12",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_reactor_core_03.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "eec0aac3c01d21fd",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_reactor_core_04.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "c907825b8f711e5e",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_reactor_core_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "2d847876e94163b4",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_env_reactor_core_slimeA.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "a090eb37d44a9e2b",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_reactor_core_slimeB.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "52b4b1884cc0a899",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_reactor_core_smoke_01.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "0fcc5787a3f26dae",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_env_smoke_01.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "074ef9f3b4e63e91",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_sprawl_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "91fa30a7c80d5552",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_env_sprawl_01_hologram.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "637afd6d901e7a28",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_sprawl_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "35531b717f920001",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_env_sprawl_02_hologram.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "f5386752bbf98f29",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_sprawl_03.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "f3bc39ce30ac8190",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_env_sprawl_03_hologram.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "65f5c2309258abb2",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_sprawl_04.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "d3f4b929c559757c",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_env_sprawl_starfield_01.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "a3210bd7f8160164",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_tram_tunnel.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "d699cc3007795377",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_tram_tunnel_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "6e119284c0ba2731",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_tram_tunnel_objects_02.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "ea8a1e13130d4f41",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_env_tram_tunnel_objects_03.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "fd62e3f42e8304fc",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_waterplant_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "13af87191a536990",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_waterplant_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "14613c6680b6d7d7",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_waterplant_03.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "5cf7d8705368220c",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_env_waterplant_caustics.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "36cecadf06a53109",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_env_waterplant_objects.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "ab8aba48e17442d4",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 4194304,
+      "source": "published/textures/texture_env_waterplant_objects_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "fbde742c62fb2db2",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_env_waterplant_water.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "b950aa57617f6de9",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_exploder.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "8dc928f237211c4d",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_exploder_uber.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "21f0061da6c89e21",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_floor_shadow.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "29e19aa9c3c3f469",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures/texture_fx_aiming_beams.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "b0b306d8bce6e600",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_fx_blinkLights.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "654a8b6061b899f2",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_fx_blood_boss_01.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "4e67a185c0b8b1d8",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_fx_boss_needle_projectile.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "070313df3d31cbfe",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures/texture_fx_boss_needle_spurt.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "109cc006946d5bd3",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_fx_hologram_warning_locators.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "011a5236e63cb4f0",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_fx_lens_flare_blue.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "ed33078152e45a64",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_fx_lens_flare_orange.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "39432af15a65f425",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_fx_lightening.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "92267f661a97e70d",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_fx_stasis_cloud.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "13a8d137a152fe34",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_fx_stasis_electricity.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "c72bc990d29ebcfe",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_hemispheremap.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "22ead286177424d1",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures/texture_hologram_grid.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "f9973f7d6252e134",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures/texture_hud_ammo_counter.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "a1153a8f548c7dcb",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_10bars.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "d4517d529ade0ac4",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_10bars_orange.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "1a0686e8291b3641",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_10bars_red.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "fe2da8d7a1441925",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_4bars.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "668628ce818f1c22",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_4bars_orange.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "efe36415f2c19087",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_4bars_red.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "e0dc65ce3ed55e58",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_5bars.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "66837ba37b8c73fe",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_5bars_orange.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "eaf4ef410dbfe5ab",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_5bars_red.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "1e2675e6b03f4bde",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_6bars.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "efa46b54d1fe2100",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_6bars_orange.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "cb7e583256f8fffc",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_6bars_red.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "03cb153ca357438e",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_7bars.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "3e6072f1c2456cdd",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_7bars_orange.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "ab26ca285cb123d5",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_7bars_red.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "45771e790f6cc6f1",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_8bars.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "532396a82fab633e",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_8bars_orange.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "c50fec9eab2d292d",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 2048,
+      "source": "published/textures/texture_isaac_rig_health_8bars_red.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "1107772b1227e2e4",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_isaac_suit_01.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "38f103e4d4c2b32b",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_isaac_suit_02.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "71c1a45cdeb15819",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_isaac_suit_03.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "3342b03ffd78f218",
+      "object": 3,
+      "base_dimensions": [
+        1024,
+        1024
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 524288,
+      "source": "published/textures/texture_isaac_suit_04.m3g",
+      "hd_dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "key": "c93db1f937663064",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_linegun.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "30139d129e8f0c5c",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_lurker.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "ca84c8965243491e",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        64
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 4096,
+      "source": "published/textures/texture_lurker_projectile.m3g",
+      "hd_dimensions": [
+        256,
+        128
+      ]
+    },
+    {
+      "key": "65fb5363a446baa4",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_lurker_uber.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "2a9a7205935d70b9",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_muzzle_flare.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "28219b36cb5598e1",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_plasmacutter.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "e22dd5d199298a29",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_plasmasaw.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "1927ddb1dafe00ac",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 16384,
+      "source": "published/textures/texture_plasmasaw_blades.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "4839e6e96b4080e6",
+      "object": 3,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 16384,
+      "source": "published/textures/texture_plasmasaw_sparks.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "54257c7e58a7851f",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_pregnant.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "54042fa501ec0091",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_pregnant_uber.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "ccbdf541a5b823aa",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 32768,
+      "source": "published/textures/texture_ripper.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "51564dd36a679d13",
+      "object": 3,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 262144,
+      "source": "published/textures/texture_scratches.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "4591ae8fe0c29a64",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_slasher.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "ea636132a2bd8adb",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 131072,
+      "source": "published/textures/texture_slasher_alt.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "19e52420a3ca7010",
+      "object": 3,
+      "base_dimensions": [
+        512,
+        512
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 1048576,
+      "source": "published/textures/texture_slasher_uber.m3g",
+      "hd_dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "key": "35ac99836800828e",
+      "object": 3,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 8192,
+      "source": "published/textures/texture_swarm.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "100d9d606878630a",
+      "object": 3,
+      "base_dimensions": [
+        32,
+        32
+      ],
+      "base_image_format": 116,
+      "base_gl_format": "0x8d64",
+      "base_level0_bytes": 512,
+      "source": "published/textures/texture_text_dynamic.m3g",
+      "hd_dimensions": [
+        64,
+        64
+      ]
+    },
+    {
+      "key": "82897c4304e31f7e",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 32768,
+      "source": "published/textures_uncompressed/texture_dementia_battery_01.m3g",
+      "hd_dimensions": [
+        256,
+        128
+      ]
+    },
+    {
+      "key": "a06eb8088a831e4c",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 99,
+      "base_gl_format": "0x1907",
+      "base_level0_bytes": 49152,
+      "source": "published/textures_uncompressed/texture_dementia_battery_02.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "dbaa13cca494fd6a",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 99,
+      "base_gl_format": "0x1907",
+      "base_level0_bytes": 49152,
+      "source": "published/textures_uncompressed/texture_dementia_battery_03.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "bb752a36c5343335",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 99,
+      "base_gl_format": "0x1907",
+      "base_level0_bytes": 49152,
+      "source": "published/textures_uncompressed/texture_dementia_battery_04.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "85c39fd35d661411",
+      "object": 2,
+      "base_dimensions": [
+        256,
+        256
+      ],
+      "base_image_format": 99,
+      "base_gl_format": "0x1907",
+      "base_level0_bytes": 196608,
+      "source": "published/textures_uncompressed/texture_door_hologram.m3g",
+      "hd_dimensions": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "63cf227af145f97d",
+      "object": 2,
+      "base_dimensions": [
+        256,
+        128
+      ],
+      "base_image_format": 99,
+      "base_gl_format": "0x1907",
+      "base_level0_bytes": 98304,
+      "source": "published/textures_uncompressed/texture_env_generic_uv_particle.m3g",
+      "hd_dimensions": [
+        512,
+        256
+      ]
+    },
+    {
+      "key": "47e669d719262b12",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 99,
+      "base_gl_format": "0x1907",
+      "base_level0_bytes": 49152,
+      "source": "published/textures_uncompressed/texture_env_generic_uv_particle_fire.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "88ac44db50214885",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        64
+      ],
+      "base_image_format": 99,
+      "base_gl_format": "0x1907",
+      "base_level0_bytes": 24576,
+      "source": "published/textures_uncompressed/texture_fx_pickup.m3g",
+      "hd_dimensions": [
+        256,
+        128
+      ]
+    },
+    {
+      "key": "a1f790258b44496d",
+      "object": 2,
+      "base_dimensions": [
+        64,
+        64
+      ],
+      "base_image_format": 99,
+      "base_gl_format": "0x1907",
+      "base_level0_bytes": 12288,
+      "source": "published/textures_uncompressed/texture_hud_pickup_scanlines.m3g",
+      "hd_dimensions": [
+        128,
+        128
+      ]
+    },
+    {
+      "key": "bcb9579848989b74",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        64
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 32768,
+      "source": "published/textures_uncompressed/texture_o2.m3g",
+      "hd_dimensions": [
+        256,
+        128
+      ]
+    },
+    {
+      "key": "7bd975da9b9e2b17",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures_uncompressed/texture_reload.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "3892133c32e0a6f4",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures_uncompressed/texture_secondary.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    },
+    {
+      "key": "9fe8b67d17c35abb",
+      "object": 2,
+      "base_dimensions": [
+        128,
+        128
+      ],
+      "base_image_format": 100,
+      "base_gl_format": "0x1908",
+      "base_level0_bytes": 65536,
+      "source": "published/textures_uncompressed/texture_stasis.m3g",
+      "hd_dimensions": [
+        256,
+        256
+      ]
+    }
+  ],
+  "mapped_texture_count": 222,
+  "mapping_scope": "APK's own base assets; PSV donor assets not compared"
+}

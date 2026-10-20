@@ -1,0 +1,9 @@
+{
+  "textures": 106,
+  "mip_levels": 1115,
+  "rgba_bytes_compared": 845392488,
+  "reference": "texture2ddecoder 1.0.6",
+  "reference_output_order": "BGRA converted to RGBA before comparison",
+  "result": "all bytes equal",
+  "switch_tested": false
+}

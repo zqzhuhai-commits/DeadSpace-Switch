@@ -93,6 +93,10 @@ Dynarmic 主机短函数与构造函数通过。独立 Unicorn 调查已通过 J
 
 当前 NRO 只建立平台诊断能力。没有将 Linux qemu 测试、三角形或占位接口宣称为游戏运行，也没有制作“可玩 NSP”。
 
+## Reanimated 高清包
+
+已核验并单独提取 v1.3 APK 的 222 份 KTX 高清材质，在 APK 自带原始资源中全部找到精确映射。新增提取工具及 ATC 插值透明解码支持；尚未接入 Switch 实际渲染，也未与 PSV 数据逐对象比对。详见 [高清包审计与接入限制](switch/docs/REANIMATED-HD.md)。
+
 ## License
 
 GPL-3.0，并保留第三方各自的许可证。见 `LICENSE`、`NOTICE.md` 和 `third_party/`。没有分发 EA 游戏库和游戏资源。
