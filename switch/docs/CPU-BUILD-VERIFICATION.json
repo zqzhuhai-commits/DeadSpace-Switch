@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "game_playable": false,
+  "switch_hardware_tested": false,
+  "dynarmic_commit": "a41c380246d3d9f9874f0f792d234dc0cc17c180",
+  "host_real_donor_functions": "5/5 pass",
+  "host_thumb_interworking": "pass",
+  "host_vfp_scalar_add": "pass",
+  "host_unmapped_execution_rejection": "pass",
+  "switch_aarch64_cpu_backend": "compiled",
+  "switch_jit_runtime": "not tested on hardware",
+  "nro_bytes": 8968389,
+  "nro_sha256": "72d3bdc3346183bb7671ad94a21693e00842b37fb7d00e10028505bad7e2a848",
+  "nro_segment_bounds": "pass",
+  "elf_text_relocations": false,
+  "missing_game_components": [
+    "external imports and ABI marshaling",
+    "JNI lifecycle",
+    "connected graphics/audio/input/storage",
+    "actual game testing"
+  ]
+}

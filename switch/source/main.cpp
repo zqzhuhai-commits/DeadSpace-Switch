@@ -1,6 +1,9 @@
 #include <switch.h>
 #include "preflight.hpp"
 #include "platform_probe.hpp"
+#ifdef DS_CPU_PROBE
+#include "cpu_probe.hpp"
+#endif
 #include <cstdio>
 #include <string>
 #include <sys/stat.h>
@@ -12,12 +15,15 @@ static void record(const std::string& s) {
 }
 static void draw_report() {
     consoleClear();
-    std::puts("DEAD SPACE SWITCH 0.1.0 - DEVELOPMENT DIAGNOSTICS\n");
-    std::puts("Game execution backend NOT IMPLEMENTED. This is not a playable port.\n");
+    std::puts("DEAD SPACE SWITCH - DEVELOPMENT DIAGNOSTICS\n");
+    std::puts("Game lifecycle is NOT implemented. This is not a playable port.\n");
     const auto r=ds::preflight(root);
     record("--- donor preflight ---");
     for (const auto& m:r.messages) { std::puts(m.c_str()); record(m); }
     std::puts("\nA: rescan  X: GPU/PVRTC/audio  Y: GLES1 compatibility  +: exit");
+#ifdef DS_CPU_PROBE
+    std::puts("B: ARM32 Dynarmic leaf-function probe (not game startup)");
+#endif
     std::puts("Touch and left/right stick values appear below.");
     std::puts("Log: /switch/deadspace/diagnostics.log");
     if (!logfile) std::puts("WARNING: log file could not be opened; check SD card space/access.");
@@ -49,6 +55,13 @@ int main() {
             consoleInit(nullptr); draw_report();
             std::puts(result.c_str());
         }
+#ifdef DS_CPU_PROBE
+        if (down&HidNpadButton_B) {
+            const auto result=cpu_probe(std::string(root)+"/lib/armeabi/libEAMGameDeadSpace.so");
+            record(result);consoleClear();std::puts(result.c_str());
+            std::puts("A: return to data diagnostics  +: exit");
+        }
+#endif
         const auto left=padGetStickPos(&pad,0),right=padGetStickPos(&pad,1);
         HidTouchScreenState touch{};
         hidGetTouchScreenStates(&touch,1);

@@ -1,6 +1,6 @@
 # Dead Space Mobile — Switch 移植开发项目
 
-**0.1.0：已编译的原生诊断程序，不是可玩版；尚未实现 ARM32 游戏执行后端，也未通过 Switch 实机测试。**
+**0.2.0：ARM32 执行核心原型和 Switch 诊断程序，不是可玩版；游戏生命周期尚未接通，也未通过 Switch 实机测试。**
 
 基于 EapRules/deadspace-native-arm 提交 `cc8fd2c8a16530936aa3c2ce205ef4cffc2814e9`。上游目录保留；原 Linux/PortMaster 说明见 `README.portmaster.md`。Switch 新代码位于 `switch/`。Vita 版作为补丁和操作参考。Reanimated 当前没有公开核心运行时代码，本项目不包含该运行时。
 
@@ -12,6 +12,7 @@
 - Joy-Con 双摇杆和触摸坐标诊断。
 - GLES2 纹理三角形回读、上游 PowerVR PVRTC 真实解码器测试、低音量测试音队列。
 - 独立 GLES1.1 探测：游戏所需 190 个 GL 名称、matrix-palette 扩展和固定管线三角形回读。
+- Dynarmic 执行核心原型：主机实际运行真实游戏库的 5 个短函数，返回值全部正确；Thumb、VFP 与非法执行拒绝测试通过。Switch JIT 适配及含 B 键 CPU 测试的 NRO 已编译，等待实机运行。
 
 这些平台诊断均已编译，但尚未在 Switch 执行。非空函数指针或扩展声明不能证明骨骼渲染正确；音频队列消耗不能代替实际听音。数据检查仅验证必要资源文件存在，不保证章节资源完整。
 
@@ -24,6 +25,8 @@ make -C switch -j2
 ```
 
 产物：`switch/build/deadspace-switch.nro`。本次工具版本：GCC 16.1.0、libnx 4.12.0、SDL2 2.28.5、Mesa 20.1.0。编译和链接均需 `-fPIC`，以选择 PIC C++ 运行库。根目录原 Makefile 仍用于 Linux ARM32。
+
+包含 ARM32 执行核心的 0.2.0 版本另按 [CPU-BACKEND.md](switch/docs/CPU-BACKEND.md) 编译，需要初始化固定版本的 Dynarmic 子模块、应用 Switch JIT 补丁，并安装 Boost 头文件。默认 Makefile 仍生成较小的平台诊断版。
 
 主机测试（Python3、g++）：
 
@@ -62,6 +65,7 @@ python3 switch/tools/audit_donor.py /path/to/libEAMGameDeadSpace.so --output don
 - A：重扫数据。
 - X：GLES2/PVRTC/音频平台测试，约3秒。
 - Y：游戏 GLES1.1 固定管线兼容性探测。
+- B（0.2.0 CPU 版本）：运行真实库短函数及 Thumb/VFP 测试，结果写入诊断日志。
 - +：退出。
 - 摇杆与触摸：检查屏幕上的坐标读数。
 
@@ -69,7 +73,7 @@ python3 switch/tools/audit_donor.py /path/to/libEAMGameDeadSpace.so --output don
 
 ## 下一开发关卡
 
-实际游戏库和重定位已完成静态核验。下一步验证 AArch32 原生执行或 ARM32→ARM64 动态转换。接通真实 JNI/Bionic、GLES1、音频、控制和存档后，以第一关可操作、射击、实际声音、存档读档和切关为可玩门槛。详见 `switch/docs/PORTING.md`。
+实际游戏库和重定位已完成静态核验；Dynarmic 主机执行短函数已通过。下一步验证 Switch 上的 JIT 原型，并接通外部函数调用与 JNI/Bionic。接通 GLES1、音频、控制和存档后，以第一关可操作、射击、实际声音、存档读档和切关为可玩门槛。详见 `switch/docs/CPU-BACKEND.md`。
 
 当前 NRO 只建立平台诊断能力。没有将 Linux qemu 测试、三角形或占位接口宣称为游戏运行，也没有制作“可玩 NSP”。
 

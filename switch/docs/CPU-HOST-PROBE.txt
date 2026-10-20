@@ -1,0 +1,11 @@
+Dynarmic ARM32 actual-donor leaf-function probe
+Guest mapped, relative relocations=22677
+NativeGetIdRawPointerCancel = 12 OK
+NativeGetIdRawPointerDown = 393228 OK
+NativeGetIdRawPointerMove = 262156 OK
+NativeGetIdUndefined = 0 OK
+NativeGetIdRawPointerUp = 524300 OK
+Thumb shift and return to ARM sentinel: OK
+VFP add 1.25 + 2.5 = 3.75: OK
+Unmapped execute rejection: OK
+PASS: 5/5 real game functions executed. Game lifecycle/JNI services NOT initialized.

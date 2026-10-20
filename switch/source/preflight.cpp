@@ -96,7 +96,7 @@ Report preflight(const std::string& root) {
     r.messages.push_back(r.donor_matches?"Xperia Play v1.1.33 SHA1: OK":"Unsupported library SHA1: "+r.sha1);
     r.assets_present=regular(root+"/assets/EAMCore.ini") && regular(root+"/assets/published/data/achievements.sb");
     r.messages.push_back(r.assets_present?"Asset sentinels: OK (not a full integrity check)":"Missing EAMCore.ini or published/data/achievements.sb");
-    r.messages.push_back("ARM32 execution backend: NOT IMPLEMENTED");
+    r.messages.push_back("Game lifecycle and external JNI services: NOT IMPLEMENTED");
     return r;
 }
 }

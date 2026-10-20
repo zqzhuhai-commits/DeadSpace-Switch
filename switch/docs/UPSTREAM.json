@@ -4,7 +4,7 @@
   "reference_repository": "https://github.com/v-atamanenko/deadspace-vita",
   "closed_runtime_reference": "https://github.com/GINESTR0/DeadSpaceReanimated",
   "target": "Nintendo Switch Horizon / libnx AArch64",
-  "milestone": "0.1.0 platform diagnostics",
+  "milestone": "0.2.0 ARM32 CPU execution prototype; host tested; Switch compiled",
   "game_execution_implemented": false,
   "hardware_tested": false,
   "donor_files_available": true,
