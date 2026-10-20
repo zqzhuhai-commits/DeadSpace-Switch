@@ -1,12 +1,14 @@
 # Dead Space Mobile — Switch 移植开发项目
 
-**0.3.2：已加入 JNI 生命周期诊断及映像/寄存器调试更新；GL 仍是模拟接口，当前仍是开发诊断版，不是可玩完整版或 NSP。**
+**0.3.2 开发基线：已加入 JNI、映像/堆修复及可选原生 GL 桥；当前仍是开发诊断版，不是可玩完整版或 NSP。默认 L 诊断使用模拟 GL，R 使用原生 GLES1 子集。**
 
 [0.3.2 源码审查和 NSP 阻塞项](switch/docs/REVIEW-0.3.2.md)。高清资源准备现支持与实际 PSV 数据匹配，并纳入内置 RomFS 校验；尚未接入游戏渲染。
 
 [后续 JNI 修复](switch/docs/PROGRESS-JNI-0.3.2.md)：已修正函数表、参数解码、实例接收者、字符串/数组和真实资源读取，通过主机 ASan/UBSan 回归；尚未重跑真实 PSV 库或验证游戏画面。
 
 [后续内存修复](switch/docs/PROGRESS-MEMORY-0.3.2.md)：已删除与栈冲突的第二份映像，修复嵌套调用现场恢复、堆复用及 realloc 越界读取，通过主机回归；线程调度仍待实现。
+
+[原生 GL 接入](switch/docs/PROGRESS-NATIVE-GL.md)：真实 GL 子集已接到生命周期执行器，并通过主机 Mesa 像素回读。ATC 格式支持解码后原生上传；尚未实现高清包自动替换或验证 Switch 游戏画面。
 
 0.2.1 源码已按实机日志修正路径与版本标识：开发目录改为 `deadspacemobile`，增加完整库路径提示、CPU探测开始/结束日志及包内 RomFS 数据源选择。基础图形/PVRTC实机通过；CPU尚无实机结果，4个矩阵调色板入口缺失。详见 [实机日志分析](switch/docs/DEVICE-LOG-20261020.md)。
 

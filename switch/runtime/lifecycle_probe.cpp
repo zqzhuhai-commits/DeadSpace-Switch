@@ -18,6 +18,7 @@
 #include <cstring>
 #include <ctime>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -51,6 +52,8 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     std::string fault;
     unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0;
     std::map<std::string,uint64_t> service_counts;
+    ds::GraphicsBackend graphics;
+    std::unique_ptr<ds::GuestGl> native_gl;
 
     bool mapped(uint32_t a) const {
         return (a>=stack && a-stack<2*1024*1024) || (a>=heap && a<guest_heap.high_water()) ||
@@ -292,6 +295,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
 
     uint32_t gl_dispatch(const std::string& name,uint32_t a,uint32_t b,uint32_t,uint32_t) {
         ++gl_calls;
+        if(native_gl)return native_gl->call(name);
         if(name=="glGetIntegerv"){
             if(a==0x0BA2){MemoryWrite32(b,0);MemoryWrite32(b+4,0);MemoryWrite32(b+8,480);MemoryWrite32(b+12,640);}
             else if(a==0x0D33||a==0x0D34){MemoryWrite32(b,0);MemoryWrite32(b+4,0);MemoryWrite32(b+8,480);MemoryWrite32(b+12,640);}
@@ -364,8 +368,21 @@ public:
         return p;
     }
 
-    void initialize(const std::string& data) {
+    void initialize(const std::string& data,ds::GraphicsBackend backend) {
         data_root=data;
+        graphics=std::move(backend);
+        if(graphics.resolve)native_gl=std::make_unique<ds::GuestGl>(graphics,ds::GlGuestMemory{
+            [&](unsigned n){return arg(n);},[&](uint32_t n){return alloc(n);},
+            [&](uint32_t p,void* out,size_t n){
+                if(uint64_t(p)+n>0x100000000ull)throw std::runtime_error("GL guest read wraps");
+                auto* bytes=static_cast<uint8_t*>(out);for(size_t i=0;i<n;++i)bytes[i]=MemoryRead8(p+uint32_t(i));
+                if(!fault.empty())throw std::runtime_error(fault);
+            },
+            [&](uint32_t p,const void* input,size_t n){
+                if(uint64_t(p)+n>0x100000000ull)throw std::runtime_error("GL guest write wraps");
+                const auto* bytes=static_cast<const uint8_t*>(input);for(size_t i=0;i<n;++i)MemoryWrite8(p+uint32_t(i),bytes[i]);
+                if(!fault.empty())throw std::runtime_error(fault);
+            }});
         errno_address=alloc(4);
         std::string error;if(!image.bind_imports([&](const auto& i){return bind(i);},error))throw std::runtime_error(error);
         if(!fault.empty())throw std::runtime_error(fault);
@@ -445,23 +462,30 @@ public:
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
         for(unsigned i=0;i<frames;++i){
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
+            if(graphics.present)graphics.present();
             trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
         }
         frames_done=frames;
     }
 
     static std::string to_hex(uint32_t v){char buf[16];std::snprintf(buf,sizeof(buf),"%08x",v);return buf;}
+    std::string graphics_report() const {
+        if(!native_gl)return "Graphics backend: mock diagnostics.\n";
+        return std::string("Graphics backend: ")+(graphics.desktop_compatibility?"desktop compatibility reference":"native GLES1 subset")+"; "+std::to_string(native_gl->calls)+" guest GL dispatches, "+std::to_string(native_gl->draws)+" draw submissions, "+std::to_string(native_gl->texture_uploads)+" texture uploads, "+std::to_string(native_gl->atc_uploads)+" ATC uploads.\n";
+    }
 
     std::string report() const {
         std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
-        out+="Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
+        out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
+        out+=graphics_report();
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_lists)+" directories listed; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
         for(const auto& kv:service_counts)if(kv.second)out+="  svc "+kv.first+" "+std::to_string(kv.second)+"\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;
     }
     std::string trace_report() const {
-        std::string out;
+        std::string out=graphics_report();
+        out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;
     }
@@ -469,12 +493,12 @@ public:
 };
 }
 
-std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames) {
+std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics) {
     LifecycleRuntime env;
     try {
         std::string error;if(!env.image.load(library,error))throw std::runtime_error(error);
         //env.trace.push_back("image memory bytes="+std::to_string(env.image.memory.size()));
-        env.initialize(data_root);
+        env.initialize(data_root,std::move(graphics));
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
         conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;

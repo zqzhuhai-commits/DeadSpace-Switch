@@ -22,7 +22,7 @@ static void record(const std::string& s) {
 static void draw_report() {
     consoleClear();
     std::puts("Dead Space Mobile " DS_APP_VERSION " - DEVELOPMENT DIAGNOSTICS\n");
-    std::puts("Lifecycle probe uses mock GL. This is not a playable port.\n");
+    std::puts("Development diagnostics. Gameplay has not been verified.\n");
     const auto r=ds::preflight(root);
     std::printf("Data: %s\n",root);
     record("--- donor preflight ---");
@@ -31,6 +31,7 @@ static void draw_report() {
 #ifdef DS_CPU_PROBE
     std::puts("B: ARM32 functions + game constructors (not gameplay)");
     std::puts("L: JNI lifecycle diagnostics (mock GL, not gameplay)");
+    std::puts("R: JNI lifecycle with native GLES1 subset (not verified gameplay)");
 #endif
     std::puts("Touch and left/right stick values appear below.");
     std::printf("Log: %s\n",ds::paths::log_file);
@@ -74,6 +75,14 @@ int main() {
             std::puts(result.c_str());
         }
 #ifdef DS_CPU_PROBE
+        if (down&HidNpadButton_R) {
+            record("Native game GL lifecycle begin");
+            consoleExit(nullptr);
+            const auto result=game_graphics_probe(root);record(result);
+            consoleInit(nullptr);consoleClear();std::puts(result.c_str());
+            record("Native game GL lifecycle end");
+            std::puts("A: return to diagnostics  +: exit");
+        }
         if (down&HidNpadButton_B) {
             record("ARM32 CPU probe begin");
             const auto library=std::string(root)+"/lib/armeabi/libEAMGameDeadSpace.so";

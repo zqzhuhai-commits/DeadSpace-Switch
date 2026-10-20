@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import importlib.util
+import argparse
 from pathlib import Path
 import struct
 import subprocess
@@ -12,7 +13,7 @@ data = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(data)
 
 
-def run():
+def run(native_gl=False):
     with tempfile.TemporaryDirectory() as t:
         work = Path(t)
         exe = work / "core-test"
@@ -35,6 +36,14 @@ def run():
                         "-I" + str(ROOT / "runtime"), str(ROOT / "tests/guest_memory_test.cpp"),
                         "-o", str(memory_exe)], check=True)
         subprocess.run([str(memory_exe)], check=True)
+        if native_gl:
+            gl_exe = work / "native-gl-test"
+            subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                            "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
+                            "-I" + str(ROOT / "runtime"), str(ROOT / "runtime/guest_gl.cpp"),
+                            str(ROOT.parent / "src/atc_decompress.cpp"), str(ROOT / "tests/guest_gl_native_test.cpp"),
+                            "-ldl", "-o", str(gl_exe)], check=True)
+            subprocess.run([str(gl_exe)], check=True)
         # The real donor SHA1 gate is never relaxed. Synthetic archives must fail.
         for name, contents in [
             ("vpk", {"eboot.bin": b"not a game library"}),
@@ -57,4 +66,6 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--native-gl", action="store_true", help="Also require native EGL/desktop compatibility GL readback")
+    run(parser.parse_args().native_gl)

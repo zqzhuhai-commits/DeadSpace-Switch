@@ -1,4 +1,4 @@
-# Standalone Switch platform probe. Upstream's ARM32 game loader is NOT linked.
+# Switch diagnostics; CPU_PROBE links the ARM32 runtime and native GL subset.
 .DEFAULT_GOAL := all
 ifndef DEVKITPRO
 $(error Set DEVKITPRO to your devkitPro installation)
@@ -24,7 +24,7 @@ CPPFLAGS += -DDS_APP_VERSION='"$(APP_VERSION)"'
 ifneq ($(strip $(ROMFS_ROOT)),)
 ROMFS_OPTION := --romfsdir="$(ROMFS_ROOT)"
 endif
-OBJECTS := build/main.o build/preflight.o build/platform_probe.o build/fixed_function_probe.o build/PVRTDecompress.o
+OBJECTS := build/main.o build/preflight.o build/platform_probe.o build/fixed_function_probe.o build/game_graphics_probe.o build/PVRTDecompress.o
 
 .PHONY: all clean host-test FORCE
 FORCE:
