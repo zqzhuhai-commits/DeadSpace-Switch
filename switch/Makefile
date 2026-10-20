@@ -7,6 +7,8 @@ export PATH := $(DEVKITPRO)/devkitA64/bin:$(DEVKITPRO)/tools/bin:$(PATH)
 CXX := $(DEVKITPRO)/devkitA64/bin/aarch64-none-elf-g++
 PORT := $(DEVKITPRO)/portlibs/switch
 NX := $(DEVKITPRO)/libnx
+APP_TITLE := Dead Space Mobile
+APP_ICON := assets/icon.jpg
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -ftls-model=local-exec
 CPPFLAGS := -D__SWITCH__ -D_REENTRANT -Iinclude -isystem $(NX)/include -isystem $(PORT)/include -I../third_party/powervr
 CXXFLAGS := -std=gnu++17 -O2 -g -Wall -Wextra -Werror $(ARCH) -fPIC -ffunction-sections -fdata-sections
@@ -32,9 +34,9 @@ build/PVRTDecompress.o: ../third_party/powervr/PVRTDecompress.cpp | build
 build/deadspace-switch.elf: $(OBJECTS)
 	$(CXX) $(LDFLAGS) $^ $(LIBS) -o $@
 build/deadspace-switch.nacp: Makefile | build
-	nacptool --create "Dead Space Switch Diagnostics" "Switch Port Contributors" "$(APP_VERSION)" $@
-build/deadspace-switch.nro: build/deadspace-switch.elf build/deadspace-switch.nacp
-	elf2nro $< $@ --nacp=build/deadspace-switch.nacp --icon=$(NX)/default_icon.jpg
+	nacptool --create "$(APP_TITLE)" "Switch Port Contributors" "$(APP_VERSION)" $@
+build/deadspace-switch.nro: build/deadspace-switch.elf build/deadspace-switch.nacp $(APP_ICON)
+	elf2nro $< $@ --nacp=build/deadspace-switch.nacp --icon=$(APP_ICON)
 host-test:
 	python3 tests/run_tests.py
 clean:

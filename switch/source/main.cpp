@@ -19,7 +19,7 @@ static void record(const std::string& s) {
 }
 static void draw_report() {
     consoleClear();
-    std::puts("DEAD SPACE MOBILE " DS_APP_VERSION " - DEVELOPMENT DIAGNOSTICS\n");
+    std::puts("Dead Space Mobile " DS_APP_VERSION " - DEVELOPMENT DIAGNOSTICS\n");
     std::puts("Game lifecycle is NOT implemented. This is not a playable port.\n");
     const auto r=ds::preflight(root);
     std::printf("Data: %s\n",root);
