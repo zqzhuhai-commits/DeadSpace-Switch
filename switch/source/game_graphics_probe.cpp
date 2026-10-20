@@ -1,6 +1,8 @@
 #include "platform_probe.hpp"
 #ifdef DS_CPU_PROBE
 #include "lifecycle_probe.hpp"
+#include "hd_texture.hpp"
+#include "app_paths.hpp"
 #include <SDL2/SDL.h>
 #include <cstdio>
 
@@ -19,6 +21,9 @@ std::string game_graphics_probe(const std::string& root) {
     ds::GraphicsBackend graphics;
     graphics.resolve=[](const char* name){return SDL_GL_GetProcAddress(name);};
     graphics.present=[&]{SDL_GL_SwapWindow(window);SDL_Event event;while(SDL_PollEvent(&event)){};};
+    const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
+    graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};
+    log+="Optional HD root: "+hd_root+" (missing files use original textures)\n";
     log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,8,std::move(graphics));
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
     if(get_error){char text[80];std::snprintf(text,sizeof(text),"Native context GL error after probe: 0x%x\n",get_error());log+=text;}

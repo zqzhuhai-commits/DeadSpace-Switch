@@ -1,5 +1,7 @@
 # Reanimated v1.3 高清材质核验
 
+后续已实现实验性高清运行时，包含键匹配、KTX 读取、独立高清对象和原材质回退；全部 222 张纹理解码与独立参考一致。详见 [运行时接入及验证范围](PROGRESS-HD-RUNTIME.md)。尚未进行实际 PSV 数据联调或 Switch 游戏画面验证。
+
 2026-10-20 实际下载 [v1.3 APK](https://github.com/GINESTR0/DeadSpaceReanimated/releases/tag/v1.3)，没有安装或运行 APK。全文件 SHA256 与 GitHub 发布资产记录一致：
 
 `dbd94ee54fc3fefdddb101fac4eba1e2058a5db7cfcf30ac41ad96e88b285a3a`
@@ -20,7 +22,7 @@ APK 中原始资源在 `assets/game/assets/`。通过静态检查其纹理加载
 
 ## 已完成的 ATC 格式兼容验证
 
-已在可移植 ATC 解码器中新增 `atc::decode_rgba_interpolated`，输出 RGBA8888。针对本包全部 106 张 ATC 材质、1,115 个 mip 层，与独立的 texture2ddecoder 1.0.6 比对（将其 BGRA 输出转换为 RGBA后比较），845,392,488 个输出字节全部一致。另通过 ASan/UBSan 检查透明度两种端点模式、非整块尺寸裁切和短输入拒绝。该函数尚未接入 Switch 游戏加载路径，也不代表已完成整包转码或真机验证。详见 `REANIMATED-HD-ATC-VERIFICATION.json`。
+已在可移植 ATC 解码器中新增 `atc::decode_rgba_interpolated`，输出 RGBA8888。针对本包全部 106 张 ATC 材质、1,115 个 mip 层，与独立的 texture2ddecoder 1.0.6 比对（将其 BGRA 输出转换为 RGBA后比较），845,392,488 个输出字节全部一致。另通过 ASan/UBSan 检查透明度两种端点模式、非整块尺寸裁切和短输入拒绝。该函数现已接入实验性原生 GL 上传路径，但不代表已验证真实游戏或 Switch 效果。详见 `REANIMATED-HD-ATC-VERIFICATION.json`。
 
 ## 接入 Switch 所需工作
 
@@ -43,7 +45,7 @@ python3 switch/tools/reanimated_hd.py /path/to/DeadSpaceReanimated-1.3.apk \
 python3 switch/tests/reanimated_hd_test.py
 ```
 
-工具锁定该发布版 SHA256，拒绝错误包、异常 KTX、重复/危险文件名及已存在的目标目录。失败时清理暂存内容，不发布半成品。它完成提取和映射，**尚未接入 Switch 游戏运行时**。公开仓库仅保存工具与元数据，不包含材质文件。
+工具锁定该发布版 SHA256，拒绝错误包、异常 KTX、重复/危险文件名及已存在的目标目录。失败时清理暂存内容，不发布半成品。提取工具本身不执行游戏；实验性加载和替换路径另见运行时进度，**尚未验证真实游戏整合**。公开仓库仅保存工具与元数据，不包含材质文件。
 
 ## 0.3.2 基线：与实际 PSV 数据比对并准备内置资源
 
@@ -59,6 +61,6 @@ python3 switch/tests/hd_romfs_test.py
 
 RomFS 准备工具在 `gamedata/` 中保留受支持的游戏库和原始资源，另将高清 KTX 放在 `texture_hd/`，两者都纳入顶层逐文件 SHA256 清单。高清目录另含 `donor-compatibility.json`，记录实际匹配数量、对应对象和未匹配键。零匹配时拒绝发布整个 RomFS 暂存目录；部分匹配时明确记录数量，不能据此认定全部 222 张都可用。不会导入 APK 的 Android 运行库。
 
-此工具更新只准备内置数据，**尚无游戏纹理替换入口，亦不生成 NSP**。清单保持 `runtime_integrated: false`。当前 PSV 原版数据未在本工作区找到，因此尚未运行实际 PSV 对照；使用 APK 自带的 265 个 M3G 对扫描器做回归，222 个高清键全部匹配，该结果仅验证扫描器。
+此工具只准备内置数据，**不生成 NSP**。后续实验性纹理替换入口见运行时进度；清单仍保持 `runtime_integrated: false`，表示未验证真实游戏整合。当前 PSV 原版数据未在本工作区找到，因此尚未运行实际 PSV 对照；使用 APK 自带的 265 个 M3G 对扫描器做回归，222 个高清键全部匹配，该结果仅验证扫描器。
 
 格式名称核对：[Khronos ATC 扩展规范](https://github.com/KhronosGroup/OpenGL-Registry/blob/main/extensions/AMD/AMD_compressed_ATC_texture.txt)。

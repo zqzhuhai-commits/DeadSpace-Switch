@@ -1,5 +1,6 @@
 // Independent native EGL/desktop GL reference. No Switch or original game claim.
 #include "guest_gl.hpp"
+#include "hd_texture.hpp"
 #include <array>
 #include <cstring>
 #include <dlfcn.h>
@@ -35,7 +36,7 @@ struct Fixture {
     std::array<uint32_t,16> args{};
     uint32_t next=1024;
     ds::GuestGl bridge;
-    Fixture(Egl& egl):bridge({[&](const char* n){return egl.resolve(n);},{},true},
+    Fixture(Egl& egl,std::function<std::vector<uint8_t>(const std::string&)> hd={},uint64_t budget=128*1024*1024):bridge({[&](const char* n){return egl.resolve(n);},{},true,std::move(hd),budget},
         {[&](unsigned n){return args.at(n);},[&](uint32_t n){return allocate(n);},
          [&](uint32_t p,void* out,size_t n){read(p,out,n);},[&](uint32_t p,const void* data,size_t n){write(p,data,n);}}){}
     uint32_t allocate(uint32_t n){if(uint64_t(next)+n+16>memory.size())throw std::runtime_error("Fixture memory exhausted");auto p=next;next+=(n+15)&~15u;return p;}
@@ -50,9 +51,20 @@ struct Fixture {
     void color(float r,float g,float b){call("glColor4f",{f(r),f(g),f(b),f(1)});}
     void clear(){call("glClearColor",{f(0),f(0),f(0),f(1)});call("glClear",{0x4000});}
 };
+static std::vector<uint8_t> blue_ktx() {
+    const uint8_t magic[]={0xab,0x4b,0x54,0x58,0x20,0x31,0x31,0xbb,0x0d,0x0a,0x1a,0x0a};
+    std::vector<uint8_t> out(magic,magic+12);
+    const auto word=[&](uint32_t v){for(unsigned i=0;i<4;++i)out.push_back(uint8_t(v>>(8*i)));};
+    for(uint32_t v:{0x04030201u,0u,1u,0u,0x87eeu,0x1908u,4u,4u,0u,0u,1u,3u,0u})word(v);
+    const uint8_t block[]={255,0,0,0,0,0,0,0,31,0,0,0,0,0,0,0};
+    for(unsigned level=0;level<3;++level){word(16);out.insert(out.end(),block,block+16);}
+    return out;
+}
 int main(){
     try {
-        Egl egl;Fixture r(egl);
+        Egl egl;std::map<std::string,std::vector<uint8_t>> hd_files;
+        const auto load=[&](const std::string& key){auto it=hd_files.find(key);return it==hd_files.end()?std::vector<uint8_t>{}:it->second;};
+        Fixture r(egl,load);
         std::cout<<"Native renderer: "<<r.text(r.call("glGetString",{0x1f01}))<<'\n';
         std::cout<<"Native version: "<<r.text(r.call("glGetString",{0x1f02}))<<'\n';
         require(r.text(r.call("glGetString",{0x1f03})).empty(),"Advertised unimplemented extensions");
@@ -89,9 +101,36 @@ int main(){
         r.call("glCompressedTexImage2D",{0x0de1,0,0x87ee,4,4,0,16,atcp});r.call("glDrawArrays",{4,0,6});pixel=r.pixel();require(pixel[2]>250&&pixel[0]<3&&pixel[3]>250&&r.bridge.atc_uploads==1,"ATC native upload/readback failed");
         reject([&]{r.call("glCompressedTexImage2D",{0x0de1,0,0x87ee,4,4,0,15,atcp});});
         r.call("glGenFramebuffersOES",{1,ids});const auto framebuffer=r.word(ids);r.call("glBindFramebufferOES",{0x8d40,framebuffer});r.call("glFramebufferTexture2DOES",{0x8d40,0x8ce0,0x0de1,texture,0});require(r.call("glCheckFramebufferStatusOES",{0x8d40})==0x8cd5,"Native FBO incomplete");r.call("glBindFramebufferOES",{0x8d40,0});
+        const uint8_t red[]={255,0,0,255,255,0,0,255,255,0,0,255,255,0,0,255};
+        const auto redp=r.upload(red);const auto redkey=ds::texture_key(2,2,0x1908,std::vector<uint8_t>(red,red+16));hd_files[redkey]=blue_ktx();
+        r.call("glGenTextures",{1,ids});r.call("glBindTexture",{0x0de1,r.word(ids)}); // fresh static object; earlier texture was dynamic
+        r.call("glTexParameteri",{0x0de1,0x2800,0x2600});
+        r.call("glTexParameteri",{0x0de1,0x2801,0x2700});
+        r.call("glTexImage2D",{0x0de1,0,0x1908,2,2,0,0x1908,0x1401,redp});
+        const uint8_t green[]={0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255};const auto greenp=r.upload(green);
+        r.call("glTexImage2D",{0x0de1,1,0x1908,1,1,0,0x1908,0x1401,greenp}); // later original mip cannot overwrite HD chain
+        r.call("glDrawArrays",{4,0,6});pixel=r.pixel();require(pixel[2]>250&&pixel[0]<3&&pixel[1]<3,"Automatic HD substitution not visible");
+        require(r.bridge.hd_matches==1&&r.bridge.hd_mip_uploads==3,"HD full mip chain not uploaded");
+        r.call("glTexImage2D",{0x0de1,0,0x1908,2,2,0,0x1908,0x1401,redp});require(r.bridge.hd_matches==1&&r.bridge.hd_mip_uploads==3,"Identical base upload needlessly rebuilt HD texture");
+        int native_width=0;reinterpret_cast<void(*)(unsigned,int,unsigned,int*)>(egl.resolve("glGetTexLevelParameteriv"))(0x0de1,0,0x1000,&native_width);require(native_width==2,"Draw did not restore original texture binding");
+        r.call("glTexSubImage2D",{0x0de1,0,0,0,2,2,0x1908,0x1401,greenp});r.call("glDrawArrays",{4,0,6});pixel=r.pixel();require(pixel[1]>250&&pixel[2]<3&&r.bridge.hd_dynamic_fallbacks==1,"Dynamic update failed to restore original texture");
+        r.call("glGenTextures",{1,ids});const auto bad_texture=r.word(ids);r.call("glBindTexture",{0x0de1,bad_texture});r.call("glTexParameteri",{0x0de1,0x2801,0x2600});
+        hd_files[redkey]={1,2,3};r.call("glTexImage2D",{0x0de1,0,0x1908,2,2,0,0x1908,0x1401,redp});r.call("glDrawArrays",{4,0,6});pixel=r.pixel();require(pixel[0]>250&&pixel[2]<3&&r.bridge.hd_rejected==1,"Corrupt HD did not fall back to original");
+        const uint8_t rgb_red[]={255,0,0,255,0,0,0x7a,0x7b,255,0,0,255,0,0};const auto rgbp=r.upload(rgb_red);
+        const std::vector<uint8_t> tight_rgb={255,0,0,255,0,0,255,0,0,255,0,0};hd_files[ds::texture_key(2,2,0x1907,tight_rgb)]=blue_ktx();
+        r.call("glGenTextures",{1,ids});r.call("glBindTexture",{0x0de1,r.word(ids)});r.call("glTexParameteri",{0x0de1,0x2801,0x2600});r.call("glTexParameteri",{0x0de1,0x2800,0x2600});
+        r.call("glTexImage2D",{0x0de1,0,0x1907,2,2,0,0x1907,0x1401,rgbp});r.call("glTexEnvi",{0x2300,0x2200,0x1e01});r.call("glColor4f",{Fixture::f(1),Fixture::f(1),Fixture::f(1),Fixture::f(.5f)});r.call("glDrawArrays",{4,0,6});pixel=r.pixel();require(pixel[2]>250&&pixel[0]<3&&pixel[3]>=126&&pixel[3]<=129,"HD changed RGB texture alpha semantics or row hashing");r.call("glTexEnvi",{0x2300,0x2200,0x2100});r.color(1,1,1);
         reject([&]{r.call("glCurrentPaletteMatrixOES",{0});});
+        r.call("glBindFramebufferOES",{0x8d40,framebuffer});r.call("glFramebufferTexture2DOES",{0x8d40,0x8ce0,0x0de1,r.word(ids),0});r.call("glBindFramebufferOES",{0x8d40,0});r.call("glDrawArrays",{4,0,6});pixel=r.pixel();require(pixel[0]>250&&pixel[2]<3&&r.bridge.hd_dynamic_fallbacks==2,"Render-target attachment did not disable stale HD texture");
         r.call("glVertexPointer",{2,0x1406,0,0xfffffff0});reject([&]{r.call("glDrawArrays",{4,0,6});});
         require(r.call("glGetError")==0,"Native GL reports error");
-        std::cout<<"PASS: real native GL pixel readback; client arrays, VBO/EBO, RGB padding, null texture allocation, subimage, ATC alpha, FBO and bounds rejection; draws="<<r.bridge.draws<<'\n';
+        hd_files[redkey]=blue_ktx();
+        Fixture limited(egl,load,80);const auto q=limited.upload(quad),t=limited.upload(coords),source=limited.upload(red),limited_ids=limited.allocate(4);
+        limited.call("glEnableClientState",{0x8074});limited.call("glVertexPointer",{2,0x1406,0,q});limited.call("glEnableClientState",{0x8078});limited.call("glTexCoordPointer",{2,0x1406,0,t});limited.call("glGenTextures",{1,limited_ids});limited.call("glBindTexture",{0x0de1,limited.word(limited_ids)});limited.call("glTexParameteri",{0x0de1,0x2801,0x2600});limited.call("glTexImage2D",{0x0de1,0,0x1908,2,2,0,0x1908,0x1401,source});limited.call("glDrawArrays",{4,0,6});pixel=limited.pixel();require(pixel[0]>250&&pixel[2]<3&&limited.bridge.hd_budget_skips==1&&limited.bridge.hd_matches==0,"HD budget did not preserve original rendering");
+        require(limited.call("glGetError")==0,"Native GL error after budget fallback");
+        reinterpret_cast<void(*)(unsigned)>(egl.resolve("glEnable"))(0xdeadbeef);
+        limited.call("glTexImage2D",{0x0de1,0,0x1908,2,2,0,0x1908,0x1401,source});
+        require(limited.call("glGetError")==0x0500&&limited.call("glGetError")==0,"HD probe swallowed original native GL error");
+        std::cout<<"PASS: native GL readback, arrays/buffers, pixel bounds, compressed upload, HD/full mips/reuse, original binding, RGB alpha, dynamic/corrupt/budget fallback; draws="<<r.bridge.draws<<'\n';
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

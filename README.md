@@ -2,13 +2,15 @@
 
 **0.3.2 开发基线：已加入 JNI、映像/堆修复及可选原生 GL 桥；当前仍是开发诊断版，不是可玩完整版或 NSP。默认 L 诊断使用模拟 GL，R 使用原生 GLES1 子集。**
 
-[0.3.2 源码审查和 NSP 阻塞项](switch/docs/REVIEW-0.3.2.md)。高清资源准备现支持与实际 PSV 数据匹配，并纳入内置 RomFS 校验；尚未接入游戏渲染。
+[0.3.2 源码审查和 NSP 阻塞项](switch/docs/REVIEW-0.3.2.md)。高清资源准备现支持与实际 PSV 数据匹配，并纳入内置 RomFS 校验；尚未验证完整游戏运行。
 
 [后续 JNI 修复](switch/docs/PROGRESS-JNI-0.3.2.md)：已修正函数表、参数解码、实例接收者、字符串/数组和真实资源读取，通过主机 ASan/UBSan 回归；尚未重跑真实 PSV 库或验证游戏画面。
 
 [后续内存修复](switch/docs/PROGRESS-MEMORY-0.3.2.md)：已删除与栈冲突的第二份映像，修复嵌套调用现场恢复、堆复用及 realloc 越界读取，通过主机回归；线程调度仍待实现。
 
-[原生 GL 接入](switch/docs/PROGRESS-NATIVE-GL.md)：真实 GL 子集已接到生命周期执行器，并通过主机 Mesa 像素回读。ATC 格式支持解码后原生上传；尚未实现高清包自动替换或验证 Switch 游戏画面。
+[原生 GL 接入](switch/docs/PROGRESS-NATIVE-GL.md)：真实 GL 子集已接到生命周期执行器，并通过主机 Mesa 像素回读；尚未验证 Switch 游戏画面。
+
+[高清运行时接入](switch/docs/PROGRESS-HD-RUNTIME.md)：已加入哈希匹配、KTX 完整 mip 上传、独立高清对象和原图回退，通过主机原生回读；222 张高清图的 2,310 层与独立解码器一致。尚未进行实际 PSV 联调或 Switch 画面验证。
 
 0.2.1 源码已按实机日志修正路径与版本标识：开发目录改为 `deadspacemobile`，增加完整库路径提示、CPU探测开始/结束日志及包内 RomFS 数据源选择。基础图形/PVRTC实机通过；CPU尚无实机结果，4个矩阵调色板入口缺失。详见 [实机日志分析](switch/docs/DEVICE-LOG-20261020.md)。
 
@@ -103,7 +105,7 @@ Dynarmic 主机短函数与构造函数通过。独立 Unicorn 调查已通过 J
 
 ## Reanimated 高清包
 
-已核验并单独提取 v1.3 APK 的 222 份 KTX 高清材质，在 APK 自带原始资源中全部找到精确映射。新增提取工具及 ATC 插值透明解码支持；尚未接入 Switch 实际渲染，也未与 PSV 数据逐对象比对。详见 [高清包审计与接入限制](switch/docs/REANIMATED-HD.md)。
+已核验并单独提取 v1.3 APK 的 222 份 KTX 高清材质，在 APK 自带原始资源中全部找到精确映射。已加入实验性哈希替换、KTX 完整 mip 上传和原图回退；尚未验证 Switch 游戏画面，也未与 PSV 数据逐对象比对。详见 [高清包审计与接入限制](switch/docs/REANIMATED-HD.md)。
 
 ## License
 

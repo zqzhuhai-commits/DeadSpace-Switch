@@ -1,0 +1,16 @@
+{
+  "source_apk_sha256": "dbd94ee54fc3fefdddb101fac4eba1e2058a5db7cfcf30ac41ad96e88b285a3a",
+  "reference": "texture2ddecoder 1.0.6 (BGRA converted to RGBA)",
+  "texture_counts": {
+    "ETC1_RGB8_OES": 116,
+    "ATC_RGBA_INTERPOLATED_ALPHA_AMD": 106
+  },
+  "mip_counts": {
+    "ETC1_RGB8_OES": 1195,
+    "ATC_RGBA_INTERPOLATED_ALPHA_AMD": 1115
+  },
+  "compared_rgba_bytes": 1876164400,
+  "all_mips_equal": true,
+  "switch_hardware_tested": false,
+  "original_game_executed": false
+}

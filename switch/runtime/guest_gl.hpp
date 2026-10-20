@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,6 +13,8 @@ struct GraphicsBackend {
     std::function<void*(const char*)> resolve;
     std::function<void()> present;
     bool desktop_compatibility=false; // host reference only; Switch uses GLES1
+    std::function<std::vector<uint8_t>(const std::string&)> hd_texture={};
+    uint64_t hd_budget_bytes=128*1024*1024;
 };
 struct GlGuestMemory {
     std::function<uint32_t(unsigned)> arg;
@@ -30,6 +33,14 @@ class GuestGl {
     std::map<U,std::vector<uint8_t>> buffers;
     std::map<U,bool> index_contents_known;
     std::map<U,U> strings;
+    U active_unit=0;
+    std::map<U,U> texture_bindings;
+    struct Replacement {U shadow,width,height;uint64_t bytes;std::string key;};
+    std::map<U,Replacement> replacements;
+    std::set<U> dynamic_textures;
+    std::set<std::string> missing_hd_keys;
+    uint64_t hd_live_bytes=0;
+    std::vector<U> pending_errors;
     void* proc(const std::string& name);
     template<class Signature> Signature fn(const std::string& name){return reinterpret_cast<Signature>(proc(name));}
     U arg(unsigned n) const {return memory.arg(n);}
@@ -42,9 +53,17 @@ class GuestGl {
     Array& array(U name);
     void prepare_arrays(U last);
     void pointer(const std::string&,U size,U type,U stride,const void* data);
+    void invalidate_hd(U texture,bool dynamic=false);
+    void maybe_replace(U target,U level,U width,U height,U format,const std::vector<uint8_t>& pixels);
+    void draw_textured(const std::function<void()>& draw);
+    static U storage_format(U original_format);
+    void upload_rgba(U target,U level,U width,U height,U format,const std::vector<uint8_t>& rgba);
 public:
     GuestGl(GraphicsBackend b,GlGuestMemory m):backend(std::move(b)),memory(std::move(m)){}
+    ~GuestGl();
     U call(const std::string& name);
     uint64_t calls=0,draws=0,texture_uploads=0,atc_uploads=0;
+    uint64_t hd_matches=0,hd_rejected=0,hd_misses=0,hd_budget_skips=0,hd_dynamic_fallbacks=0,hd_mip_uploads=0;
+    std::string last_hd_error;
 };
 }

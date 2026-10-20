@@ -1,5 +1,5 @@
 #include "guest_gl.hpp"
-#include "../../src/atc_decompress.h"
+#include "hd_texture.hpp"
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
@@ -87,9 +87,92 @@ void GuestGl::prepare_arrays(U last) {
     fn<void(*)(U,U)>("glBindBuffer")(0x8892,array_buffer);
     fn<void(*)(U)>("glClientActiveTexture")(0x84c0+client_unit);
 }
+GuestGl::~GuestGl(){try{while(!replacements.empty())invalidate_hd(replacements.begin()->first);}catch(...){};}
+void GuestGl::invalidate_hd(U texture,bool dynamic) {
+    const auto it=replacements.find(texture);
+    if(it!=replacements.end()) {
+        fn<void(*)(I,const U*)>("glDeleteTextures")(1,&it->second.shadow);
+        hd_live_bytes-=it->second.bytes;replacements.erase(it);
+        if(dynamic)++hd_dynamic_fallbacks;
+    }
+    if(dynamic&&texture)dynamic_textures.insert(texture);
+}
+GuestGl::U GuestGl::storage_format(U format) {
+    if(format==0x8d64||format==0x8c92||format==0x8c00||format==0x8c01)return 0x1907;
+    if(format==0x87ee||format==0x8c93||format==0x8c02||format==0x8c03)return 0x1908;
+    if(format==0x1906||format==0x1907||format==0x1908||format==0x1909||format==0x190a)return format;
+    throw std::runtime_error("Unsupported HD source channel semantics");
+}
+void GuestGl::upload_rgba(U target,U level,U w,U h,U format,const std::vector<uint8_t>& rgba) {
+    if(rgba.size()!=uint64_t(w)*h*4)throw std::runtime_error("Decoded texture size mismatch");
+    std::vector<uint8_t> converted;
+    const void* pixels=rgba.data();
+    if(format!=0x1908) {
+        const U channels=format==0x1907?3:format==0x190a?2:1;
+        converted.resize(size_t(w)*h*channels);
+        for(size_t i=0;i<size_t(w)*h;++i){auto* out=converted.data()+i*channels;const auto* in=rgba.data()+i*4;if(format==0x1907){out[0]=in[0];out[1]=in[1];out[2]=in[2];}else if(format==0x190a){out[0]=in[0];out[1]=in[3];}else out[0]=format==0x1906?in[3]:in[0];}
+        pixels=converted.data();
+    }
+    fn<void(*)(U,I,I,I,I,I,U,U,const void*)>("glTexImage2D")(target,I(level),I(format),I(w),I(h),0,format,0x1401,pixels);
+}
+void GuestGl::maybe_replace(U target,U level,U w,U h,U format,const std::vector<uint8_t>& pixels) {
+    const U original=texture_bindings[active_unit];
+    if(!backend.hd_texture||target!=0x0de1||!original||level||dynamic_textures.count(original)||!w||!h)return;
+    const auto key=texture_key(w,h,format,pixels);
+    if(replacements.count(original) && replacements.at(original).key==key)return;
+    invalidate_hd(original);
+    if(missing_hd_keys.count(key))return;
+    U shadow=0;
+    try {
+        auto data=backend.hd_texture(key);
+        if(data.empty()){++hd_misses;if(missing_hd_keys.size()<4096)missing_hd_keys.insert(key);return;}
+        const auto hd=HdTexture::parse(std::move(data));
+        if(hd.width<=w || hd.width%w || hd.height%h || hd.width/w!=hd.height/h)throw std::runtime_error("HD texture scale mismatch");
+        if(const U error=fn<U(*)()>("glGetError")()) {
+            if(pending_errors.size()==16)throw std::runtime_error("GL error queue bound");
+            pending_errors.push_back(error);++hd_rejected;last_hd_error="Original GL error before HD upload: "+std::to_string(error);return;
+        }
+        I maximum=0;fn<void(*)(U,I*)>("glGetIntegerv")(0x0d33,&maximum);
+        if(maximum<1||hd.width>U(maximum)||hd.height>U(maximum))throw std::runtime_error("HD dimensions exceed native GL capability");
+        uint64_t bytes=0;for(const auto& mip:hd.levels)bytes+=uint64_t(mip.width)*mip.height*4;
+        if(hd_live_bytes>backend.hd_budget_bytes || bytes>backend.hd_budget_bytes-hd_live_bytes){++hd_budget_skips;return;}
+        // Original texture and its mip chain remain untouched for exact fallback.
+        fn<void(*)(I,U*)>("glGenTextures")(1,&shadow);if(!shadow)throw std::runtime_error("HD texture allocation failed");
+        fn<void(*)(U,U)>("glBindTexture")(0x0de1,shadow);
+        fn<void(*)(U,I)>("glPixelStorei")(0x0cf5,1);
+        for(unsigned level_index=0;level_index<hd.levels.size();++level_index) {
+            const auto& mip=hd.levels[level_index];const auto rgba=hd.rgba(level_index);
+            upload_rgba(0x0de1,level_index,mip.width,mip.height,storage_format(format),rgba);
+            if(fn<U(*)()>("glGetError")()!=0)throw std::runtime_error("Native GL rejected HD mip upload");
+            ++hd_mip_uploads;if(hd.format==0x87ee)++atc_uploads;
+        }
+        fn<void(*)(U,I)>("glPixelStorei")(0x0cf5,I(unpack));
+        fn<void(*)(U,U)>("glBindTexture")(0x0de1,original);
+        replacements.emplace(original,Replacement{shadow,w,h,bytes,key});hd_live_bytes+=bytes;++hd_matches;
+    } catch(const std::exception& e) {
+        ++hd_rejected;last_hd_error=std::string(e.what()).substr(0,512);
+        if(missing_hd_keys.size()<4096)missing_hd_keys.insert(key);
+        if(shadow){fn<void(*)(U,I)>("glPixelStorei")(0x0cf5,I(unpack));fn<void(*)(U,U)>("glBindTexture")(0x0de1,original);fn<void(*)(I,const U*)>("glDeleteTextures")(1,&shadow);}
+    }
+}
+void GuestGl::draw_textured(const std::function<void()>& draw) {
+    std::vector<std::pair<U,U>> changed;
+    const auto restore=[&]{for(const auto& binding:changed){fn<void(*)(U)>("glActiveTexture")(0x84c0+binding.first);fn<void(*)(U,U)>("glBindTexture")(0x0de1,binding.second);}fn<void(*)(U)>("glActiveTexture")(0x84c0+active_unit);};
+    try {
+        for(const auto& binding:texture_bindings) {
+            const auto it=replacements.find(binding.second);if(it==replacements.end())continue;
+            fn<void(*)(U)>("glActiveTexture")(0x84c0+binding.first);
+            I values[4]{};const U names[]={0x2800,0x2801,0x2802,0x2803};
+            for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I*)>("glGetTexParameteriv")(0x0de1,names[i],&values[i]);
+            changed.push_back(binding);fn<void(*)(U,U)>("glBindTexture")(0x0de1,it->second.shadow);
+            for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I)>("glTexParameteri")(0x0de1,names[i],values[i]);
+        }
+        draw();restore();
+    } catch(...){restore();throw;}
+}
 GuestGl::U GuestGl::call(const std::string& name) {
     ++calls;const U a=arg(0),b=arg(1),c=arg(2),d=arg(3);
-    if(name=="glGetError")return fn<U(*)()>(name)();
+    if(name=="glGetError") {if(!pending_errors.empty()){const U error=pending_errors.front();pending_errors.erase(pending_errors.begin());return error;}return fn<U(*)()>(name)();}
     if(name=="glGetString") {
         if(strings.count(a))return strings.at(a);
         const auto* str=fn<const B*(*)(U)>(name)(a);if(!str)return 0;
@@ -111,7 +194,7 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(one_of(name,{"glGenTextures","glGenBuffers","glGenFramebuffersOES","glGenRenderbuffersOES","glDeleteTextures","glDeleteBuffers","glDeleteFramebuffersOES","glDeleteRenderbuffersOES"})) {
         if(a>65536 || (a&&!b))throw std::runtime_error("GL object list bound");
         std::vector<U> v(a);
-        if(name.rfind("glDelete",0)==0){if(a)memory.read(b,v.data(),a*4);fn<void(*)(I,const U*)>(name)(I(a),v.data());if(name=="glDeleteBuffers")for(U id:v){buffers.erase(id);index_contents_known.erase(id);if(array_buffer==id)array_buffer=0;if(element_buffer==id)element_buffer=0;for(auto& entry:arrays)if(entry.second.buffer==id){entry.second.pointer=0;entry.second.buffer=0;}}}
+        if(name.rfind("glDelete",0)==0){if(a)memory.read(b,v.data(),a*4);if(name=="glDeleteTextures")for(U id:v){invalidate_hd(id);dynamic_textures.erase(id);for(auto& binding:texture_bindings)if(binding.second==id)binding.second=0;}fn<void(*)(I,const U*)>(name)(I(a),v.data());if(name=="glDeleteBuffers")for(U id:v){buffers.erase(id);index_contents_known.erase(id);if(array_buffer==id)array_buffer=0;if(element_buffer==id)element_buffer=0;for(auto& entry:arrays)if(entry.second.buffer==id){entry.second.pointer=0;entry.second.buffer=0;}}}
         else {fn<void(*)(I,U*)>(name)(I(a),v.data());if(a)memory.write(b,v.data(),a*4);}
         return 0;
     }
@@ -143,7 +226,7 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(name=="glDrawArrays") {
         if(b>1000000||c>1000000 || uint64_t(b)+c>1000000)throw std::runtime_error("GL vertex count bound");
         if(c)prepare_arrays(b+c-1);
-        fn<void(*)(U,I,I)>(name)(a,I(b),I(c));++draws;return 0;
+        draw_textured([&]{fn<void(*)(U,I,I)>(name)(a,I(b),I(c));});++draws;return 0;
     }
     if(name=="glDrawElements") {
         if(b>1000000 || (c!=0x1401&&c!=0x1403))throw std::runtime_error("GL index count/type bound");
@@ -153,28 +236,37 @@ GuestGl::U GuestGl::call(const std::string& name) {
         else {indices=copy(d,n);data=indices.data();}
         U last=0;for(U i=0;i<b;++i){const U value=c==0x1401?indices[i]:U(indices[2*i])|U(indices[2*i+1])<<8;last=std::max(last,value);}
         if(b)prepare_arrays(last);
-        fn<void(*)(U,I,U,const void*)>(name)(a,I(b),c,data);++draws;return 0;
+        draw_textured([&]{fn<void(*)(U,I,U,const void*)>(name)(a,I(b),c,data);});++draws;return 0;
     }
     if(name=="glPixelStorei") {if((a!=0x0cf5&&a!=0x0d05)||(b!=1&&b!=2&&b!=4&&b!=8))throw std::runtime_error("Unsupported GL pixel-store state");fn<void(*)(U,I)>(name)(a,I(b));(a==0x0cf5?unpack:pack)=b;return 0;}
     if(name=="glTexImage2D"||name=="glTexSubImage2D") {
         const bool sub=name=="glTexSubImage2D";
         const I w=I(arg(sub?4:3)),h=I(arg(sub?5:4));const U format=arg(6),type=arg(7),p=arg(8);
         const auto n=pixel_bytes(w,h,format,type,unpack);auto bytes=p?copy(p,n):std::vector<uint8_t>{};
-        if(sub){if(n&&!p)throw std::runtime_error("Null GL texture subimage data");fn<void(*)(U,I,I,I,I,I,U,U,const void*)>(name)(a,I(b),I(c),I(d),w,h,format,type,bytes.data());}
-        else fn<void(*)(U,I,I,I,I,I,U,U,const void*)>(name)(a,I(b),I(c),w,h,I(arg(5)),format,type,p?bytes.data():nullptr);
+        if(sub){if(n&&!p)throw std::runtime_error("Null GL texture subimage data");invalidate_hd(texture_bindings[active_unit],true);fn<void(*)(U,I,I,I,I,I,U,U,const void*)>(name)(a,I(b),I(c),I(d),w,h,format,type,bytes.data());}
+        else {
+            if(!b&&(!p||arg(5)||w<=0||h<=0||!backend.hd_texture))invalidate_hd(texture_bindings[active_unit]);
+            fn<void(*)(U,I,I,I,I,I,U,U,const void*)>(name)(a,I(b),I(c),w,h,I(arg(5)),format,type,p?bytes.data():nullptr);
+            if(p&&!b&&!arg(5)&&w>0&&h>0&&backend.hd_texture) {
+                const auto row=pixel_bytes(w,1,format,type,1),step=(row+unpack-1)&~size_t(unpack-1);
+                std::vector<uint8_t> tight(size_t(h)*row);
+                for(I y=0;y<h;++y)std::copy_n(bytes.data()+size_t(y)*step,row,tight.data()+size_t(y)*row);
+                maybe_replace(a,b,U(w),U(h),format,tight);
+            }
+        }
         ++texture_uploads;return 0;
     }
     if(name=="glCompressedTexImage2D") {
         const I w=I(d),h=I(arg(4));if(w<1||h<1||w>4096||h>4096||arg(5)!=0)throw std::runtime_error("Compressed GL texture dimensions/border bound");
         const auto bytes=copy(arg(7),checked(arg(6)));
-        if(c==0x87ee||c==0x8c93||c==0x8c92) {
-            std::vector<B> rgba(checked(uint64_t(w)*h*4));
-            const bool ok=c==0x87ee?atc::decode_rgba_interpolated(bytes.data(),bytes.size(),w,h,rgba.data()):c==0x8c93?atc::decode_rgba_explicit(bytes.data(),bytes.size(),w,h,rgba.data()):atc::decode_rgb(bytes.data(),bytes.size(),w,h,rgba.data());
-            if(!ok)throw std::runtime_error("Invalid ATC compressed GL texture");
+        if(!b&&!backend.hd_texture)invalidate_hd(texture_bindings[active_unit]);
+        if(c==0x8d64||c==0x87ee||c==0x8c93||c==0x8c92||(c>=0x8c00&&c<=0x8c03)) {
+            const auto rgba=decode_texture_rgba(c,U(w),U(h),bytes);
             fn<void(*)(U,I)>("glPixelStorei")(0x0cf5,1);
-            fn<void(*)(U,I,I,I,I,I,U,U,const void*)>("glTexImage2D")(a,I(b),0x1908,w,h,0,0x1908,0x1401,rgba.data());
-            fn<void(*)(U,I)>("glPixelStorei")(0x0cf5,I(unpack));++atc_uploads;
+            upload_rgba(a,b,U(w),U(h),storage_format(c),rgba);
+            fn<void(*)(U,I)>("glPixelStorei")(0x0cf5,I(unpack));if(c==0x87ee||c==0x8c93||c==0x8c92)++atc_uploads;
         } else fn<void(*)(U,I,U,I,I,I,I,const void*)>(name)(a,I(b),c,w,h,0,I(arg(6)),bytes.data());
+        if(!b)maybe_replace(a,b,U(w),U(h),c,bytes);
         ++texture_uploads;return 0;
     }
     if(name=="glReadPixels") {
@@ -218,13 +310,15 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(one_of(name,{"glViewport","glScissor"})){fn<void(*)(I,I,I,I)>(name)(I(a),I(b),I(c),I(d));return 0;}
     if(one_of(name,{"glTexParameteri","glTexEnvi"})){fn<void(*)(U,U,I)>(name)(a,b,I(c));return 0;}
     if(one_of(name,{"glTexParameterf","glTexEnvf"})){fn<void(*)(U,U,F)>(name)(a,b,number(2));return 0;}
-    if(one_of(name,{"glBindTexture","glBlendFunc","glHint","glBindFramebufferOES","glBindRenderbufferOES","glBlendEquationSeparateOES"})){fn<void(*)(U,U)>(name)(a,b);return 0;}
-    if(one_of(name,{"glActiveTexture","glMatrixMode","glClear","glEnable","glDisable","glDepthFunc","glCullFace","glFrontFace","glShadeModel","glStencilMask","glLogicOp","glGenerateMipmapOES","glBlendEquationOES"})){fn<void(*)(U)>(name)(a);return 0;}
+    if(name=="glBindTexture") {if(a!=0x0de1)throw std::runtime_error("Unsupported GL texture target");fn<void(*)(U,U)>(name)(a,b);texture_bindings[active_unit]=b;return 0;}
+    if(name=="glActiveTexture") {I units=0;fn<void(*)(U,I*)>("glGetIntegerv")(0x84e2,&units);if(a<0x84c0||a>=0x84c0+std::min(4u,U(std::max(0,units))))throw std::runtime_error("GL active texture unit bound");fn<void(*)(U)>(name)(a);active_unit=a-0x84c0;return 0;}
+    if(one_of(name,{"glBlendFunc","glHint","glBindFramebufferOES","glBindRenderbufferOES","glBlendEquationSeparateOES"})){fn<void(*)(U,U)>(name)(a,b);return 0;}
+    if(one_of(name,{"glMatrixMode","glClear","glEnable","glDisable","glDepthFunc","glCullFace","glFrontFace","glShadeModel","glStencilMask","glLogicOp","glGenerateMipmapOES","glBlendEquationOES"})){fn<void(*)(U)>(name)(a);return 0;}
     if(name=="glClearStencil"){fn<void(*)(I)>(name)(I(a));return 0;}
     if(name=="glStencilFunc"){fn<void(*)(U,I,U)>(name)(a,I(b),c);return 0;}
     if(name=="glStencilOp"){fn<void(*)(U,U,U)>(name)(a,b,c);return 0;}
     if(name=="glCheckFramebufferStatusOES")return fn<U(*)(U)>(name)(a);
-    if(name=="glFramebufferTexture2DOES"){fn<void(*)(U,U,U,U,I)>(name)(a,b,c,d,I(arg(4)));return 0;}
+    if(name=="glFramebufferTexture2DOES"){if(d)invalidate_hd(d,true);fn<void(*)(U,U,U,U,I)>(name)(a,b,c,d,I(arg(4)));return 0;}
     if(name=="glFramebufferRenderbufferOES"){fn<void(*)(U,U,U,U)>(name)(a,b,c,d);return 0;}
     if(name=="glRenderbufferStorageOES"){fn<void(*)(U,U,I,I)>(name)(a,b,I(c),I(d));return 0;}
     if(one_of(name,{"glIsTexture","glIsBuffer","glIsEnabled","glIsFramebufferOES","glIsRenderbufferOES"}))return fn<B(*)(U)>(name)(a);
