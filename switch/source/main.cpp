@@ -5,6 +5,7 @@
 #ifdef DS_CPU_PROBE
 #include "cpu_probe.hpp"
 #include "constructor_probe.hpp"
+#include "lifecycle_probe.hpp"
 #endif
 #include <cstdio>
 #include <string>
@@ -47,10 +48,8 @@ int main() {
 #endif
     const Result romfs_result=romfsInit();
     const bool romfs_mounted=R_SUCCEEDED(romfs_result);
-    if(romfs_mounted) {
-        struct stat st{};
-        if(stat("romfs:/gamedata/lib/armeabi/libEAMGameDeadSpace.so",&st)==0 && S_ISREG(st.st_mode))root=ds::paths::packaged_game_directory;
-    }
+    struct stat st{};
+    if(stat("romfs:/gamedata/lib/armeabi/libEAMGameDeadSpace.so",&st)==0 && S_ISREG(st.st_mode))root=ds::paths::packaged_game_directory;
     record(std::string("Selected data root: ")+root);
     PadState pad;
     padConfigureInput(1,HidNpadStyleSet_NpadStandard);
@@ -80,6 +79,14 @@ int main() {
             const auto result=cpu_probe(library)+constructor_probe(library);
             record(result);consoleClear();std::puts(result.c_str());
             record("ARM32 CPU probe end");
+            std::puts("A: return to data diagnostics  +: exit");
+        }
+        if (down&HidNpadButton_L) {
+            record("JNI lifecycle probe begin");
+            const auto library=std::string(root)+"/lib/armeabi/libEAMGameDeadSpace.so";
+            const auto result=lifecycle_probe(library,root,2);
+            record(result);consoleClear();std::puts(result.c_str());
+            record("JNI lifecycle probe end");
             std::puts("A: return to data diagnostics  +: exit");
         }
 #endif
