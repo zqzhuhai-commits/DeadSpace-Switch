@@ -1,6 +1,6 @@
 # Dead Space Mobile — Switch 移植开发项目
 
-**0.2.0：ARM32 执行核心原型和 Switch 诊断程序，不是可玩版；游戏生命周期尚未接通，也未通过 Switch 实机测试。**
+**0.3.0：C++/Dynarmic 主机已执行真实库的全部 209 个构造函数；Switch 版本已编译，尚未实机验证。当前仍是开发诊断版，不是可玩完整版或 NSP。**
 
 0.2.1 源码已按实机日志修正路径与版本标识：开发目录改为 `deadspacemobile`，增加完整库路径提示、CPU探测开始/结束日志及包内 RomFS 数据源选择。基础图形/PVRTC实机通过；CPU尚无实机结果，4个矩阵调色板入口缺失。详见 [实机日志分析](switch/docs/DEVICE-LOG-20261020.md)。
 
@@ -16,7 +16,7 @@
 - 独立 GLES1.1 探测：游戏所需 190 个 GL 名称、matrix-palette 扩展和固定管线三角形回读。
 - Dynarmic 执行核心原型：主机实际运行真实游戏库的 5 个短函数，返回值全部正确；Thumb、VFP 与非法执行拒绝测试通过。Switch JIT 适配及含 B 键 CPU 测试的 NRO 已编译，等待实机运行。
 
-这些平台诊断均已编译，但尚未在 Switch 执行。非空函数指针或扩展声明不能证明骨骼渲染正确；音频队列消耗不能代替实际听音。数据检查仅验证必要资源文件存在，不保证章节资源完整。
+用户实机日志已验证 GLES2/PVRTC 和 GLES1 基础三角形；CPU/JIT 和新构造函数测试尚无实机结果。非空函数指针或扩展声明不能证明骨骼渲染正确；音频队列消耗不能代替实际听音。数据检查仅验证必要资源文件存在，不保证章节资源完整。
 
 ## 编译
 
@@ -28,7 +28,7 @@ make -C switch -j2
 
 产物：`switch/build/deadspace-switch.nro`。本次工具版本：GCC 16.1.0、libnx 4.12.0、SDL2 2.28.5、Mesa 20.1.0。编译和链接均需 `-fPIC`，以选择 PIC C++ 运行库。根目录原 Makefile 仍用于 Linux ARM32。
 
-包含 ARM32 执行核心的 0.2.0 版本另按 [CPU-BACKEND.md](switch/docs/CPU-BACKEND.md) 编译，需要初始化固定版本的 Dynarmic 子模块、应用 Switch JIT 补丁，并安装 Boost 头文件。默认 Makefile 仍生成较小的平台诊断版。
+包含 ARM32 执行核心的版本另按 [CPU-BACKEND.md](switch/docs/CPU-BACKEND.md) 编译，需要初始化固定版本的 Dynarmic 子模块、应用 Switch JIT 补丁，并安装 Boost 头文件。默认 Makefile 仍生成较小的平台诊断版。
 
 主机测试（Python3、g++）：
 
@@ -52,7 +52,7 @@ python3 switch/tools/prepare_data.py /path/to/PSV-data.zip /path/to/sdcard/switc
 
 2026-10-20 用户提供的后续直链 RAR 已完整下载（139,943,803 字节），MD5 为 `3a96fad461ac674b62464349a55d96e1`，与链接标注一致。实际游戏库 SHA1 精确匹配支持版本，1,746 个游戏库与资源文件已安全提取，导入和数据预检通过。章节完整性尚未验证。
 
-真实库审计：2 个加载段，392 个导入符号（含 190 个 GL 名称），69 个 JNI 导出（68 个 Java_* 加 JNI_OnLoad）。主机字节数组中已完成段映射、BSS 清零和 22,677 条 RELATIVE 重定位；其余外部符号绑定仍延后处理。此步骤没有执行 ARM32 指令，也不是 Switch 实机加载。
+真实库审计：2 个加载段，392 个导入符号（含 190 个 GL 名称），69 个 JNI 导出（68 个 Java_* 加 JNI_OnLoad）。主机字节数组中已完成段映射、BSS 清零和 22,677 条 RELATIVE 重定位；上述审计是静态检查。0.3.0 的独立 C++ 构造函数运行时已完成剩余符号重定位与受控导入绑定，实际完成 209 个构造函数和 112 次外部调用；不等于 Switch 实机加载或游戏生命周期。
 
 ```sh
 python3 switch/tools/audit_donor.py /path/to/libEAMGameDeadSpace.so --output donor-audit.json
@@ -67,15 +67,29 @@ python3 switch/tools/audit_donor.py /path/to/libEAMGameDeadSpace.so --output don
 - A：重扫数据。
 - X：GLES2/PVRTC/音频平台测试，约3秒。
 - Y：游戏 GLES1.1 固定管线兼容性探测。
-- B（0.2.0 CPU 版本）：运行真实库短函数及 Thumb/VFP 测试，结果写入诊断日志。
+- B（0.3.0 CPU 版本）：运行真实库短函数、Thumb/VFP 及全部构造函数，结果写入诊断日志。
 - +：退出。
 - 摇杆与触摸：检查屏幕上的坐标读数。
 
 日志：`/switch/deadspacemobile/diagnostics.log`。没有游戏文件也能运行平台诊断；本程序不要求密钥、超频或系统配置修改。
 
+## 内置资源构建
+
+最终目标仍为自包含 NSP，无需外部数据文件夹。当前先验证同一 RomFS 资源布局的内置 NRO：
+
+```sh
+python3 switch/tools/prepare_romfs.py /path/to/extracted/PSV-data /path/to/new-romfs
+make -C switch CPU_PROBE=1 CPU_BUILD_DIR=/path/to/cpu-build ROMFS_ROOT=/path/to/new-romfs
+python3 switch/tools/verify_romfs.py switch/build/deadspace-switch.nro
+```
+
+先按 CPU 构建说明编译执行核心。RomFS 中内置 `gamedata/`，运行时优先从包内读取。工具会从构建产物逐文件回读并核验 SHA256；本轮 1,746 个原始文件及 1 个导入记录全部一致，共 259,247,598 字节。资源打包验证不代表游戏可玩。
+
+详见 [0.3.0 实测与限制](switch/docs/PROGRESS-0.3.0.md)。
+
 ## 下一开发关卡
 
-实际游戏库和重定位已完成静态核验；Dynarmic 主机执行短函数已通过。下一步验证 Switch 上的 JIT 原型，并接通外部函数调用与 JNI/Bionic。接通 GLES1、音频、控制和存档后，以第一关可操作、射击、实际声音、存档读档和切关为可玩门槛。详见 `switch/docs/CPU-BACKEND.md`。
+Dynarmic 主机短函数与构造函数通过。独立 Unicorn 调查已通过 JNI_OnLoad、创建及第一轮 DrawFrame，第二轮停在真实 glGetIntegerv；没有伪造 GL 返回值。该调查尚未移入 Switch C++ 生命周期。下一步验证 Switch JIT，并迁移 JNI/JavaVM、资源流与实际 GL 桥。接通 GLES1、音频、控制和存档后，以第一关可操作、射击、实际声音、存档读档和切关为可玩门槛。详见 `switch/docs/CPU-BACKEND.md`。
 
 当前 NRO 只建立平台诊断能力。没有将 Linux qemu 测试、三角形或占位接口宣称为游戏运行，也没有制作“可玩 NSP”。
 

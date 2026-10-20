@@ -14,16 +14,20 @@ CPPFLAGS := -D__SWITCH__ -D_REENTRANT -Iinclude -isystem $(NX)/include -isystem 
 CXXFLAGS := -std=gnu++17 -O2 -g -Wall -Wextra -Werror $(ARCH) -fPIC -ffunction-sections -fdata-sections
 LDFLAGS := $(ARCH) -fPIC -specs=$(NX)/switch.specs -Wl,-Map,build/deadspace-switch.map -Wl,--gc-sections -L$(NX)/lib -L$(PORT)/lib
 LIBS := -lSDL2 -lGLESv2 -lEGL -lglapi -ldrm_nouveau -lnx -lm -lpthread
-APP_VERSION := 0.2.1
+APP_VERSION := 0.3.0
 ifeq ($(CPU_PROBE),1)
 CPU_BUILD_DIR ?= build/cpu
 CPPFLAGS += -DDS_CPU_PROBE -Iruntime
 LIBS := -Wl,--start-group $(CPU_BUILD_DIR)/libds_cpu_probe.a $(CPU_BUILD_DIR)/dynarmic/src/dynarmic/libdynarmic.a $(CPU_BUILD_DIR)/dynarmic/externals/fmt/libfmt.a $(CPU_BUILD_DIR)/dynarmic/externals/mcl/src/libmcl.a -Wl,--end-group $(LIBS)
 endif
 CPPFLAGS += -DDS_APP_VERSION='"$(APP_VERSION)"'
+ifneq ($(strip $(ROMFS_ROOT)),)
+ROMFS_OPTION := --romfsdir="$(ROMFS_ROOT)"
+endif
 OBJECTS := build/main.o build/preflight.o build/platform_probe.o build/fixed_function_probe.o build/PVRTDecompress.o
 
-.PHONY: all clean host-test
+.PHONY: all clean host-test FORCE
+FORCE:
 all: build/deadspace-switch.nro
 build:
 	mkdir -p build
@@ -35,8 +39,8 @@ build/deadspace-switch.elf: $(OBJECTS)
 	$(CXX) $(LDFLAGS) $^ $(LIBS) -o $@
 build/deadspace-switch.nacp: Makefile | build
 	nacptool --create "$(APP_TITLE)" "Switch Port Contributors" "$(APP_VERSION)" $@
-build/deadspace-switch.nro: build/deadspace-switch.elf build/deadspace-switch.nacp $(APP_ICON)
-	elf2nro $< $@ --nacp=build/deadspace-switch.nacp --icon=$(APP_ICON)
+build/deadspace-switch.nro: build/deadspace-switch.elf build/deadspace-switch.nacp $(APP_ICON) FORCE
+	elf2nro $< $@ --nacp=build/deadspace-switch.nacp --icon=$(APP_ICON) $(ROMFS_OPTION)
 host-test:
 	python3 tests/run_tests.py
 clean:

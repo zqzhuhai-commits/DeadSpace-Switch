@@ -1,0 +1,19 @@
+{
+  "version": "0.3.0",
+  "title": "Dead Space Mobile",
+  "nro_sha256": "103b2ca0ab73b4ff96c1666b3bc5cf5dc9c6743c42b856ec124598efaa21ee2e",
+  "nro_bytes": 268791240,
+  "embedded_romfs_bytes": 259712216,
+  "embedded_files_verified": 1747,
+  "embedded_content_bytes_verified": 259247598,
+  "icon_exact_match": true,
+  "nacp_title_and_version_checked": true,
+  "host_actual_constructors_returned": 209,
+  "host_constructor_import_calls": 112,
+  "host_leaf_tests": 5,
+  "host_loader_asan_ubsan": "passed; LeakSanitizer disabled in container",
+  "host_boot_investigation": "blocked in second NativeOnDrawFrame at glGetIntegerv",
+  "switch_cpu_hardware_tested": false,
+  "game_playable": false,
+  "nsp_created": false
+}

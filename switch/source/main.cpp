@@ -4,6 +4,7 @@
 #include "app_paths.hpp"
 #ifdef DS_CPU_PROBE
 #include "cpu_probe.hpp"
+#include "constructor_probe.hpp"
 #endif
 #include <cstdio>
 #include <string>
@@ -27,7 +28,7 @@ static void draw_report() {
     for (const auto& m:r.messages) { std::puts(m.c_str()); record(m); }
     std::puts("\nA: rescan  X: GPU/PVRTC/audio  Y: GLES1 compatibility  +: exit");
 #ifdef DS_CPU_PROBE
-    std::puts("B: ARM32 Dynarmic leaf-function probe (not game startup)");
+    std::puts("B: ARM32 functions + game constructors (not gameplay)");
 #endif
     std::puts("Touch and left/right stick values appear below.");
     std::printf("Log: %s\n",ds::paths::log_file);
@@ -75,7 +76,8 @@ int main() {
 #ifdef DS_CPU_PROBE
         if (down&HidNpadButton_B) {
             record("ARM32 CPU probe begin");
-            const auto result=cpu_probe(std::string(root)+"/lib/armeabi/libEAMGameDeadSpace.so");
+            const auto library=std::string(root)+"/lib/armeabi/libEAMGameDeadSpace.so";
+            const auto result=cpu_probe(library)+constructor_probe(library);
             record(result);consoleClear();std::puts(result.c_str());
             record("ARM32 CPU probe end");
             std::puts("A: return to data diagnostics  +: exit");

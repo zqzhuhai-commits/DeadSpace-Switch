@@ -1,14 +1,14 @@
-# ARM32 execution prototype — 0.2.0
+# ARM32 execution prototype — 0.3.0
 
 Pinned dependency: [lioncash/dynarmic](https://github.com/lioncash/dynarmic), commit `a41c380246d3d9f9874f0f792d234dc0cc17c180`, 0BSD; bundled dependency licenses are retained in its submodule.
 
 ## What now works
 
-The same bounded C++ ELF32 guest image and Dynarmic callbacks compile for Linux/x86-64 and Switch/AArch64. The real donor is SHA1 checked, LOAD segments are copied into a logical guest image, BSS is zeroed, and 22,677 relative relocations are applied. External symbol binding remains incomplete; no constructors or game lifecycle methods are called.
+The same bounded C++ ELF32 guest image and Dynarmic callbacks compile for Linux/x86-64 and Switch/AArch64. The real donor is SHA1 checked, LOAD segments are copied into a logical guest image, BSS is zeroed, and 22,677 relative relocations are applied. A separate bounded single-thread C++ constructor runtime binds all imports, applies symbol relocations, and executes all 209 initializers with 112 external calls. Its heap, mutex attributes/ownership, semaphores, atomics, allocator arena, clock and destructor registrations carry actual state. Unsupported services halt. JNI/game lifecycle is not initialized by this C++ runtime.
 
 Linux host execution passed five genuine exports from the supplied game library, with returns 12, 393228, 262156, 0 and 524300. These are touch event identifiers, not gameplay. Additional fixtures verified Thumb-to-ARM return, VFP single-precision addition and unmapped-execute rejection. See `CPU-HOST-PROBE.txt` for observed output.
 
-The Switch AArch64 Dynarmic backend and the 0.2.0 NRO compiled and linked successfully. **They have not been run on Switch.** B in this NRO attempts the same CPU probes with the user's donor at `/switch/deadspacemobile/gamedata/lib/armeabi/libEAMGameDeadSpace.so`.
+The Switch AArch64 Dynarmic backend and the 0.3.0 NRO compiled and linked successfully. **They have not been run on Switch.** B in this NRO attempts the CPU probes and constructor run with the user's donor at `/switch/deadspacemobile/gamedata/lib/armeabi/libEAMGameDeadSpace.so`.
 
 ## Switch JIT adaptation
 
@@ -42,4 +42,4 @@ The host probe needs the original binary locally; it is never included in this p
 
 ## Remaining before a title screen
 
-Bind imported Android/libc/GL functions through guest-aware trampolines; implement ARM32 arguments, 32-bit pointers and return handling; initialize JNI/JavaVM; call constructors and the actual lifecycle in the verified order; connect renderer/audio/input/storage. Legacy VFP short-vector mixer behavior needs dedicated testing beyond one scalar add. A five-function result is not evidence of a working game or a playable NSP.
+Extend the constructor import dispatcher to Android/JNI/GL services; implement ARM32 arguments, 32-bit pointers and return handling; initialize JNI/JavaVM; call the actual lifecycle after constructors in the verified order; connect renderer/audio/input/storage. Legacy VFP short-vector mixer behavior needs dedicated testing beyond one scalar add. A five-function result is not evidence of a working game or a playable NSP.
