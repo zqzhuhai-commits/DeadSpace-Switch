@@ -2,6 +2,8 @@
 
 **0.2.0：ARM32 执行核心原型和 Switch 诊断程序，不是可玩版；游戏生命周期尚未接通，也未通过 Switch 实机测试。**
 
+0.2.1 源码已按实机日志修正路径与版本标识：开发目录改为 `deadspacemobile`，增加完整库路径提示、CPU探测开始/结束日志及包内 RomFS 数据源选择。基础图形/PVRTC实机通过；CPU尚无实机结果，4个矩阵调色板入口缺失。详见 [实机日志分析](switch/docs/DEVICE-LOG-20261020.md)。
+
 基于 EapRules/deadspace-native-arm 提交 `cc8fd2c8a16530936aa3c2ce205ef4cffc2814e9`。上游目录保留；原 Linux/PortMaster 说明见 `README.portmaster.md`。Switch 新代码位于 `switch/`。Vita 版作为补丁和操作参考。Reanimated 当前没有公开核心运行时代码，本项目不包含该运行时。
 
 ## 已实现
@@ -43,7 +45,7 @@ ASan/UBSan 用于检查测试中的内存访问和未定义行为。当前容器
 用户提供的原版库必须位于 `lib/armeabi/libEAMGameDeadSpace.so`，SHA1 必须为 `0ed42b611415015807f759ec9b5457857143ce39`。
 
 ```sh
-python3 switch/tools/prepare_data.py /path/to/PSV-data.zip /path/to/sdcard/switch/deadspace/gamedata
+python3 switch/tools/prepare_data.py /path/to/PSV-data.zip /path/to/sdcard/switch/deadspacemobile/gamedata
 ```
 
 输出目录必须不存在。工具支持外层含 `ux0/data/deadspace/` 或其他前缀的 ZIP/APK/目录；只复制游戏库和 assets，不执行或转换 VPK。单独的 VPK 启动器不够。RAR/7z 需先解压为目录。必需资源包括 `assets/EAMCore.ini`、`assets/published/data/achievements.sb`。
@@ -60,7 +62,7 @@ python3 switch/tools/audit_donor.py /path/to/libEAMGameDeadSpace.so --output don
 
 ## 实机诊断
 
-将 NRO 放到 `/switch/deadspace/deadspace-switch.nro`，在已经配置好自制软件的 Switch 上，通过 Homebrew Menu 应用模式/title takeover 启动，给 SDL/Mesa 留足内存。
+将 NRO 放到 `/switch/deadspacemobile/deadspace-switch.nro`，在已经配置好自制软件的 Switch 上，通过 Homebrew Menu 应用模式/title takeover 启动，给 SDL/Mesa 留足内存。
 
 - A：重扫数据。
 - X：GLES2/PVRTC/音频平台测试，约3秒。
@@ -69,7 +71,7 @@ python3 switch/tools/audit_donor.py /path/to/libEAMGameDeadSpace.so --output don
 - +：退出。
 - 摇杆与触摸：检查屏幕上的坐标读数。
 
-日志：`/switch/deadspace/diagnostics.log`。没有游戏文件也能运行平台诊断；本程序不要求密钥、超频或系统配置修改。
+日志：`/switch/deadspacemobile/diagnostics.log`。没有游戏文件也能运行平台诊断；本程序不要求密钥、超频或系统配置修改。
 
 ## 下一开发关卡
 

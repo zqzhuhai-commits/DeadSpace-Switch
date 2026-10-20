@@ -81,7 +81,7 @@ Report preflight(const std::string& root) {
     Report r;
     const auto path=root+"/lib/armeabi/libEAMGameDeadSpace.so";
     std::ifstream f(path,std::ios::binary|std::ios::ate);
-    if (!f) { r.messages.push_back("Missing: lib/armeabi/libEAMGameDeadSpace.so"); return r; }
+    if (!f) { r.messages.push_back("Missing library: "+path); return r; }
     r.library_present=true;
     const auto size=f.tellg();
     if (size<52 || size>64*1024*1024) { r.messages.push_back("Library outside expected size bounds"); return r; }

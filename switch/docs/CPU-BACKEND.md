@@ -8,7 +8,7 @@ The same bounded C++ ELF32 guest image and Dynarmic callbacks compile for Linux/
 
 Linux host execution passed five genuine exports from the supplied game library, with returns 12, 393228, 262156, 0 and 524300. These are touch event identifiers, not gameplay. Additional fixtures verified Thumb-to-ARM return, VFP single-precision addition and unmapped-execute rejection. See `CPU-HOST-PROBE.txt` for observed output.
 
-The Switch AArch64 Dynarmic backend and the 0.2.0 NRO compiled and linked successfully. **They have not been run on Switch.** B in this NRO attempts the same CPU probes with the user's donor at `/switch/deadspace/gamedata/lib/armeabi/libEAMGameDeadSpace.so`.
+The Switch AArch64 Dynarmic backend and the 0.2.0 NRO compiled and linked successfully. **They have not been run on Switch.** B in this NRO attempts the same CPU probes with the user's donor at `/switch/deadspacemobile/gamedata/lib/armeabi/libEAMGameDeadSpace.so`.
 
 ## Switch JIT adaptation
 

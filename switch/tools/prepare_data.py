@@ -117,7 +117,7 @@ def import_data(source, output):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("source", type=Path, help="Extracted Vita/Android directory, ZIP, or APK")
-    p.add_argument("output", type=Path, help="New destination, typically sdcard/switch/deadspace/gamedata")
+    p.add_argument("output", type=Path, help="New destination, typically sdcard/switch/deadspacemobile/gamedata")
     a = p.parse_args()
     try:
         print(json.dumps(import_data(a.source, a.output), indent=2))

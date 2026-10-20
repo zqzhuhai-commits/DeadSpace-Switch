@@ -1,6 +1,7 @@
 #include <switch.h>
 #include "preflight.hpp"
 #include "platform_probe.hpp"
+#include "app_paths.hpp"
 #ifdef DS_CPU_PROBE
 #include "cpu_probe.hpp"
 #endif
@@ -8,16 +9,20 @@
 #include <string>
 #include <sys/stat.h>
 
-static const char* root="sdmc:/switch/deadspace/gamedata";
+#ifndef DS_APP_VERSION
+#define DS_APP_VERSION "development"
+#endif
+static const char* root=ds::paths::game_directory;
 static FILE* logfile=nullptr;
 static void record(const std::string& s) {
     if (logfile) { std::fprintf(logfile,"%s\n",s.c_str()); std::fflush(logfile); }
 }
 static void draw_report() {
     consoleClear();
-    std::puts("DEAD SPACE SWITCH - DEVELOPMENT DIAGNOSTICS\n");
+    std::puts("DEAD SPACE MOBILE " DS_APP_VERSION " - DEVELOPMENT DIAGNOSTICS\n");
     std::puts("Game lifecycle is NOT implemented. This is not a playable port.\n");
     const auto r=ds::preflight(root);
+    std::printf("Data: %s\n",root);
     record("--- donor preflight ---");
     for (const auto& m:r.messages) { std::puts(m.c_str()); record(m); }
     std::puts("\nA: rescan  X: GPU/PVRTC/audio  Y: GLES1 compatibility  +: exit");
@@ -25,15 +30,27 @@ static void draw_report() {
     std::puts("B: ARM32 Dynarmic leaf-function probe (not game startup)");
 #endif
     std::puts("Touch and left/right stick values appear below.");
-    std::puts("Log: /switch/deadspace/diagnostics.log");
+    std::printf("Log: %s\n",ds::paths::log_file);
     if (!logfile) std::puts("WARNING: log file could not be opened; check SD card space/access.");
-    record(r.ready()?"Donor preflight passed; execution unavailable":"Donor preflight failed");
+    record(r.ready()?"Donor preflight passed; game lifecycle unavailable":"Donor preflight failed");
 }
 int main() {
     consoleInit(nullptr);
-    mkdir("sdmc:/switch/deadspace",0777);
-    logfile=std::fopen("sdmc:/switch/deadspace/diagnostics.log","a");
-    record("Dead Space Switch diagnostics 0.1.0 start");
+    mkdir(ds::paths::app_directory,0777);
+    logfile=std::fopen(ds::paths::log_file,"a");
+    record("Dead Space Mobile diagnostics " DS_APP_VERSION " start");
+#ifdef DS_CPU_PROBE
+    record("Build mode: Dynarmic CPU probe enabled");
+#else
+    record("Build mode: platform diagnostics only");
+#endif
+    const Result romfs_result=romfsInit();
+    const bool romfs_mounted=R_SUCCEEDED(romfs_result);
+    if(romfs_mounted) {
+        struct stat st{};
+        if(stat("romfs:/gamedata/lib/armeabi/libEAMGameDeadSpace.so",&st)==0 && S_ISREG(st.st_mode))root=ds::paths::packaged_game_directory;
+    }
+    record(std::string("Selected data root: ")+root);
     PadState pad;
     padConfigureInput(1,HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad); hidInitializeTouchScreen();
@@ -57,8 +74,10 @@ int main() {
         }
 #ifdef DS_CPU_PROBE
         if (down&HidNpadButton_B) {
+            record("ARM32 CPU probe begin");
             const auto result=cpu_probe(std::string(root)+"/lib/armeabi/libEAMGameDeadSpace.so");
             record(result);consoleClear();std::puts(result.c_str());
+            record("ARM32 CPU probe end");
             std::puts("A: return to data diagnostics  +: exit");
         }
 #endif
@@ -72,6 +91,7 @@ int main() {
     }
     record("Clean shutdown");
     if (logfile) std::fclose(logfile);
+    if (romfs_mounted) romfsExit();
     consoleExit(nullptr);
     return 0;
 }
