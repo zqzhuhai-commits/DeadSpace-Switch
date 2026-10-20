@@ -8,6 +8,7 @@ int main(int argc,char** argv) {
         ds::GuestImage image;
         std::string error;
         if(!image.load(argv[1],error))throw std::runtime_error(error);
+        require(image.memory.size()<=ds::GuestLayout::image_limit,"Image retains double-biased storage hole");
         require(image.imports.size()==392,"Donor import count mismatch");
         require(image.constructors.size()==209,"Donor constructor count mismatch");
         const auto before=image.memory;
@@ -20,6 +21,8 @@ int main(int argc,char** argv) {
         require(!image.bind_imports([](const auto&){return 0x61000000;},error),"Accepted duplicate binding");
         require(image.memory==bound,"Duplicate binding changed image");
         uint32_t word=0;
+        require(!image.read(ds::GuestLayout::stack_base,&word,4),"Image aliases guest stack");
+        require(!image.executable(ds::GuestLayout::stack_base,4),"Stack aliases executable image");
         require(!image.read(0xfffffffcu,&word,8),"Accepted wrapped memory range");
         require(!image.read(ds::GuestImage::base+8,&word,SIZE_MAX),"Accepted overflowing read length");
         require(!image.write(ds::GuestImage::base+8,&word,SIZE_MAX),"Accepted overflowing write length");

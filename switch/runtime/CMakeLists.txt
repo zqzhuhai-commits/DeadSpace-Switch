@@ -16,6 +16,8 @@ add_library(ds_cpu_probe STATIC guest_jni.cpp guest_image.cpp cpu_probe.cpp cons
 target_include_directories(ds_cpu_probe PUBLIC . ../include)
 target_link_libraries(ds_cpu_probe PUBLIC dynarmic)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
+  add_executable(ds-memory-test ../tests/guest_memory_test.cpp)
+  target_include_directories(ds-memory-test PRIVATE .)
   add_executable(ds-jni-test guest_jni.cpp ../tests/guest_jni_test.cpp)
   target_include_directories(ds-jni-test PRIVATE .)
   add_executable(ds-cpu-probe host_main.cpp)

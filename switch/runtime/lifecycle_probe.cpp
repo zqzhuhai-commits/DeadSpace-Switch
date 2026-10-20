@@ -3,6 +3,8 @@
 // Guest addresses stay 32-bit integers; host services are dispatched by SVC id.
 #include "lifecycle_probe.hpp"
 #include "guest_image.hpp"
+#include "guest_call_scope.hpp"
+#include "guest_heap.hpp"
 #include "guest_jni.hpp"
 #include "jni_variant_bindings.hpp"
 #include "jni_table_indices.hpp"
@@ -21,9 +23,8 @@
 #include <vector>
 
 namespace {
-constexpr uint32_t heap=0x30000000, arena=0x40000000, arena_end=0x50000000;
-constexpr uint32_t stack=0x20000000, thunks=0x60000000, stop=0x70000000;
-constexpr uint32_t heap_limit=64*1024*1024;
+constexpr uint32_t heap=ds::GuestLayout::heap_base, arena=0x40000000, arena_end=0x50000000;
+constexpr uint32_t stack=ds::GuestLayout::stack_base, thunks=0x60000000, stop=0x70000000;
 constexpr unsigned jni_slots=233, vm_slots=8;
 
 using ds::MethodKey;
@@ -32,7 +33,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     using Page=std::array<uint8_t,4096>;
     std::unordered_map<uint32_t,Page> pages;
     std::vector<std::string> functions;
-    std::unordered_map<uint32_t,uint32_t> allocations;
+    ds::GuestHeap guest_heap;
     struct Mutex {unsigned type=0,depth=0;};
     std::map<uint32_t,Mutex> mutexes;
     std::map<uint32_t,unsigned> attrs,semaphores;
@@ -42,7 +43,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     std::map<uint32_t,File> files;
     std::vector<std::string> trace;
     std::string data_root;
-    uint32_t next=heap,brk=arena,mmap_top=arena_end;
+    uint32_t brk=arena,mmap_top=arena_end;
     uint32_t pending=0,errno_address=0,env_addr=0,vm_addr=0,jni_table=0,vm_table=0;
     uint32_t ext_string=0;
     bool returned=false;
@@ -52,7 +53,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     std::map<std::string,uint64_t> service_counts;
 
     bool mapped(uint32_t a) const {
-        return (a>=stack && a-stack<2*1024*1024) || (a>=heap && a<next) ||
+        return (a>=stack && a-stack<2*1024*1024) || (a>=heap && a<guest_heap.high_water()) ||
                (a>=arena && a<brk) || (a>=mmap_top && a<arena_end);
     }
     void fail(const std::string& message) {
@@ -64,11 +65,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         if(cpu)cpu->HaltExecution();
         budget=0;
     }
-    uint32_t alloc(uint32_t size) {
-        const uint64_t n=(uint64_t(size)+15)&~uint64_t(15);
-        if(n>32*1024*1024 || uint64_t(next)+std::max<uint64_t>(n,16)>heap+heap_limit)throw std::runtime_error("Guest heap limit");
-        const auto p=next;next+=uint32_t(std::max<uint64_t>(n,16));allocations[p]=next-p;return p;
-    }
+    uint32_t alloc(uint32_t size) override {return guest_heap.allocate(size);}
     uint32_t arg(unsigned n) {return n<4?cpu->Regs()[n]:MemoryRead32(cpu->Regs()[13]+4*(n-4));}
     void bounded(uint32_t n) {if(n>64*1024*1024)throw std::runtime_error("Memory operation limit");}
     std::string guest_text(uint32_t p) {
@@ -154,15 +151,12 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     }
 
     uint32_t guest_call(uint32_t address,const std::vector<uint32_t>& args,const std::string& label,bool top_level=false) {
-        const auto saved_regs=cpu->Regs();
-        const std::array<uint32_t,64> saved_ext=cpu->ExtRegs();
-        const uint32_t saved_cpsr=cpu->Cpsr(),saved_fpscr=cpu->Fpscr();
-        const bool saved_returned=returned;const uint32_t saved_pending=pending;
-        const uint64_t saved_budget=budget;const std::string saved_fault=fault;
+        ds::GuestCallScope scope(*cpu,returned,pending,budget,fault);
+        const uint32_t call_sp=ds::guest_call_sp(cpu->Regs()[13],unsigned(args.size()),top_level);
         cpu->Reset();if(!top_level)cpu->Regs().fill(0);
         cpu->Regs()[0]=args.size()>0?args[0]:0;cpu->Regs()[1]=args.size()>1?args[1]:0;
         cpu->Regs()[2]=args.size()>2?args[2]:0;cpu->Regs()[3]=args.size()>3?args[3]:0;
-        cpu->Regs()[13]=stack+2*1024*1024-256;
+        cpu->Regs()[13]=call_sp;
         cpu->Regs()[14]=stop;cpu->Regs()[15]=address&~1u;cpu->SetCpsr((address&1)?0x30:0x10);cpu->SetFpscr(0);
         for(unsigned i=4;i<args.size();++i)MemoryWrite32(cpu->Regs()[13]+4*(i-4),args[i]);
         budget=30000000;returned=false;pending=0;
@@ -175,18 +169,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         if(!returned)throw std::runtime_error(label+": instruction budget exhausted");
         const uint32_t result=cpu->Regs()[0];
         if(label=="EAIO_Startup"||label=="NativeOnDrawFrame")trace.push_back("RET "+label+" pc=0x"+to_hex(cpu->Regs()[14]-8));
-        if(top_level){
-            // Boot-probe semantics: leave the guest's own registers (r4-r12 etc.)
-            // in place across top-level calls; the game relies on that residue.
-            // Keep only internal bookkeeping clean for the next call.
-        } else {
-            // 恢复外层状态，但保留内层 caller-saved 残留（r1-r3/r12），游戏依赖其 UB 语义
-            const uint32_t g1=cpu->Regs()[1],g2=cpu->Regs()[2],g3=cpu->Regs()[3],g12=cpu->Regs()[12];
-            const std::array<uint32_t,64> saved_ext2=saved_ext;
-            cpu->Regs()=saved_regs;cpu->ExtRegs()=saved_ext2;cpu->SetCpsr(saved_cpsr);cpu->SetFpscr(saved_fpscr);
-            cpu->Regs()[0]=result;cpu->Regs()[1]=g1;cpu->Regs()[2]=g2;cpu->Regs()[3]=g3;cpu->Regs()[12]=g12;
-        }
-        returned=saved_returned;pending=saved_pending;budget=saved_budget;fault=saved_fault;
+        if(top_level)scope.keep_top_level_result();
         return result;
     }
 
@@ -210,9 +193,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         if(base=="memset"){bounded(c);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,b);result=a;}
         else if(base=="memcpy"||base=="memmove"){bounded(c);std::vector<uint8_t> v(c);for(uint32_t i=0;i<c;++i)v[i]=MemoryRead8(b+i);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,v[i]);result=a;}
         else if(base=="memcmp"){bounded(c);int cmp=0;for(uint32_t i=0;i<c;++i){uint8_t x=MemoryRead8(a+i),y=MemoryRead8(b+i);if(x!=y){cmp=x>y?1:-1;break;}}result=cmp;}
-        else if(base=="malloc"||base=="calloc"){const uint64_t n=base=="malloc"?a:uint64_t(a)*b;if(n>32*1024*1024)throw std::runtime_error("Allocation size limit");result=alloc(uint32_t(n));}
-        else if(base=="realloc"){if(!a)result=alloc(b);else{result=alloc(b);for(uint32_t i=0;i<b;++i)MemoryWrite8(result+i,MemoryRead8(a+i));}}
-        else if(base=="free"){if(a&&!allocations.count(a))throw std::runtime_error("Invalid free");}
+        else if(base=="malloc")result=alloc(a);
+        else if(base=="calloc")result=guest_heap.zeroed(a,b,[&](uint32_t p,uint32_t n){for(uint32_t i=0;i<n;++i)MemoryWrite8(p+i,0);});
+        else if(base=="realloc")result=guest_heap.reallocate(a,b,[&](uint32_t dst,uint32_t src,uint32_t n){for(uint32_t i=0;i<n;++i)MemoryWrite8(dst+i,MemoryRead8(src+i));});
+        else if(base=="free")guest_heap.release(a);
         else if(base=="strlen")result=uint32_t(guest_text(a).size());
         else if(base=="strcmp"||base=="strncmp"){std::string x=guest_text(a),y=guest_text(b);if(base=="strncmp"){x=x.substr(0,c);y=y.substr(0,c);}result=(x>y)-(x<y);}
         else if(base=="strcpy"||base=="strncpy"||base=="strcat"){std::string x=base=="strcat"?guest_text(a)+guest_text(b):guest_text(b);if(base=="strncpy")x=x.substr(0,c);for(uint32_t i=0;i<x.size();++i)MemoryWrite8(a+i,x[i]);MemoryWrite8(a+uint32_t(x.size()),0);result=a;}

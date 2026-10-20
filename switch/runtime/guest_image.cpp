@@ -1,11 +1,11 @@
 #include "guest_image.hpp"
 #include "preflight.hpp"
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
 
 namespace ds {
-namespace { constexpr uint32_t image_hi_base=0x10000000; }
 bool GuestImage::load(const std::string& path,std::string& error) {
     memory.clear();exports.clear();segments.clear();imports.clear();constructors.clear();pending.clear();bound=false;relative_relocations=0;
     try {
@@ -24,21 +24,17 @@ bool GuestImage::load(const std::string& path,std::string& error) {
             if(u32(p)!=1)continue;
             const uint32_t va=u32(p+8),size=u32(p+20);
             end=std::max(end,uint64_t(va)+size);
-            if(end>64*1024*1024)throw std::runtime_error("Guest image size bound exceeded");
+            if(end>GuestLayout::image_limit)throw std::runtime_error("Guest image size bound exceeded");
             for(const auto& s:segments)if(va<uint64_t(s.start)+s.size && uint64_t(va)+size>s.start)throw std::runtime_error("Overlapping LOAD segments");
             segments.push_back({va,size,u32(p+24)});
         }
-        memory.resize(std::max<uint64_t>(end,uint64_t(image_hi_base)+end),0);
+        memory.resize(end,0);
         for(unsigned i=0;i<u16(44);++i) {
             const uint64_t p=u32(28)+uint64_t(i)*32;
             if(u32(p)==1)std::memcpy(memory.data()+u32(p+8),raw.data()+u32(p+4),u32(p+16));
         }
-        // Old Android images hard-code a 0x10000000 load bias inside code (absolute
-        // function pointers via movw/movt or data tables). Mirror every LOAD segment
-        // at bias+va so those absolute jumps land on the same bytes.
-        const auto lo_segments=segments;
-        for(const auto& s:lo_segments)std::memcpy(memory.data()+uint64_t(s.start)+image_hi_base,memory.data()+s.start,s.size);
-        for(const auto& s:lo_segments)segments.push_back({s.start+image_hi_base,s.size,s.flags});
+        // memory stores ELF-relative bytes; read/write add the load bias once.
+        // A second bias would overlap the runtime's 0x20000000 stack region.
         if(u16(46)!=40)throw std::runtime_error("Invalid section header size");
         auto section=[&](unsigned index)->uint64_t {if(index>=u16(48))throw std::runtime_error("Invalid section index");const uint64_t p=u32(32)+uint64_t(index)*40;if(p+40>raw.size())throw std::runtime_error("Truncated sections");return p;};
         for(unsigned i=0;i<u16(48);++i) {
@@ -85,7 +81,6 @@ bool GuestImage::load(const std::string& path,std::string& error) {
                     uint32_t addend=v[0]|uint32_t(v[1])<<8|uint32_t(v[2])<<16|uint32_t(v[3])<<24;
                     const uint32_t result=base+addend;
                     for(unsigned k=0;k<4;++k)memory[target+k]=result>>(8*k);
-                    for(unsigned k=0;k<4;++k)memory[target+image_hi_base+k]=result>>(8*k);
                     ++relative_relocations;
                 }
             }
@@ -130,26 +125,22 @@ bool GuestImage::bind_imports(const std::function<uint32_t(const Import&)>& reso
         }
         // Only the loader writes text relocations; guest writes retain segment protection.
         for(const auto& w:writes)for(unsigned k=0;k<4;++k)memory[w.first+k]=w.second>>(8*k);
-        for(const auto& w:writes)for(unsigned k=0;k<4;++k)memory[w.first+image_hi_base+k]=w.second>>(8*k);
         bound=true;error.clear();return true;
     } catch(const std::exception& e) {error=e.what();return false;}
 }
 bool GuestImage::read(uint32_t address,void* out,size_t length) const {
-    if(address<base || length>memory.size())return false;
-    const uint64_t p=address-base;
-    for(const auto& s:segments)if(p>=s.start && p+length<=uint64_t(s.start)+s.size){std::memcpy(out,memory.data()+p,length);return true;}
-    return false;
+    const auto offset=image_range(segments,memory.size(),address,length);
+    if(!offset)return false;
+    if(length)std::memcpy(out,memory.data()+*offset,length);
+    return true;
 }
 bool GuestImage::write(uint32_t address,const void* in,size_t length) {
-    if(address<base || length>memory.size())return false;
-    const uint64_t p=address-base;
-    for(const auto& s:segments)if((s.flags&2) && p>=s.start && p+length<=uint64_t(s.start)+s.size){std::memcpy(memory.data()+p,in,length);return true;}
-    return false;
+    const auto offset=image_range(segments,memory.size(),address,length,2);
+    if(!offset)return false;
+    if(length)std::memcpy(memory.data()+*offset,in,length);
+    return true;
 }
 bool GuestImage::executable(uint32_t address,size_t length) const {
-    if(address<base || length>memory.size())return false;
-    const uint64_t p=address-base;
-    for(const auto& s:segments)if((s.flags&1) && p>=s.start && p+length<=uint64_t(s.start)+s.size)return true;
-    return false;
+    return image_range(segments,memory.size(),address,length,1).has_value();
 }
 }

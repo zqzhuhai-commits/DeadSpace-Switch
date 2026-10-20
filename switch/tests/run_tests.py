@@ -29,6 +29,12 @@ def run():
                         "-I" + str(ROOT / "runtime"), str(ROOT / "runtime/guest_jni.cpp"),
                         str(ROOT / "tests/guest_jni_test.cpp"), "-o", str(jni_exe)], check=True)
         subprocess.run([str(jni_exe)], check=True)
+        memory_exe = work / "memory-test"
+        subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                        "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
+                        "-I" + str(ROOT / "runtime"), str(ROOT / "tests/guest_memory_test.cpp"),
+                        "-o", str(memory_exe)], check=True)
+        subprocess.run([str(memory_exe)], check=True)
         # The real donor SHA1 gate is never relaxed. Synthetic archives must fail.
         for name, contents in [
             ("vpk", {"eboot.bin": b"not a game library"}),
