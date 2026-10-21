@@ -64,7 +64,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     bool returned=false;
     uint64_t budget=0;
     std::string fault;
-    unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0,strstr_log=0,asset_reads=0,guard_log=0,svc_log=0;std::string last_service;
+    unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0,strstr_log=0,asset_reads=0,guard_log=0,svc_log=0,call277efc=0,call28778=0;std::string last_service;
     std::map<std::string,uint64_t> service_counts;
     ds::GraphicsBackend graphics;
     std::unique_ptr<ds::GuestGl> native_gl;
@@ -430,7 +430,7 @@ public:
         if(mapped(a)){const auto it=pages.find(a>>12);if(it!=pages.end())return it->second[a&4095];uint8_t rv=0;if(!image.read(a,&rv,1)){if(!(a>=arena&&a<arena_end)&&!(a>=heap&&a<heap+0x4000000))fail("Unmapped guest read at "+std::to_string(a));return rv;}return rv;}
         if(a>=thunks && uint64_t(a)-thunks<functions.size()*4) return uint8_t((0xef000001u+((a-thunks)/4))>>(8*((a-thunks)%4)));
         if(a>=stop && a-stop<4)return uint8_t(0xef00ffffu>>(8*(a-stop)));
-        uint8_t v=0;if(!image.read(a,&v,1))fail("Unmapped guest read at "+std::to_string(a)+" img="+std::to_string(image.memory.size()));return v;
+        uint8_t v=0;if(!image.read(a,&v,1)){uint32_t sp=cpu->Regs()[13];std::string st="  STACK@0x"+to_hex(sp-0x20)+":";for(int i=0;i<24;i++){uint32_t w=0;if(mapped(sp-0x20+i*4)&&image.read(sp-0x20+i*4,&w,4))st+=" "+to_hex(w);else st+=" ?";}trace.push_back(st);fail("Unmapped guest read at "+std::to_string(a)+" img="+std::to_string(image.memory.size()));}return v;
     }
     uint16_t MemoryRead16(uint32_t a) override {return MemoryRead8(a)|uint16_t(MemoryRead8(a+1))<<8;}
     uint32_t MemoryRead32(uint32_t a) override {
@@ -442,7 +442,8 @@ public:
     uint64_t MemoryRead64(uint32_t a) override {return MemoryRead32(a)|uint64_t(MemoryRead32(a+4))<<32;}
     std::optional<uint32_t> MemoryReadCode(uint32_t a) override {
         if((a&~1u)==0x10235944u&&++guard_log<=40)trace.push_back("  CODE 0x235944 r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7])+" r8=0x"+to_hex(cpu->Regs()[8])+" lr=0x"+to_hex(cpu->Regs()[14])+" lit=0x"+to_hex(MemoryRead32(0x1023599c)));
-        if((a&~1u)==0x102f7efcu&&++guard_log<=30)trace.push_back("  CALL 0x2f7efc r0=0x"+to_hex(cpu->Regs()[0])+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6]));
+        if((a&~1u)==0x102f7efcu&&call277efc++<20)trace.push_back("  CALL 0x2f7efc r0=0x"+to_hex(cpu->Regs()[0])+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r9=0x"+to_hex(cpu->Regs()[9]));
+        if((a&~1u)==0x102f8778u&&call28778++<30)trace.push_back("  CALL 0x2f8778 r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" r9=0x"+to_hex(cpu->Regs()[9]));
         if(a!=stop && !(a>=thunks && uint64_t(a)-thunks+4<=functions.size()*4) && !image.executable(a,4)){fail("Unmapped guest execution");return std::nullopt;}
         return MemoryRead32(a);
     }
@@ -569,6 +570,7 @@ public:
         trace.push_back("lit 0x23599c="+to_hex(MemoryRead32(0x1023599c))+" 0x2359a0="+to_hex(MemoryRead32(0x102359a0))+" 0x2359a8="+to_hex(MemoryRead32(0x102359a8))+" 0x2359a4="+to_hex(MemoryRead32(0x102359a4)));
         trace.push_back("GOT 0x1043f100="+to_hex(MemoryRead32(0x1043f100))+" 0x1043f0c0="+to_hex(MemoryRead32(0x1043f0c0))+" 0x1043ef90="+to_hex(MemoryRead32(0x1043ef90))+" 0x1043e8d0="+to_hex(MemoryRead32(0x1043e8d0))+" raw43f100="+to_hex(image.memory[0x43f100]|image.memory[0x43f101]<<8|image.memory[0x43f102]<<16|image.memory[0x43f103]<<24)+" raw43f0c0="+to_hex(image.memory[0x43f0c0]|image.memory[0x43f0c1]<<8|image.memory[0x43f0c2]<<16|image.memory[0x43f0c3]<<24));
         trace.push_back("post-ctor 0x1044bb58..0x1044bb8c: "+to_hex(MemoryRead32(0x1044bb58))+" "+to_hex(MemoryRead32(0x1044bb5c))+" "+to_hex(MemoryRead32(0x1044bb60))+" "+to_hex(MemoryRead32(0x1044bb64))+" "+to_hex(MemoryRead32(0x1044bb68))+" "+to_hex(MemoryRead32(0x1044bb6c))+" "+to_hex(MemoryRead32(0x1044bb70))+" "+to_hex(MemoryRead32(0x1044bb74))+" "+to_hex(MemoryRead32(0x1044bb78))+" "+to_hex(MemoryRead32(0x1044bb7c))+" "+to_hex(MemoryRead32(0x1044bb80))+" "+to_hex(MemoryRead32(0x1044bb84))+" "+to_hex(MemoryRead32(0x1044bb88))+" "+to_hex(MemoryRead32(0x1044bb8c)));
+        trace.push_back("post-ctor 0x10455b40..0x10455b70: "+to_hex(MemoryRead32(0x10455b40))+" "+to_hex(MemoryRead32(0x10455b44))+" "+to_hex(MemoryRead32(0x10455b48))+" "+to_hex(MemoryRead32(0x10455b4c))+" "+to_hex(MemoryRead32(0x10455b50))+" "+to_hex(MemoryRead32(0x10455b54))+" "+to_hex(MemoryRead32(0x10455b58))+" "+to_hex(MemoryRead32(0x10455b5c))+" "+to_hex(MemoryRead32(0x10455b60))+" "+to_hex(MemoryRead32(0x10455b64))+" "+to_hex(MemoryRead32(0x10455b68))+" "+to_hex(MemoryRead32(0x10455b6c)));
         const auto onload=image.exports.find("JNI_OnLoad");
         if(onload==image.exports.end())throw std::runtime_error("JNI_OnLoad export missing");
         const uint32_t version=guest_call(onload->second,{vm_addr,0},"JNI_OnLoad",true);
