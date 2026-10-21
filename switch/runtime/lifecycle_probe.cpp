@@ -247,7 +247,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         ++service_counts[name];
         const auto a=arg(0),b=arg(1),c=arg(2),d=arg(3);
         uint32_t result=0;
-        static const std::array<const char*,14> float_imports={"acosf","asinf","atanf","atan2f","ceilf","cosf","expf","floorf","fmodf","logf","log10f","powf","sinf","sqrtf"};
+        static const std::array<const char*,15> float_imports={"acosf","asinf","atanf","atan2f","ceilf","cosf","expf","floorf","fmodf","logf","log10f","powf","sinf","sqrtf","tanf"};
         const bool floating=std::find(float_imports.begin(),float_imports.end(),name)!=float_imports.end();
         const std::string base=floating?name.substr(0,name.size()-1):name;
         if(base=="memset"){bounded(c);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,b);result=a;}
@@ -473,16 +473,16 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             else if(op=="DetachCurrentThread")result=0;
             else throw std::runtime_error("Unsupported VM: "+op);
         }
-        else if(base=="acos"||base=="asin"||base=="atan"||base=="atan2"||base=="ceil"||base=="cos"||base=="exp"||base=="floor"||base=="fmod"||base=="log"||base=="log10"||base=="pow"||base=="sin"||base=="sqrt"){
+        else if(base=="acos"||base=="asin"||base=="atan"||base=="atan2"||base=="ceil"||base=="cos"||base=="exp"||base=="floor"||base=="fmod"||base=="log"||base=="log10"||base=="pow"||base=="sin"||base=="sqrt"||base=="tan"){
             const bool single=name==base+"f";
             if(single){
                 float x=0,y=0;std::memcpy(&x,&a,4);if(base=="atan2"||base=="fmod"||base=="pow")std::memcpy(&y,&b,4);
-                float r=base=="atan2"?std::atan2(x,y):base=="fmod"?std::fmod(x,y):base=="pow"?std::pow(x,y):base=="acos"?std::acos(x):base=="asin"?std::asin(x):base=="atan"?std::atan(x):base=="ceil"?std::ceil(x):base=="cos"?std::cos(x):base=="exp"?std::exp(x):base=="floor"?std::floor(x):base=="log"?std::log(x):base=="log10"?std::log10(x):base=="sin"?std::sin(x):std::sqrt(x);
+                float r=base=="atan2"?std::atan2(x,y):base=="fmod"?std::fmod(x,y):base=="pow"?std::pow(x,y):base=="acos"?std::acos(x):base=="asin"?std::asin(x):base=="atan"?std::atan(x):base=="ceil"?std::ceil(x):base=="cos"?std::cos(x):base=="exp"?std::exp(x):base=="floor"?std::floor(x):base=="log"?std::log(x):base=="log10"?std::log10(x):base=="sin"?std::sin(x):base=="tan"?std::tan(x):std::sqrt(x);
                 std::memcpy(&result,&r,4);
             } else {
                 uint64_t vx=uint64_t(a)|uint64_t(b)<<32;double dx;std::memcpy(&dx,&vx,8);
                 uint64_t vy=uint64_t(c)|uint64_t(d)<<32;double dy;std::memcpy(&dy,&vy,8);
-                double r=base=="atan2"?std::atan2(dx,dy):base=="fmod"?std::fmod(dx,dy):base=="pow"?std::pow(dx,dy):base=="acos"?std::acos(dx):base=="asin"?std::asin(dx):base=="atan"?std::atan(dx):base=="ceil"?std::ceil(dx):base=="cos"?std::cos(dx):base=="exp"?std::exp(dx):base=="floor"?std::floor(dx):base=="log"?std::log(dx):base=="log10"?std::log10(dx):base=="sin"?std::sin(dx):std::sqrt(dx);
+                double r=base=="atan2"?std::atan2(dx,dy):base=="fmod"?std::fmod(dx,dy):base=="pow"?std::pow(dx,dy):base=="acos"?std::acos(dx):base=="asin"?std::asin(dx):base=="atan"?std::atan(dx):base=="ceil"?std::ceil(dx):base=="cos"?std::cos(dx):base=="exp"?std::exp(dx):base=="floor"?std::floor(dx):base=="log"?std::log(dx):base=="log10"?std::log10(dx):base=="sin"?std::sin(dx):base=="tan"?std::tan(dx):std::sqrt(dx);
                 uint64_t bits=0;std::memcpy(&bits,&r,8);
                 cpu->Regs()[0]=uint32_t(bits);cpu->Regs()[1]=uint32_t(bits>>32);
                 goto done;
