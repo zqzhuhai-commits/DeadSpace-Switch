@@ -42,6 +42,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     std::map<uint32_t,unsigned> attrs,semaphores;
     std::map<uint32_t,uint32_t> tls;
     ds::GuestThreads threads;
+    const uint64_t realtime_epoch=uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
     ds::GuestJumps jumps;
     struct ThreadAttr {uint32_t stack_size=1024*1024,detached=0;};
     std::map<uint32_t,ThreadAttr> thread_attrs;
@@ -187,7 +188,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         while(!returned&&fault.empty()&&budget){
             quantum=std::min<uint64_t>(budget,100000);
             cpu->Run();
-            if((++beats&1023)==0)fprintf(stderr,"HB %s instr=%llu left=%llu reads=%u bytes=%u pc=0x%x sp=0x%x\n",label.c_str(),(unsigned long long)(2000000000ull-budget),(unsigned long long)budget,asset_reads,asset_read_bytes,cpu->Regs()[15],cpu->Regs()[13]);
+            if((++beats&1023)==0)fprintf(stderr,"HB %s instr=%llu left=%llu reads=%u bytes=%llu pc=0x%x sp=0x%x\n",label.c_str(),(unsigned long long)(6000000000ull-budget),(unsigned long long)budget,asset_reads,(unsigned long long)asset_read_bytes,cpu->Regs()[15],cpu->Regs()[13]);
             if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>50000000)throw std::runtime_error("Import dispatch limit "+label);++service_calls;if(cpu->Regs()[15]>=0x10235800u&&cpu->Regs()[15]<0x10235960u&&++svc_log<=40)trace.push_back("  SVC "+functions[id-1]+" guest_pc=0x"+to_hex(cpu->Regs()[15]-8)+" a=0x"+to_hex(cpu->Regs()[0])+" b=0x"+to_hex(cpu->Regs()[1])+" c=0x"+to_hex(cpu->Regs()[2])+" d=0x"+to_hex(cpu->Regs()[3]));service(functions[id-1]);}
             if(!outer)continue;
             if(!fault.empty())break;
@@ -212,6 +213,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             // points. Nested Java-to-native calls retain their suspended context.
             const auto previous=threads.current();
             threads.select();
+            if(threads.thread().completion_errno){MemoryWrite32(threads.thread().error,threads.thread().completion_errno);threads.thread().completion_errno=0;}
             if(previous!=threads.current() || rotate) {
                 ++thread_switches;cpu->ClearExclusiveState();threads.thread().cpu.load(*cpu);
                 jni_exception=threads.thread().exception;errno_address=threads.thread().error;
@@ -297,6 +299,11 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="pthread_attr_init")thread_attrs[a]={};
         else if(base=="pthread_attr_setstacksize") {if(!thread_attrs.count(a)||b<16384||b>0x200000)result=22;else thread_attrs.at(a).stack_size=b;}
         else if(base=="pthread_attr_setdetachstate") {if(!thread_attrs.count(a)||b>1)result=22;else thread_attrs.at(a).detached=b;}
+        // Cooperative round-robin supports SCHED_OTHER/priority zero only.
+        // Report unsupported priorities instead of pretending to apply them.
+        else if(base=="pthread_attr_setschedparam") {if(!thread_attrs.count(a)||!b||MemoryRead32(b)!=0)result=22;}
+        else if(base=="pthread_getschedparam") {if(!threads.find(a))result=3;else if(!b||!c)result=22;else {MemoryWrite32(b,0);MemoryWrite32(c,0);}}
+        else if(base=="pthread_setschedparam") {if(!threads.find(a))result=3;else if(!c||b||MemoryRead32(c)!=0)result=22;}
         else if(base=="pthread_attr_getstacksize"||base=="pthread_attr_getdetachstate") {if(!thread_attrs.count(a)||!b)result=22;else MemoryWrite32(b,base=="pthread_attr_getstacksize"?thread_attrs.at(a).stack_size:thread_attrs.at(a).detached);}
         else if(base=="pthread_attr_destroy") {if(!thread_attrs.erase(a))result=22;}
         else if(base=="pthread_create") {
@@ -316,8 +323,22 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="pthread_exit") {if(call_depth!=1||threads.current()==1)throw std::runtime_error("Unsupported main/nested pthread_exit");result=a;returned=true;}
         else if(base=="sem_init"){if(b||c>0x7fffffff)throw std::runtime_error("Unsupported semaphore attributes");semaphores[a]=c;}
         else if(base=="sem_destroy"){if(!semaphores.erase(a))throw std::runtime_error("Unknown semaphore");}
-        else if(base=="sem_post"){auto& v=semaphores.at(a);const auto waiter=threads.waiter(ds::GuestThreads::State::semaphore,a);if(waiter)threads.wake(waiter);else{if(v==0x7fffffff)throw std::runtime_error("Semaphore overflow");++v;}}
-        else if(base=="sem_wait"||base=="sem_trywait"){if(semaphores[a]){--semaphores[a];}else if(base=="sem_trywait"){MemoryWrite32(errno_address,11);result=0xffffffff;}else {if(call_depth!=1)throw std::runtime_error("Semaphore wait across host callback boundary");threads.block(ds::GuestThreads::State::semaphore,a);rotate=true;}}
+        else if(base=="sem_post"){auto& v=semaphores.at(a);threads.expire_timers();const auto waiter=threads.waiter(ds::GuestThreads::State::semaphore,a);if(waiter)threads.wake(waiter);else{if(v==0x7fffffff)throw std::runtime_error("Semaphore overflow");++v;}}
+        else if(base=="sem_wait"||base=="sem_trywait"||base=="sem_timedwait"){
+            auto it=semaphores.find(a);
+            if(it==semaphores.end()){MemoryWrite32(errno_address,22);result=0xffffffff;}
+            else if(it->second){--it->second;}
+            else if(base=="sem_trywait"){MemoryWrite32(errno_address,11);result=0xffffffff;}
+            else {
+                if(call_depth!=1)throw std::runtime_error("Semaphore wait across host callback boundary");
+                if(base=="sem_timedwait"){
+                    const int32_t sec=int32_t(MemoryRead32(b)),ns=int32_t(MemoryRead32(b+4));
+                    if(ns<0||ns>=1000000000){MemoryWrite32(errno_address,22);result=0xffffffff;}
+                    else if(sec<0||uint64_t(sec)*1000000000+uint32_t(ns)<=realtime_epoch+threads.time()){MemoryWrite32(errno_address,110);result=0xffffffff;}
+                    else {threads.timed_semaphore(a,uint64_t(sec)*1000000000+uint32_t(ns)-realtime_epoch);rotate=true;}
+                }else {threads.block(ds::GuestThreads::State::semaphore,a);rotate=true;}
+            }
+        }
         else if(base=="sem_getvalue")MemoryWrite32(b,semaphores[a]);
         else if(base=="pthread_key_create"){if(next_tls_key>=4096)result=11;else{const auto key=next_tls_key++;tls[key]=b;MemoryWrite32(a,key);}}
         else if(base=="pthread_getspecific")result=threads.thread().tls.count(a)?threads.thread().tls.at(a):0;
@@ -336,9 +357,9 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="__atomic_inc"||base=="__atomic_dec"){result=MemoryRead32(a);MemoryWrite32(a,result+(base=="__atomic_inc"?1:-1));}
         else if(base=="__atomic_cmpxchg"){result=MemoryRead32(c)!=a;if(!result)MemoryWrite32(c,b);}
         else if(base=="clock")result=uint32_t(uint64_t(std::clock())*1000000/CLOCKS_PER_SEC);
-        else if(base=="time"){result=uint32_t(std::time(nullptr));if(a)MemoryWrite32(a,result);}
-        else if(base=="gettimeofday"){if(a){const uint32_t now=uint32_t(std::time(nullptr));MemoryWrite32(a,now);MemoryWrite32(a+4,0);}if(b)MemoryWrite64(b,0);result=0;}
-        else if(base=="clock_gettime"){const auto ns=threads.time();MemoryWrite32(b,uint32_t(ns/1000000000));MemoryWrite32(b+4,uint32_t(ns%1000000000));result=0;}
+        else if(base=="time"){result=uint32_t((realtime_epoch+threads.time())/1000000000);if(a)MemoryWrite32(a,result);}
+        else if(base=="gettimeofday"){const auto ns=realtime_epoch+threads.time();if(a){MemoryWrite32(a,uint32_t(ns/1000000000));MemoryWrite32(a+4,uint32_t(ns%1000000000/1000));}if(b)MemoryWrite64(b,0);result=0;}
+        else if(base=="clock_gettime"){if(a>1){MemoryWrite32(errno_address,22);result=0xffffffff;}else{const auto ns=threads.time()+(a==0?realtime_epoch:0);MemoryWrite32(b,uint32_t(ns/1000000000));MemoryWrite32(b+4,uint32_t(ns%1000000000));result=0;}}
         else if(base=="stat"||base=="lstat"){
             const std::string path=resolve_path(guest_text(a));
             std::FILE* fp=std::fopen(path.c_str(),"rb");
