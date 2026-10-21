@@ -78,6 +78,8 @@ std::optional<uint64_t> GuestJni::asset_delegate(uint32_t receiver,const MethodK
     auto& o=object(receiver);
     if(o.cls=="android/content/res/AssetManager" && (m.name=="open"||m.name=="openFd"||m.name=="list")) {
         std::string name=object(uint32_t(values.at(0))).text;
+        char pcb[16];snprintf(pcb,sizeof pcb,"%08x",guest_pc());
+        last_asset_call=m.name+" '"+name+"' pc=0x"+pcb;
         if(name.rfind("appbundle:",0)==0)name=name.substr(10);
         if(name.find_first_of("\\:\0",0,3)!=std::string::npos || (!name.empty()&&name[0]=='/'))return raise_exception("java/io/IOException","Unsafe asset path");
         size_t p=0;
@@ -266,6 +268,10 @@ uint64_t GuestJni::jni_dispatch(const std::string& op,uint32_t env,uint32_t vm) 
         const uint64_t result=java_delegate(b,m,values); // receiver, never declaring class
         // ARM32 soft-float ABI returns jlong/jdouble in r0:r1. The caller writes r1.
         return result;
+    }
+    if(op=="MonitorEnter"||op=="MonitorExit") {
+        if(b)object(b);
+        return 0; // single-threaded runtime: no contention, lock/unlock succeed
     }
     throw std::runtime_error("Unsupported JNI: "+op);
 }

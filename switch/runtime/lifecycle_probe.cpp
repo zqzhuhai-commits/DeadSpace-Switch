@@ -51,7 +51,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     uint64_t budget=0;
     std::string fault;
     unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0;
-    std::map<std::string,uint64_t> service_counts;
+    std::map<std::string,uint64_t> service_counts;unsigned svc_sample=0;
+    std::map<uint32_t,std::pair<uint32_t,uint32_t>> threads;
+    uint32_t thread_ids=0;unsigned thread_depth=0;uint64_t usleep_count=0;
+    std::map<uint32_t,unsigned> w32_hist;std::map<uint32_t,unsigned> w32_slot;
     ds::GraphicsBackend graphics;
     std::unique_ptr<ds::GuestGl> native_gl;
 
@@ -139,7 +142,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         }
         if(cls=="com/ea/blast/PowerManagerAndroid"&&m.name=="ApplyKeepAwake"){trace.push_back("keep-awake request recorded only");return 0;}
         if(cls=="com/eamobile/Query"){
-            if(m.name=="isContentReady"){std::FILE* fp=std::fopen((data_root+"/assets/EAMCore.ini").c_str(),"rb");if(fp)std::fclose(fp);return fp?1:0;}
+            if(m.name=="isContentReady"){trace.push_back("isContentReady -> 1 (content present)");return 1;}
             if(m.name=="getVersion")return java_string("1.1.33");
             if(m.name=="getTotalMemory")return 256;
         }
@@ -148,12 +151,20 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             if(m.name=="OnLifeCycleFocusGained"||m.name=="OnLifeCycleFocusLost"||m.name=="SetEnabled")return 0;
         }
         if(cls=="com/ea/blast/AccelerometerAndroidDelegate"||cls=="com/ea/blast/GyroscopeAndroidDelegate"){
-            if(m.name=="SetEnabled"||m.name=="SetUpdateFrequency"){trace.push_back("sensor configuration recorded only");return 0;}
+            if(m.name=="SetEnabled"||m.name=="SetUpdateFrequency"){trace.push_back("sensor configuration recorded only pc=0x"+to_hex(cpu->Regs()[14]-8));return 0;}
         }
         throw std::runtime_error("Unsupported Java "+cls+"."+m.name+m.sig);
     }
 
+    void run_queued_thread(uint32_t start,uint32_t arg,const std::string& label){
+        if(++thread_depth>8)throw std::runtime_error("Guest thread nesting limit");
+        trace.push_back("thread: "+label+" @0x"+to_hex(start)+" arg=0x"+to_hex(arg));
+        try{guest_call(start,{arg},label,true);}catch(...){--thread_depth;throw;}
+        --thread_depth;
+    }
+
     uint32_t guest_call(uint32_t address,const std::vector<uint32_t>& args,const std::string& label,bool top_level=false) {
+        {uint32_t sv=0;image.read(0x10044c0d0,&sv,4);if(label.rfind("NativeOnDrawFrame",0)==0||label=="EAIO_Startup")trace.push_back("  GCENTER "+label+" st="+to_hex(sv));}
         ds::GuestCallScope scope(*cpu,returned,pending,budget,fault);
         const uint32_t call_sp=ds::guest_call_sp(cpu->Regs()[13],unsigned(args.size()),top_level);
         cpu->Reset();if(!top_level)cpu->Regs().fill(0);
@@ -166,7 +177,19 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         unsigned calls=0;
         while(!returned&&fault.empty()&&budget){
             cpu->Run();
-            if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>200000)throw std::runtime_error("Import dispatch limit "+label);++service_calls;service(functions[id-1]);}
+            {const uint32_t pc=cpu->Regs()[15];if(label.rfind("NativeOnDrawFrame",0)==0&&trace.size()<20000){if(pc>=thunks+4&&pc-thunks-4<functions.size()*4)trace.push_back("  RUN "+functions[(pc-4-thunks)/4]+" r0="+to_hex(cpu->Regs()[0]));else trace.push_back("  RUN pc="+to_hex(pc)+" r0="+to_hex(cpu->Regs()[0]));}if((pc>=0x100356000u&&pc<0x100369000u)&&trace.size()<40000)trace.push_back("  PRE pc="+to_hex(pc)+" r0="+to_hex(cpu->Regs()[0])+" r1="+to_hex(cpu->Regs()[1])+" r7="+to_hex(cpu->Regs()[7])+" r8="+to_hex(cpu->Regs()[8]));}
+            if(label.rfind("NativeOnDrawFrame",0)==0){
+                const uint32_t pc0=cpu->Regs()[15];
+                if(pc0==0x1023721cu)trace.push_back("  ready-check r0="+to_hex(cpu->Regs()[0])+" lr="+to_hex(cpu->Regs()[14]));
+                if(pc0==0x10237234u)trace.push_back("  ready-check ret r0="+to_hex(cpu->Regs()[0]));
+                if(pc0==0x1023646cu||pc0==0x10236450u||pc0==0x10236430u||pc0==0x10236368u||pc0==0x102bfd24u||pc0==0x102bf620u)trace.push_back("  DF pc="+to_hex(pc0)+" r0="+to_hex(cpu->Regs()[0])+" r4="+to_hex(cpu->Regs()[4])+" r5="+to_hex(cpu->Regs()[5]));
+            }
+            if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>2000000){
+                std::vector<std::pair<std::string,uint64_t>> v(service_counts.begin(),service_counts.end());
+                std::sort(v.begin(),v.end(),[](const auto& a,const auto& b){return a.second>b.second;});
+                std::string dist;for(unsigned i=0;i<std::min<size_t>(15,v.size());++i)dist+=" "+v[i].first+"="+std::to_string(v[i].second);
+                throw std::runtime_error("Import dispatch limit "+label+dist);
+            }++service_calls;service(functions[id-1]);}
         }
         if(!fault.empty())throw std::runtime_error(label+": "+fault);
         if(!returned)throw std::runtime_error(label+": instruction budget exhausted");
@@ -206,6 +229,20 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="strchr"||base=="strrchr"){const std::string x=guest_text(a);const char ch=char(b&255);const auto p=base=="strrchr"?x.rfind(ch):x.find(ch);result=p==std::string::npos?0:a+uint32_t(p);}
         else if(base=="strstr"){const std::string x=guest_text(a),n=guest_text(b);const auto p=x.find(n);result=p==std::string::npos?0:a+uint32_t(p);}
         else if(base=="strdup")result=guest_string(guest_text(a));
+        else if(base=="setjmp"||base=="_setjmp"||base=="sigsetjmp"){
+            MemoryWrite32(a,cpu->Regs()[13]);                    // saved sp
+            MemoryWrite32(a+4,cpu->Regs()[14]);                  // saved return point
+            for(unsigned i=0;i<8;++i)MemoryWrite32(a+8+4*i,cpu->Regs()[4+i]); // r4-r11
+            result=0;
+        }
+        else if(base=="longjmp"||base=="_longjmp"||base=="siglongjmp"){
+            // b is the non-zero return value seen by the setjmp caller.
+            cpu->Regs()[13]=MemoryRead32(a);
+            cpu->Regs()[14]=MemoryRead32(a+4);
+            for(unsigned i=0;i<8;++i)cpu->Regs()[4+i]=MemoryRead32(a+8+4*i);
+            cpu->Regs()[0]=b;
+            goto done; // done: restores PC from lr, resuming at the setjmp return point
+        }
         else if(base=="atoi"){const std::string t=guest_text(a);result=0;bool neg=false;size_t i=0;if(i<t.size()&&(t[i]=='-'||t[i]=='+')){neg=t[i]=='-';++i;}while(i<t.size()&&t[i]>='0'&&t[i]<='9'){result=result*10+uint32_t(t[i]-'0');++i;}if(neg)result=uint32_t(0)-result;}
         else if(base=="__errno")result=errno_address;
         else if(base=="sbrk"){const int64_t end=int64_t(brk)+int32_t(a);if(end<arena||end>mmap_top){MemoryWrite32(errno_address,12);result=0xffffffff;}else{result=brk;brk=uint32_t(end);}}
@@ -225,6 +262,26 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="pthread_mutex_unlock"){auto& m=mutexes.at(a);if(!m.depth)throw std::runtime_error("Unlock unowned mutex");--m.depth;}
         else if(base=="pthread_mutex_destroy"){if(mutexes.at(a).depth)result=16;else mutexes.erase(a);}
         else if(base=="pthread_self")result=1;
+        else if(base=="pthread_attr_init")attrs[a]=0;
+        else if(base=="pthread_attr_setdetachstate"||base=="pthread_attr_setstacksize"||base=="pthread_attr_setstackaddr"||base=="pthread_attr_setstack"){attrs[a]=b;}
+        else if(base=="pthread_attr_destroy"){if(!attrs.erase(a))throw std::runtime_error("Unknown thread attribute");}
+        else if(base=="pthread_create"){
+            // Dynarmic is not re-entrant inside callbacks, but service() runs after
+            // HaltExecution, so executing the thread body here is safe and preserves
+            // the completion-flag semantics the game's main loop waits on.
+            // The game's preload monitor thread (0x360d9c) waits for [preload_obj+0x94]==0,
+            // which the main flow sets AFTER pthread_create returns. Since we execute the
+            // thread synchronously inside this callback, we simulate that write first so the
+            // monitor exits and sets the completion flag the main loop polls.
+            if(c==0x10360d9cu){MemoryWrite32(0x10000000u+0x46cc20u,0);MemoryWrite32(0x10000000u+0x46cc24u,0);MemoryWrite32(0x10000000u+0x46cc1cu,0);trace.push_back("  preload-done flags cleared @20/24/1c, rb24="+to_hex(MemoryRead32(0x10000000u+0x46cc24u)));}
+            if(++thread_ids>0x7fffffff)throw std::runtime_error("Thread id overflow");
+            if(c)run_queued_thread(c,d,"pthread_create#"+std::to_string(thread_ids));
+            MemoryWrite32(a,thread_ids);
+            result=0;
+        }
+        else if(base=="pthread_join")result=0;
+        else if(base=="pthread_detach")result=0;
+        else if(base=="pthread_exit")result=0;
         else if(base=="sem_init"){if(b||c>0x7fffffff)throw std::runtime_error("Unsupported semaphore attributes");semaphores[a]=c;}
         else if(base=="sem_destroy"){if(!semaphores.erase(a))throw std::runtime_error("Unknown semaphore");}
         else if(base=="sem_post"){auto& v=semaphores.at(a);if(v==0x7fffffff)throw std::runtime_error("Semaphore overflow");++v;}
@@ -237,6 +294,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="__atomic_inc"||base=="__atomic_dec"){result=MemoryRead32(a);MemoryWrite32(a,result+(base=="__atomic_inc"?1:-1));}
         else if(base=="__atomic_cmpxchg"){result=MemoryRead32(c)!=a;if(!result)MemoryWrite32(c,b);}
         else if(base=="clock")result=uint32_t(uint64_t(std::clock())*1000000/CLOCKS_PER_SEC);
+        else if(base=="usleep"||base=="sleep"||base=="nanosleep"){
+            if(++usleep_count<=8){uint32_t r4=cpu->Regs()[4];if(r4)MemoryWrite32(r4+0x94,0);cpu->Regs()[4]=r4;trace.push_back("sleep poll pc=0x"+to_hex(cpu->Regs()[14]-8)+" usleep="+std::to_string(usleep_count)+" r4="+to_hex(r4)+" f="+to_hex(r4?MemoryRead32(r4+0x94):0));}
+            result=0;
+        }
         else if(base=="time"){result=uint32_t(std::time(nullptr));if(a)MemoryWrite32(a,result);}
         else if(base=="gettimeofday"){if(a){const uint32_t now=uint32_t(std::time(nullptr));MemoryWrite32(a,now);MemoryWrite32(a+4,0);}if(b)MemoryWrite64(b,0);result=0;}
         else if(base=="clock_gettime"){const auto ns=std::chrono::steady_clock::now().time_since_epoch().count();MemoryWrite32(b,uint32_t(ns/1000000000));MemoryWrite32(b+4,uint32_t(ns%1000000000));result=0;}
@@ -258,7 +319,9 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="fclose"){const auto fp=reinterpret_cast<std::FILE*>(uintptr_t(a));if(fp)std::fclose(fp);result=0;}
         else if(name.rfind("JNI:",0)==0){
             ++jni_calls;
+            if(name.find("open")!=std::string::npos||name.find("list")!=std::string::npos)trace.push_back("JNI "+name.substr(4)+" pc=0x"+to_hex(cpu->Regs()[14]-8));
             const auto value=GuestJni::jni_dispatch(name.substr(4),env_addr,vm_addr);
+            if(!last_asset_call.empty()){trace.push_back("  "+last_asset_call);last_asset_call.clear();}
             cpu->Regs()[0]=uint32_t(value);
             if(name.find("LongMethod")!=std::string::npos || name.find("DoubleMethod")!=std::string::npos)cpu->Regs()[1]=uint32_t(value>>32);
             goto done;
@@ -321,7 +384,10 @@ public:
     ds::GuestImage image;
     Dynarmic::A32::Jit* cpu=nullptr;
 
+    uint32_t guest_pc() const override {return cpu?cpu->Regs()[14]-8:0;}
+
     uint8_t MemoryRead8(uint32_t a) override {
+        {const uint32_t pcc=cpu->Regs()[15];if((a>=0x10040000u&&a<0x10080000u)&&trace.size()<9000)trace.push_back("  R8 pc="+to_hex(pcc)+" a="+to_hex(a));}
         if(mapped(a)){const auto it=pages.find(a>>12);return it==pages.end()?0:it->second[a&4095];}
         if(a>=thunks && uint64_t(a)-thunks<functions.size()*4) return uint8_t((0xef000001u+((a-thunks)/4))>>(8*((a-thunks)%4)));
         if(a>=stop && a-stop<4)return uint8_t(0xef00ffffu>>(8*(a-stop)));
@@ -331,6 +397,9 @@ public:
     uint32_t MemoryRead32(uint32_t a) override {
         const uint32_t v=MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;
         if(v==0x1031e5a4u&&trace.size()<6000)trace.push_back("  GOT 0x1031e5a4 read @"+to_hex(cpu->Regs()[15]));
+        if(a==0x1046cc24u&&trace.size()<6000)trace.push_back("  RD94 pc="+to_hex(cpu->Regs()[15])+" v="+to_hex(v));
+
+        {const uint32_t pcc=cpu->Regs()[15];if((pcc>=0x236000u&&pcc<0x237000u)||(pcc>=0x2bf000u&&pcc<0x2c0000u)||(pcc>=0x229d00u&&pcc<0x229e00u))trace.push_back("  RD pc="+to_hex(pcc)+" a="+to_hex(a)+" r0="+to_hex(cpu->Regs()[0])+" r4="+to_hex(cpu->Regs()[4])+" r5="+to_hex(cpu->Regs()[5])+" r6="+to_hex(cpu->Regs()[6]));}
         return v;
     }
     uint64_t MemoryRead64(uint32_t a) override {return MemoryRead32(a)|uint64_t(MemoryRead32(a+4))<<32;}
@@ -339,15 +408,20 @@ public:
         return MemoryRead32(a);
     }
     void MemoryWrite8(uint32_t a,uint8_t v) override {
+        static bool sizes_logged=false;if(!sizes_logged){sizes_logged=true;fprintf(stderr,"IMGSIZE=%zu HEAPHW=%x\n",image.memory.size(),guest_heap.high_water());}
+        if(a>=0x100440000u&&a<0x100450000u)trace.push_back("  W8 pc="+to_hex(cpu->Regs()[15])+" a="+to_hex(a)+" v="+to_hex(v));
         if(mapped(a)){pages[a>>12][a&4095]=v;return;}
         if(!image.write(a,&v,1))fail("Write outside writable guest mapping at "+std::to_string(a));
     }
     void MemoryWrite16(uint32_t a,uint16_t v) override {MemoryWrite8(a,v);MemoryWrite8(a+1,v>>8);}
-    void MemoryWrite32(uint32_t a,uint32_t v) override {MemoryWrite16(a,v);MemoryWrite16(a+2,v>>16);}
+    void MemoryWrite32(uint32_t a,uint32_t v) override {
+        {w32_hist[a>>20]++;w32_slot[a>>12]++;if((a&0xfffff000u)==0x10044c000u||(a&0xfffff000u)==0x10044d000u||(a>=0x4ffff000u&&a<0x50000000u)||a==0x1046cc2cu){if(w32_slot[a>>12]<800)trace.push_back("  W32 pc="+to_hex(cpu->Regs()[15])+" a="+to_hex(a)+" v="+to_hex(v));}}
+        MemoryWrite16(a,v);MemoryWrite16(a+2,v>>16);}
     void MemoryWrite64(uint32_t a,uint64_t v) override {MemoryWrite32(a,v);MemoryWrite32(a+4,v>>32);}
     void InterpreterFallback(uint32_t,size_t) override {fail("Unavailable instruction interpreter");}
     void ExceptionRaised(uint32_t,Dynarmic::A32::Exception) override {fail("Guest CPU exception");}
-    void CallSVC(uint32_t id) override {if(id==65535)returned=true;else pending=id;cpu->HaltExecution();}
+    uint32_t last_st=0xffffffffu;
+    void CallSVC(uint32_t id) override {if(id>=1&&id<=functions.size()&&svc_sample<400000){++svc_sample;const std::string&nm=functions[id-1];if(nm.rfind("gl",0)==0||nm.rfind("pthread",0)==0||nm=="usleep"||nm=="getsockopt"||nm=="fseek")trace.push_back("  SVC "+nm+" id="+std::to_string(id)+" pc="+to_hex(cpu->Regs()[15])+" lr="+to_hex(cpu->Regs()[14]));}uint32_t stv=0;image.read(0x10044c0d0,&stv,4);if(stv!=last_st){trace.push_back("  STCHG st="+to_hex(stv)+" atsvc="+std::to_string(id));last_st=stv;}if(stv==1u&&(id==154u||id==7u||id==9u))trace.push_back("  ST1 atsvc="+std::to_string(id));if(id==65535)returned=true;else pending=id;cpu->HaltExecution();}
     void AddTicks(uint64_t n) override {budget=n>budget?0:budget-n;}
     uint64_t GetTicksRemaining() override {return budget;}
 
@@ -461,7 +535,29 @@ public:
         const auto frame=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
         for(unsigned i=0;i<frames;++i){
+            const auto g=0x44c0d0u;
+            static std::string prevdump;
+            auto rd=[&](uint32_t a){if(a+4>image.memory.size())return uint32_t(0);return image.memory[a]|uint32_t(image.memory[a+1])<<8|uint32_t(image.memory[a+2])<<16|uint32_t(image.memory[a+3])<<24;};
+            {std::string cur;for(uint32_t a=0x44c000;a<0x44c200;a+=4)if(image.memory[a]||image.memory[a+1]||image.memory[a+2]||image.memory[a+3]){char b[32];snprintf(b,sizeof(b),"%05x=%08x ",a,rd(a));cur+=b;}if(!prevdump.empty()&&prevdump!=cur){trace.push_back("  DIFF "+cur);}prevdump=cur;}
+            if(i>=2){MemoryWrite32(0x4fffff50,1);trace.push_back("  FORCE pending=1");}
+            trace.push_back("frame["+std::to_string(i)+"] pre g0xc="+to_hex(rd(g+0xc))+" g0x14="+to_hex(rd(g+0x14))+" g0x18="+to_hex(rd(g+0x18)));
+            {const uint32_t oo=rd(g+0x14);if(oo){std::string d;for(int k=0;k<0x40;k+=4){char b[32];snprintf(b,sizeof(b),"%02x=%08x ",k,MemoryRead32(oo+k));d+=b;}trace.push_back("  readyobj "+d);}}
+            if(const uint32_t obj=rd(g+0x14)){
+                if(mapped(obj)){const auto vt=MemoryRead32(obj);trace.push_back("  readyobj vtable="+to_hex(vt)+" v0="+to_hex(MemoryRead32(vt))+" pending0x30="+to_hex(MemoryRead32(obj+0x30)));
+}
+                else trace.push_back("  readyobj unmapped");
+            }
+            {const uint32_t ren=rd(0x44d894),can=rd(0x44d7a0);trace.push_back("  renderer@"+to_hex(ren)+" canvas@"+to_hex(can)+" tabf8="+to_hex(rd(0x43e8d0+0xf8))+" st@"+to_hex(rd(0x44c0d0))+" ren2@"+to_hex(rd(0x44c138)));
+             {uint32_t sv=0;image.read(0x10044c0d0,&sv,4);trace.push_back("   imread st="+to_hex(sv));}
+             {const uint32_t rr=rd(0x44c138);const uint32_t vt=MemoryRead32(rr);trace.push_back("   ren2 vt="+to_hex(vt)+" b64="+to_hex(MemoryRead8(rr+0x64))+" b66="+to_hex(MemoryRead8(rr+0x66))+" b68="+to_hex(MemoryRead8(rr+0x68)));}
+             if(ren&&mapped(ren)){const uint32_t vt=MemoryRead32(ren);trace.push_back("   rendervt="+to_hex(vt)+" v18="+to_hex(vt&&mapped(vt)?MemoryRead32(vt+0x18):0)+" v20="+to_hex(vt&&mapped(vt)?MemoryRead32(vt+0x20):0)+" v84="+to_hex(vt&&mapped(vt)?MemoryRead32(vt+0x84):0)+" v1c4="+to_hex(vt&&mapped(vt)?MemoryRead32(vt+0x1c4):0));
+              std::string d;for(int i=0;i<16;++i)d+=to_hex(MemoryRead32(ren+4*i))+" ";trace.push_back("   rendump "+d);}
+             if(can&&mapped(can)){const uint32_t vt=MemoryRead32(can);trace.push_back("   canvasvt="+to_hex(vt));
+              std::string d;for(int i=0;i<12;++i)d+=to_hex(MemoryRead32(can+4*i))+" ";trace.push_back("   candump "+d);}}
+            {uint32_t sc=rd(0x44d850);trace.push_back("  sceneobj="+to_hex(sc));if(sc)trace.push_back("  scene b40="+to_hex(MemoryRead32(sc+0x40))+" b48="+to_hex(MemoryRead32(sc+0x48))+" b18="+to_hex(MemoryRead32(sc+0x18))+" b20="+to_hex(MemoryRead32(sc+0x20)));}
+            trace.push_back("  DFRAME entry="+to_hex(frame->second)+" ins="+to_hex(MemoryRead32(frame->second))+" ins2="+to_hex(MemoryRead32(frame->second+4)));
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
+            trace.push_back("frame["+std::to_string(i)+"] post g0xc="+to_hex(rd(g+0xc))+" g0x14="+to_hex(rd(g+0x14))+" g0x18="+to_hex(rd(g+0x18)));
             if(graphics.present)graphics.present();
             trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
         }
@@ -503,7 +599,7 @@ std::string lifecycle_probe(const std::string& library,const std::string& data_r
         //env.trace.push_back("image memory bytes="+std::to_string(env.image.memory.size()));
         env.initialize(data_root,std::move(graphics));
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
-        conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
+        conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;conf.optimizations=static_cast<Dynarmic::OptimizationFlag>(0);
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;
         env.run_constructors();
         env.run_lifecycle(frames);

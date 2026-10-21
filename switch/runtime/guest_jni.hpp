@@ -43,6 +43,8 @@ protected:
     virtual void MemoryWrite16(uint32_t,uint16_t)=0;
     virtual void MemoryWrite32(uint32_t,uint32_t)=0;
     virtual uint64_t java_delegate(uint32_t,const MethodKey&,const std::vector<uint64_t>&)=0;
+    virtual uint32_t guest_pc() const {return 0;}
+    std::string last_asset_call;
     JavaObject& object(uint32_t ref);
     std::string cstring(uint32_t address);
     uint32_t java_string(const std::string& modified_utf8);
