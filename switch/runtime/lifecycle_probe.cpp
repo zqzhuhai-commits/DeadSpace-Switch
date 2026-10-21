@@ -64,14 +64,15 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     bool returned=false;
     uint64_t budget=0;
     std::string fault;
-    unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0;
+    unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0,strstr_log=0,asset_reads=0,guard_log=0,svc_log=0;std::string last_service;
     std::map<std::string,uint64_t> service_counts;
     ds::GraphicsBackend graphics;
     std::unique_ptr<ds::GuestGl> native_gl;
 
     bool mapped(uint32_t a) const {
         return threads.mapped(a) || (a>=heap && a<guest_heap.high_water()) ||
-               (a>=arena && a<brk) || (a>=mmap_top && a<arena_end);
+               (a>=arena && a<arena_end) ||
+               (a>=0x10000000u && a<0x20200000u);
     }
     void fail(const std::string& message) {
         if(fault.empty()){
@@ -86,7 +87,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     uint32_t arg(unsigned n) {return n<4?cpu->Regs()[n]:MemoryRead32(cpu->Regs()[13]+4*(n-4));}
     void bounded(uint32_t n) {if(n>64*1024*1024)throw std::runtime_error("Memory operation limit");}
     std::string guest_text(uint32_t p) {
-        if(!p)throw std::runtime_error("Null guest string");
+        if(!p){std::string e="Null guest string pc="+to_hex(cpu->Regs()[15])+" lr="+to_hex(cpu->Regs()[14])+" r1="+to_hex(cpu->Regs()[1]);throw std::runtime_error(e);}
         std::string s;for(uint32_t i=0;i<1024*1024;++i){uint8_t b=MemoryRead8(p+i);if(!b)return s;s+=char(b);}throw std::runtime_error("Unterminated guest string");
     }
     uint32_t guest_string(const std::string& v) {
@@ -180,12 +181,14 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         cpu->Regs()[13]=call_sp;
         cpu->Regs()[14]=stop;cpu->Regs()[15]=address&~1u;cpu->SetCpsr((address&1)?0x30:0x10);cpu->SetFpscr(0);
         for(unsigned i=4;i<args.size();++i)MemoryWrite32(cpu->Regs()[13]+4*(i-4),args[i]);
-        budget=30000000;returned=false;pending=0;
+        budget=6000000000;returned=false;pending=0;
         unsigned calls=0;
+        unsigned beats=0;
         while(!returned&&fault.empty()&&budget){
             quantum=std::min<uint64_t>(budget,100000);
             cpu->Run();
-            if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>200000)throw std::runtime_error("Import dispatch limit "+label);++service_calls;service(functions[id-1]);}
+            if((++beats&1023)==0)fprintf(stderr,"HB %s instr=%llu left=%llu reads=%u bytes=%u pc=0x%x sp=0x%x\n",label.c_str(),(unsigned long long)(2000000000ull-budget),(unsigned long long)budget,asset_reads,asset_read_bytes,cpu->Regs()[15],cpu->Regs()[13]);
+            if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>50000000)throw std::runtime_error("Import dispatch limit "+label);++service_calls;if(cpu->Regs()[15]>=0x10235800u&&cpu->Regs()[15]<0x10235960u&&++svc_log<=40)trace.push_back("  SVC "+functions[id-1]+" guest_pc=0x"+to_hex(cpu->Regs()[15]-8)+" a=0x"+to_hex(cpu->Regs()[0])+" b=0x"+to_hex(cpu->Regs()[1])+" c=0x"+to_hex(cpu->Regs()[2])+" d=0x"+to_hex(cpu->Regs()[3]));service(functions[id-1]);}
             if(!outer)continue;
             if(!fault.empty())break;
             if(returned) {
@@ -235,7 +238,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         MemoryWrite64(p+96,0);
     }
 
-    void service(const std::string& name) {
+    void service(const std::string& name) {last_service=name;
         ++service_counts[name];
         const auto a=arg(0),b=arg(1),c=arg(2),d=arg(3);
         uint32_t result=0;
@@ -253,7 +256,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="strcmp"||base=="strncmp"){std::string x=guest_text(a),y=guest_text(b);if(base=="strncmp"){x=x.substr(0,c);y=y.substr(0,c);}result=(x>y)-(x<y);}
         else if(base=="strcpy"||base=="strncpy"||base=="strcat"){std::string x=base=="strcat"?guest_text(a)+guest_text(b):guest_text(b);if(base=="strncpy")x=x.substr(0,c);for(uint32_t i=0;i<x.size();++i)MemoryWrite8(a+i,x[i]);MemoryWrite8(a+uint32_t(x.size()),0);result=a;}
         else if(base=="strchr"||base=="strrchr"){const std::string x=guest_text(a);const char ch=char(b&255);const auto p=base=="strrchr"?x.rfind(ch):x.find(ch);result=p==std::string::npos?0:a+uint32_t(p);}
-        else if(base=="strstr"){const std::string x=guest_text(a),n=guest_text(b);const auto p=x.find(n);result=p==std::string::npos?0:a+uint32_t(p);}
+        else if(base=="strstr"){if(!a||!b){trace.push_back("  STRSTR-NULL a="+to_hex(a)+" b="+to_hex(b)+" lr="+to_hex(cpu->Regs()[14]-8));result=0;}else{const std::string x=guest_text(a),n=guest_text(b);const auto p=x.find(n);result=p==std::string::npos?0:a+uint32_t(p);}}
         else if(base=="strdup")result=guest_string(guest_text(a));
         else if(base=="atoi"){const std::string t=guest_text(a);result=0;bool neg=false;size_t i=0;if(i<t.size()&&(t[i]=='-'||t[i]=='+')){neg=t[i]=='-';++i;}while(i<t.size()&&t[i]>='0'&&t[i]<='9'){result=result*10+uint32_t(t[i]-'0');++i;}if(neg)result=uint32_t(0)-result;}
         else if(base=="__errno")result=errno_address;
@@ -381,7 +384,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             }
         }
         else if(name.rfind("gl",0)==0)result=gl_dispatch(name,a,b,c,d);
-        else throw std::runtime_error("Unsupported import: "+name);
+        else {
+            trace.push_back("UNSUP-IMPORT "+name+" a=0x"+to_hex(a)+" b=0x"+to_hex(b)+" c=0x"+to_hex(c)+" d=0x"+to_hex(d)+" pc=0x"+to_hex(cpu->Regs()[15]-8)+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" got088="+to_hex(MemoryRead32(0x1043f088))+" canary=0x"+to_hex(MemoryRead32(0x104a1000))+" sym30007540=0x"+to_hex(MemoryRead32(0x30007540)));
+            throw std::runtime_error("Unsupported import: "+name);
+        }
         cpu->Regs()[0]=result;
         goto done;
     done:
@@ -418,7 +424,10 @@ public:
     Dynarmic::A32::Jit* cpu=nullptr;
 
     uint8_t MemoryRead8(uint32_t a) override {
-        if(mapped(a)){const auto it=pages.find(a>>12);return it==pages.end()?0:it->second[a&4095];}
+        if(a==0&&++guard_log<=20)trace.push_back("  RD0 pc=0x"+to_hex(cpu->Regs()[15]-8)+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7]));
+        if(a==0x1044bb6c&&++guard_log<=40)trace.push_back("  RD 0x1044bb6c pc=0x"+to_hex(cpu->Regs()[15]-8)+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6]));
+        if((a==0x10450b68u||a==0x10450b69u||a==0x10450b6au||a==0x10450b6bu)&&++guard_log<=40)trace.push_back("  RD 0x10450b68 pc=0x"+to_hex(cpu->Regs()[15]-8)+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7]));
+        if(mapped(a)){const auto it=pages.find(a>>12);if(it!=pages.end())return it->second[a&4095];uint8_t rv=0;if(!image.read(a,&rv,1)){if(!(a>=arena&&a<arena_end)&&!(a>=heap&&a<heap+0x4000000))fail("Unmapped guest read at "+std::to_string(a));return rv;}return rv;}
         if(a>=thunks && uint64_t(a)-thunks<functions.size()*4) return uint8_t((0xef000001u+((a-thunks)/4))>>(8*((a-thunks)%4)));
         if(a>=stop && a-stop<4)return uint8_t(0xef00ffffu>>(8*(a-stop)));
         uint8_t v=0;if(!image.read(a,&v,1))fail("Unmapped guest read at "+std::to_string(a)+" img="+std::to_string(image.memory.size()));return v;
@@ -426,16 +435,34 @@ public:
     uint16_t MemoryRead16(uint32_t a) override {return MemoryRead8(a)|uint16_t(MemoryRead8(a+1))<<8;}
     uint32_t MemoryRead32(uint32_t a) override {
         const uint32_t v=MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;
+        if(a==0x10444100u&&trace.size()<6000)trace.push_back("  RD32 0x10444100="+to_hex(v)+" @"+to_hex(cpu->Regs()[15])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4]));
         if(cpu&&v==0x1031e5a4u&&trace.size()<6000)trace.push_back("  GOT 0x1031e5a4 read @"+to_hex(cpu->Regs()[15]));
         return v;
     }
     uint64_t MemoryRead64(uint32_t a) override {return MemoryRead32(a)|uint64_t(MemoryRead32(a+4))<<32;}
     std::optional<uint32_t> MemoryReadCode(uint32_t a) override {
+        if((a&~1u)==0x10235944u&&++guard_log<=40)trace.push_back("  CODE 0x235944 r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7])+" r8=0x"+to_hex(cpu->Regs()[8])+" lr=0x"+to_hex(cpu->Regs()[14])+" lit=0x"+to_hex(MemoryRead32(0x1023599c)));
+        if((a&~1u)==0x102f7efcu&&++guard_log<=30)trace.push_back("  CALL 0x2f7efc r0=0x"+to_hex(cpu->Regs()[0])+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6]));
         if(a!=stop && !(a>=thunks && uint64_t(a)-thunks+4<=functions.size()*4) && !image.executable(a,4)){fail("Unmapped guest execution");return std::nullopt;}
         return MemoryRead32(a);
     }
     void MemoryWrite8(uint32_t a,uint8_t v) override {
-        if(mapped(a)){pages[a>>12][a&4095]=v;return;}
+        if(a==0x1043f088u&&++svc_log<=20)trace.push_back("  WR088 v="+to_hex(v)+" mapped="+std::to_string(mapped(a))+" pcount="+std::to_string(pages.count(a>>12)));
+        if((a>=0x1044bb58u&&a<0x1044bb90u||a>=0x10450b60u&&a<0x10450b90u)&&++guard_log<=500)trace.push_back("  WR 0x"+to_hex(a)+"=0x"+to_hex(v)+" svc="+last_service+" pc=0x"+to_hex(cpu->Regs()[15])+" sp=0x"+to_hex(cpu->Regs()[13])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7])+" r3=0x"+to_hex(cpu->Regs()[3])+" r2=0x"+to_hex(cpu->Regs()[2]));
+        if(a==0x1043f100u&&++svc_log<=80)trace.push_back("  WRF100 0x"+to_hex(v)+" svc="+last_service+" pc=0x"+to_hex(cpu->Regs()[15]-8)+" r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6]));
+        if(mapped(a)){
+            if(a==0x1043f088u)trace.push_back("  WR88-PATH mapped-branch page=0x"+to_hex(a>>12)+" memsize=0x"+to_hex(image.memory.size()));
+            const uint32_t page=a>>12;
+            if(!pages.count(page)){
+                auto& arr=pages[page];
+                const uint32_t imbase=0x10000000u,gp=page<<12;
+                if(gp>=imbase && uint64_t(gp)-imbase<image.memory.size()){
+                    const uint32_t off=gp-imbase,n=std::min<uint32_t>(4096,uint32_t(image.memory.size()-off));
+                    std::memcpy(arr.data(),image.memory.data()+off,n);
+                }
+            }
+            pages[a>>12][a&4095]=v;return;
+        }
         if(!image.write(a,&v,1))fail("Write outside writable guest mapping at "+std::to_string(a));
     }
     void MemoryWrite16(uint32_t a,uint16_t v) override {MemoryWrite8(a,v);MemoryWrite8(a+1,v>>8);}
@@ -521,7 +548,15 @@ public:
         vm_addr=alloc(4);MemoryWrite32(vm_addr,vm_table);
     }
 
+    void install_stack_chk_guard() {
+        // GOT 槽 0x1043f088 由 bind_imports 指向符号 __stack_chk_guard（0x30007540），
+        // guest bionic 已写入默认金丝雀 0xa5a55a5a。此函数仅兜底：符号位置为空时补默认值。
+        // 注意：不得把金丝雀放到 0x104a1000 附近——那是 guest 调用桥栈活动区（sp 实测 0x104a1010），会被覆盖。
+        if(MemoryRead32(0x30007540)==0){MemoryWrite32(0x30007540,0xa5a55a5a);}
+    }
+
     void run_constructors() {
+        trace.push_back("pre-ctor GOT 0x1043f100="+to_hex(MemoryRead32(0x1043f100))+" raw="+to_hex(image.memory[0x43f100]|image.memory[0x43f101]<<8|image.memory[0x43f102]<<16|image.memory[0x43f103]<<24));
         for(const auto fn:image.constructors){
             if(!image.executable(fn&~1u,4))throw std::runtime_error("Invalid constructor address");
             guest_call(fn,{},"constructor",true);
@@ -531,6 +566,9 @@ public:
 
     void run_lifecycle(unsigned frames) {
         trace.push_back("Constructors returned: "+std::to_string(constructors_completed));
+        trace.push_back("lit 0x23599c="+to_hex(MemoryRead32(0x1023599c))+" 0x2359a0="+to_hex(MemoryRead32(0x102359a0))+" 0x2359a8="+to_hex(MemoryRead32(0x102359a8))+" 0x2359a4="+to_hex(MemoryRead32(0x102359a4)));
+        trace.push_back("GOT 0x1043f100="+to_hex(MemoryRead32(0x1043f100))+" 0x1043f0c0="+to_hex(MemoryRead32(0x1043f0c0))+" 0x1043ef90="+to_hex(MemoryRead32(0x1043ef90))+" 0x1043e8d0="+to_hex(MemoryRead32(0x1043e8d0))+" raw43f100="+to_hex(image.memory[0x43f100]|image.memory[0x43f101]<<8|image.memory[0x43f102]<<16|image.memory[0x43f103]<<24)+" raw43f0c0="+to_hex(image.memory[0x43f0c0]|image.memory[0x43f0c1]<<8|image.memory[0x43f0c2]<<16|image.memory[0x43f0c3]<<24));
+        trace.push_back("post-ctor 0x1044bb58..0x1044bb8c: "+to_hex(MemoryRead32(0x1044bb58))+" "+to_hex(MemoryRead32(0x1044bb5c))+" "+to_hex(MemoryRead32(0x1044bb60))+" "+to_hex(MemoryRead32(0x1044bb64))+" "+to_hex(MemoryRead32(0x1044bb68))+" "+to_hex(MemoryRead32(0x1044bb6c))+" "+to_hex(MemoryRead32(0x1044bb70))+" "+to_hex(MemoryRead32(0x1044bb74))+" "+to_hex(MemoryRead32(0x1044bb78))+" "+to_hex(MemoryRead32(0x1044bb7c))+" "+to_hex(MemoryRead32(0x1044bb80))+" "+to_hex(MemoryRead32(0x1044bb84))+" "+to_hex(MemoryRead32(0x1044bb88))+" "+to_hex(MemoryRead32(0x1044bb8c)));
         const auto onload=image.exports.find("JNI_OnLoad");
         if(onload==image.exports.end())throw std::runtime_error("JNI_OnLoad export missing");
         const uint32_t version=guest_call(onload->second,{vm_addr,0},"JNI_OnLoad",true);
@@ -603,6 +641,7 @@ std::string lifecycle_probe(const std::string& library,const std::string& data_r
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
         conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;
+        env.install_stack_chk_guard();
         env.run_constructors();
         env.run_lifecycle(frames);
         return env.report();

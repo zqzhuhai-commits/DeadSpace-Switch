@@ -39,7 +39,7 @@ protected:
     virtual void block_monitor(uint32_t) {throw std::runtime_error("Contended JNI monitor requires guest scheduler");}
     virtual uint32_t monitor_waiter(uint32_t) const {return 0;}
     virtual void wake_monitor(uint32_t) {throw std::runtime_error("JNI monitor scheduler unavailable");}
-    uint64_t asset_opens=0, asset_lists=0, asset_read_bytes=0;
+    uint64_t asset_opens=0, asset_lists=0, asset_read_bytes=0; unsigned open_log=0;
     virtual uint32_t alloc(uint32_t)=0;
     virtual uint32_t arg(unsigned)=0;
     virtual uint8_t MemoryRead8(uint32_t)=0;

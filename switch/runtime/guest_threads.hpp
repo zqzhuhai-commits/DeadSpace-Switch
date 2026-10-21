@@ -51,7 +51,7 @@ public:
         const auto id=t.id;tasks.emplace(id,t);*slot=id;return id;
     }
     bool mapped(uint32_t p)const {
-        if(p>=0x20000000u&&p<0x20200000u)return true;
+        if(p>=0x10600000u&&p<0x20200000u)return true;
         if(p<0x21000000u||p>=0x25000000u)return false;
         const auto id=stacks[(p-0x21000000u)/0x200000u];
         const auto it=tasks.find(id);
