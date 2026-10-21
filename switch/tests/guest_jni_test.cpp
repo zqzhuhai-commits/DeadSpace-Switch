@@ -1,6 +1,7 @@
 #include "guest_jni.hpp"
 #include "jni_variant_bindings.hpp"
 #include <array>
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -10,6 +11,16 @@
 
 static void check(bool condition,const char* why) {if(!condition)throw std::runtime_error(why);}
 template<class F> void reject(F fn) {bool caught=false;try{fn();}catch(const std::exception&){caught=true;}check(caught,"Invalid JNI operation accepted");}
+struct PcmRecord {std::vector<uint8_t> bytes;unsigned starts=0,stops=0,clears=0,closes=0;bool blocking=false;uint32_t accept=UINT32_MAX;};
+class RecordingSink:public ds::AudioSink {
+    std::shared_ptr<PcmRecord> record;
+public:
+    explicit RecordingSink(std::shared_ptr<PcmRecord> r):record(std::move(r)){}
+    ~RecordingSink()override{++record->closes;}
+    void playing(bool on)override{if(on)++record->starts;else ++record->stops;}
+    void clear()override{++record->clears;}
+    uint32_t write(const uint8_t* p,uint32_t n,bool blocking)override{n=std::min(n,record->accept);record->bytes.insert(record->bytes.end(),p,p+n);record->blocking=blocking;return n;}
+};
 class TestRuntime:public ds::GuestJni {
     std::vector<uint8_t> memory=std::vector<uint8_t>(4*1024*1024);
     uint32_t next=4096;
@@ -37,6 +48,7 @@ public:
     uint64_t java_delegate(uint32_t r,const ds::MethodKey& m,const std::vector<uint64_t>& args) override {
         receiver=r;values=args;
         if(const auto result=asset_delegate(r,m,args,root))return *result;
+        if(const auto result=audio_delegate(r,m,args))return *result;
         if(m.name=="echo")return 0xfedcba9876543210ull;
         if(m.name=="<init>" && m.sig=="(I)V")return 0;
         throw std::runtime_error("Unsupported test delegate");
@@ -54,6 +66,8 @@ public:
     uint32_t exception(){return uint32_t(call("ExceptionOccurred"));}
     std::string exception_class(){return object(exception()).cls;}
     uint32_t position(uint32_t r){return object(r).position;}
+    uint32_t audio(std::shared_ptr<PcmRecord> record){audio_backend={"recording test sink",[record](uint32_t hz,uint32_t ch){check(hz==44100&&ch==2,"Audio format was not preserved");return std::make_unique<RecordingSink>(record);}};const auto ref=instance("android/media/AudioTrack");configure_audio(ref,44100,2);return ref;}
+    std::string audio_summary(){return audio_report();}
 };
 int main() {
     try {
@@ -162,6 +176,27 @@ int main() {
         check(r.exception_class()=="java/io/IOException","Asset traversal accepted");r.call("ExceptionClear");
         const auto close=r.method(stream2,"close","()V");r.call("CallVoidMethod",{stream2,close});
         r.call("CallIntMethod",{stream2,read,array,0,1});check(r.exception_class()=="java/io/IOException","Closed asset readable");
+        r.call("ExceptionClear");
+        auto record=std::make_shared<PcmRecord>();const auto track=r.audio(record);
+        const auto shorts=uint32_t(r.call("NewShortArray",{8}));const auto pcm=r.data(shorts);
+        const std::array<uint16_t,8> samples={0x1234,0x8000,0,0x7fff,0xffff,1,0,0};
+        for(unsigned i=0;i<samples.size();++i)r.MemoryWrite16(pcm+i*2,samples[i]);
+        const auto write_short=r.method(track,"write","([SII)I");
+        check(r.call("CallIntMethod",{track,write_short,shorts,2,4})==4,"short[] write did not return sample count");
+        check(record->starts==1&&record->bytes==std::vector<uint8_t>({0,0,0xff,0x7f,0xff,0xff,1,0})&&record->blocking,"PCM offset/order or blocking mode corrupted");
+        check(uint32_t(r.call("CallIntMethod",{track,write_short,shorts,7,2}))==uint32_t(-2),"Audio array overflow accepted");
+        check(uint32_t(r.call("CallIntMethod",{track,write_short,shorts,0,3}))==uint32_t(-2),"Incomplete stereo frame accepted");
+        const auto write_byte=r.method(track,"write","([BIII)I");
+        check(uint32_t(r.call("CallIntMethod",{track,write_byte,shorts,0,4,1}))==uint32_t(-2),"Wrong audio array type accepted");
+        const auto bytes=uint32_t(r.call("NewByteArray",{8}));for(unsigned i=0;i<8;++i)r.MemoryWrite8(r.data(bytes)+i,uint8_t(i));
+        record->accept=4;check(r.call("CallIntMethod",{track,write_byte,bytes,0,8,1})==4&&!record->blocking,"Nonblocking partial write count corrupted");
+        check(r.audio_summary().find("PCM bytes=12")!=std::string::npos&&r.audio_summary().find("peak=32767")!=std::string::npos,"PCM telemetry is not based on accepted samples");
+        const auto pause=r.method(track,"pause","()V"),play=r.method(track,"play","()V"),stop=r.method(track,"stop","()V"),release=r.method(track,"release","()V");
+        r.call("CallVoidMethod",{track,pause});r.call("CallVoidMethod",{track,play});r.call("CallVoidMethod",{track,stop});r.call("CallVoidMethod",{track,release});
+        check(record->stops==2&&record->starts==2&&record->clears==1&&record->closes==1,"Audio lifecycle failed to release output");
+        check(uint32_t(r.call("CallIntMethod",{track,write_short,shorts,0,2}))==uint32_t(-3),"Released AudioTrack accepted PCM");
+        ds::GuestAudioTrack unavailable({},44100,2);reject([&]{unavailable.play();});
+        std::cout<<"PASS: AudioTrack JNI PCM offsets/types, frame bounds, byte/sample counts, partial writes, state/release, accepted-sample telemetry and missing-backend rejection\n";
         std::cout<<"PASS: actual JNI dispatch, all 92 variant slots, ARM32 direct/V/A arguments, UTF-16/MUTF-8, arrays, real asset streams/listing/exceptions\n";
     } catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }
