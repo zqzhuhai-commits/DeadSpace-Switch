@@ -40,6 +40,18 @@ int main(){try{
  s.exit(0);require(s.select()==1&&s.time()==10000000,"Later sleeper did not resume");
  s.block(T::State::mutex,42);reject([&]{s.select();});s.wake(1);
  reject([&]{s.create(0,0,1024*1024,false,0);});reject([&]{s.create(1,0,0xffffffff,false,0);});
+ // Timed waits must wake without a producer and retain timeout status.
+ T timed;timed.thread().cpu.regs[0]=0;
+ timed.wait_until(T::State::semaphore,11,900);
+ require(timed.select()==1&&timed.time()==900,"Timed wait did not advance idle clock");
+ require(timed.thread().timed_out&&timed.thread().cpu.regs[0]==UINT32_MAX,"Timed wait resumed with success");
+ T signaled;const auto worker=signaled.create(0x10001000,0,65536,false,0x70000000);
+ signaled.wait_until(T::State::semaphore,12,1000);
+ require(signaled.select()==worker,"Timed waiter prevented producer progress");
+ const auto waiter=signaled.waiter(T::State::semaphore,12);require(waiter==1,"Timed waiter invisible to post");
+ signaled.wake(waiter);signaled.tick(2000);signaled.block(T::State::mutex,13);
+ require(signaled.select()==1&&!signaled.thread().timed_out&&signaled.thread().cpu.regs[0]==0,"Signaled wait later timed out");
+ require(!signaled.mapped(0x1ffffffc)&&signaled.mapped(0x20000000)&&!signaled.mapped(0x20200000),"Main stack includes unmapped gap");
  ds::GuestJumps jumps;std::map<uint32_t,uint32_t> mem;
  cpu.state=main;jumps.save(cpu,4,1,1,[&](auto p,auto v){mem[p]=v;});mem[8]=mem[4];cpu.state={};
  jumps.restore(cpu,8,0,1,1,[&](auto p){return mem[p];});
