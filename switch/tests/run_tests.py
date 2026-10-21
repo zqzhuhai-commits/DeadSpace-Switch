@@ -27,9 +27,15 @@ def run(native_gl=False):
         jni_exe = work / "jni-test"
         subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                         "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
-                        "-I" + str(ROOT / "runtime"), str(ROOT / "runtime/guest_jni.cpp"),
+                        "-I" + str(ROOT / "runtime"), str(ROOT / "runtime/guest_jni.cpp"), str(ROOT / "runtime/guest_audio.cpp"),
                         str(ROOT / "tests/guest_jni_test.cpp"), "-o", str(jni_exe)], check=True)
         subprocess.run([str(jni_exe)], check=True)
+        services_exe = work / "services-test"
+        subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                        "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
+                        "-I" + str(ROOT / "runtime"), str(ROOT / "runtime/wav_audio.cpp"),
+                        str(ROOT / "tests/guest_services_test.cpp"), "-o", str(services_exe)], check=True)
+        subprocess.run([str(services_exe)], check=True)
         memory_exe = work / "memory-test"
         subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                         "-fsanitize=address,undefined", "-fno-omit-frame-pointer",

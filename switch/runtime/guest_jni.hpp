@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "guest_audio.hpp"
 #include <stdexcept>
 #include <map>
 #include <optional>
@@ -33,6 +34,11 @@ protected:
     std::map<MethodKey,uint32_t> methods;
     std::unordered_map<uint32_t,MethodKey> method_info;
     uint32_t jni_exception=0;
+    AudioBackend audio_backend;
+    std::map<uint32_t,std::unique_ptr<GuestAudioTrack>> audio_tracks;
+    void configure_audio(uint32_t ref,uint32_t rate,uint32_t channels);
+    std::optional<uint64_t> audio_delegate(uint32_t,const MethodKey&,const std::vector<uint64_t>&);
+    std::string audio_report() const;
     struct Monitor {uint32_t owner=0,depth=0;};
     std::unordered_map<uint32_t,Monitor> monitors;
     virtual uint32_t current_thread() const {return 1;}

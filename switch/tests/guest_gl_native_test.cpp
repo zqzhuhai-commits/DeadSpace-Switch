@@ -1,6 +1,7 @@
 // Independent native EGL/desktop GL reference. No Switch or original game claim.
 #include "guest_gl.hpp"
 #include "hd_texture.hpp"
+#include "host_egl.hpp"
 #include <array>
 #include <cstring>
 #include <dlfcn.h>
@@ -9,28 +10,7 @@
 
 static void require(bool ok,const char* why){if(!ok)throw std::runtime_error(why);}
 template<class F> static void reject(F f){bool caught=false;try{f();}catch(const std::exception&){caught=true;}require(caught,"Invalid GL operation accepted");}
-template<class F> F symbol(void* lib,const char* name){auto p=dlsym(lib,name);if(!p)throw std::runtime_error(name);return reinterpret_cast<F>(p);}
-struct Egl {
-    void* library=dlopen("libEGL.so.1",RTLD_NOW|RTLD_LOCAL);
-    void* gl=dlopen("libGL.so.1",RTLD_NOW|RTLD_LOCAL);
-    void* display=nullptr;void* surface=nullptr;void* context=nullptr;
-    Egl(){
-        require(library&&gl,"Native EGL/GL libraries missing");
-        auto get=symbol<void*(*)(const char*)>(library,"eglGetProcAddress");
-        auto platform=reinterpret_cast<void*(*)(unsigned,void*,const int*)>(get("eglGetPlatformDisplayEXT"));
-        require(platform!=nullptr,"Surfaceless EGL unavailable");display=platform(0x31dd,nullptr,nullptr);
-        int major=0,minor=0;require(symbol<unsigned(*)(void*,int*,int*)>(library,"eglInitialize")(display,&major,&minor),"EGL initialize failed");
-        require(symbol<unsigned(*)(unsigned)>(library,"eglBindAPI")(0x30a2),"Desktop GL bind failed");
-        const int attrs[]={0x3033,1,0x3040,8,0x3024,8,0x3023,8,0x3022,8,0x3021,8,0x3038};
-        void* config=nullptr;int count=0;require(symbol<unsigned(*)(void*,const int*,void**,int,int*)>(library,"eglChooseConfig")(display,attrs,&config,1,&count)&&count==1,"EGL config failed");
-        const int size[]={0x3057,64,0x3056,64,0x3038};
-        surface=symbol<void*(*)(void*,void*,const int*)>(library,"eglCreatePbufferSurface")(display,config,size);
-        const int ctx[]={0x3038};context=symbol<void*(*)(void*,void*,void*,const int*)>(library,"eglCreateContext")(display,config,nullptr,ctx);
-        require(surface&&context&&symbol<unsigned(*)(void*,void*,void*,void*)>(library,"eglMakeCurrent")(display,surface,surface,context),"EGL compatibility context failed");
-    }
-    ~Egl(){if(display){symbol<unsigned(*)(void*,void*,void*,void*)>(library,"eglMakeCurrent")(display,nullptr,nullptr,nullptr);if(context)symbol<unsigned(*)(void*,void*)>(library,"eglDestroyContext")(display,context);if(surface)symbol<unsigned(*)(void*,void*)>(library,"eglDestroySurface")(display,surface);symbol<unsigned(*)(void*)>(library,"eglTerminate")(display);}if(gl)dlclose(gl);if(library)dlclose(library);}
-    void* resolve(const char* name){auto p=dlsym(gl,name);return p?p:symbol<void*(*)(const char*)>(library,"eglGetProcAddress")(name);}
-};
+using ds::host::Egl;
 struct Fixture {
     std::vector<uint8_t> memory=std::vector<uint8_t>(1024*1024);
     std::array<uint32_t,16> args{};
@@ -76,6 +56,11 @@ int main(){
         const float ambient[]={.2f,.2f,.2f,1};r.call("glLightModelfv",{0x0b53,r.upload(ambient)});
         reject([&]{r.call("glColorPointer",{2,0x1401,0,matrix});});
         reject([&]{r.call("glGetIntegerv",{0xdeadbeef,query});});
+        r.call("glClearColorx",{13107,52428,65536,65536});r.call("glClear",{0x4000});
+        const auto fixed_pixel=r.pixel();require(fixed_pixel[0]>=49&&fixed_pixel[0]<=53&&fixed_pixel[1]>=202&&fixed_pixel[2]>=253,"Fixed clear color was not converted to float");
+        const int32_t fixed_identity[]={65536,0,0,0,0,65536,0,0,0,0,65536,0,0,0,0,65536};
+        r.call("glLoadMatrixx",{r.upload(fixed_identity)});r.call("glTranslatex",{65536,0xffff0000,0});
+        r.call("glGetFloatv",{0x0ba6,matrix_out});require(r.word(matrix_out+48)==Fixture::f(1)&&r.word(matrix_out+52)==Fixture::f(-1),"Signed fixed matrix/translation conversion failed");r.call("glLoadIdentity");
         const float triangle[]={9,9,-.8f,-.8f,.8f,-.8f,0,.8f};const auto points=r.upload(triangle);
         r.call("glEnableClientState",{0x8074});r.call("glVertexPointer",{2,0x1406,0,points});r.color(.2f,.8f,1);r.clear();r.call("glDrawArrays",{4,1,3});
         auto pixel=r.pixel();require(pixel[0]>=49&&pixel[0]<=53&&pixel[1]>=202&&pixel[2]>=253,"Client-array triangle framebuffer wrong");
@@ -91,6 +76,14 @@ int main(){
         const float quad[]={-1,-1,1,-1,1,1,-1,-1,1,1,-1,1};const float coords[]={0,0,1,0,1,1,0,0,1,1,0,1};
         const auto quadp=r.upload(quad),uv=r.upload(coords);r.call("glVertexPointer",{2,0x1406,0,quadp});r.call("glTexCoordPointer",{2,0x1406,0,uv});r.call("glEnableClientState",{0x8078});r.call("glEnable",{0x0de1});r.color(1,1,1);
         r.call("glGenTextures",{1,ids});const auto texture=r.word(ids);r.call("glBindTexture",{0x0de1,texture});r.call("glTexParameteri",{0x0de1,0x2801,0x2600});r.call("glTexParameteri",{0x0de1,0x2800,0x2600});r.call("glTexParameteri",{0x0de1,0x2802,0x812f});r.call("glTexParameteri",{0x0de1,0x2803,0x812f});
+        r.call("glTexParameterx",{0x0de1,0x2800,0x2600});
+        int fixed_filter=0;reinterpret_cast<void(*)(unsigned,unsigned,int*)>(egl.resolve("glGetTexParameteriv"))(0x0de1,0x2800,&fixed_filter);
+        require(fixed_filter==0x2600,"Fixed texture enum was treated as 16.16 number");
+        reject([&]{r.call("glTexParameterx",{0x0de1,0xdeadbeef,1});});
+        r.call("glTexEnvx",{0x2300,0x8573,2*65536});
+        float fixed_scale=0;reinterpret_cast<void(*)(unsigned,unsigned,float*)>(egl.resolve("glGetTexEnvfv"))(0x2300,0x8573,&fixed_scale);
+        require(fixed_scale==2.0f,"Fixed texture scale was not converted to float");
+        r.call("glTexEnvx",{0x2300,0x8573,65536});
         const uint8_t rgb[]={255,0,0,0x7a,0,255,0};const auto image=r.upload(rgb);
         r.call("glTexImage2D",{0x0de1,0,0x1907,1,2,0,0x1907,0x1401,image});r.clear();r.call("glDrawArrays",{4,0,6});
         pixel=r.pixel(32,16);require(pixel[0]>250&&pixel[1]<3,"RGB row zero upload wrong");pixel=r.pixel(32,48);require(pixel[0]<3&&pixel[1]>250,"RGB padded row upload wrong");

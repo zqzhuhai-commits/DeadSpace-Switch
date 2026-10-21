@@ -3,6 +3,7 @@
 #include "lifecycle_probe.hpp"
 #include "hd_texture.hpp"
 #include "app_paths.hpp"
+#include "sdl_audio.hpp"
 #include <SDL2/SDL.h>
 #include <cstdio>
 
@@ -24,7 +25,7 @@ std::string game_graphics_probe(const std::string& root) {
     const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
     graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};
     log+="Optional HD root: "+hd_root+" (missing files use original textures)\n";
-    log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,8,std::move(graphics));
+    log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,8,std::move(graphics),ds::sdl_audio());
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
     if(get_error){char text[80];std::snprintf(text,sizeof(text),"Native context GL error after probe: 0x%x\n",get_error());log+=text;}
     SDL_GL_DeleteContext(context);SDL_DestroyWindow(window);SDL_Quit();return log;
