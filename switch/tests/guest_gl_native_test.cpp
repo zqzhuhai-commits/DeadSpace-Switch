@@ -100,7 +100,8 @@ int main(){
         const uint8_t atc[]={255,0,0,0,0,0,0,0,31,0,0,0,0,0,0,0};const auto atcp=r.upload(atc);
         r.call("glCompressedTexImage2D",{0x0de1,0,0x87ee,4,4,0,16,atcp});r.call("glDrawArrays",{4,0,6});pixel=r.pixel();require(pixel[2]>250&&pixel[0]<3&&pixel[3]>250&&r.bridge.atc_uploads==1,"ATC native upload/readback failed");
         reject([&]{r.call("glCompressedTexImage2D",{0x0de1,0,0x87ee,4,4,0,15,atcp});});
-        r.call("glGenFramebuffersOES",{1,ids});const auto framebuffer=r.word(ids);r.call("glBindFramebufferOES",{0x8d40,framebuffer});r.call("glFramebufferTexture2DOES",{0x8d40,0x8ce0,0x0de1,texture,0});require(r.call("glCheckFramebufferStatusOES",{0x8d40})==0x8cd5,"Native FBO incomplete");r.call("glBindFramebufferOES",{0x8d40,0});
+        r.call("glGenFramebuffersOES",{1,ids});const auto framebuffer=r.word(ids);r.call("glBindFramebufferOES",{0x8d40,framebuffer});r.call("glFramebufferTexture2DOES",{0x8d40,0x8ce0,0x0de1,texture,0});require(r.call("glCheckFramebufferStatusOES",{0x8d40})==0x8cd5,"Native FBO incomplete");std::fill(r.memory.begin()+query,r.memory.begin()+query+8,0x7b);r.call("glGetIntegerv",{0x8ca6,query});require(r.word(query)==framebuffer&&r.memory[query+4]==0x7b,"FBO binding query/guard incorrect");
+        r.call("glBindFramebufferOES",{0x8d40,0});
         const uint8_t red[]={255,0,0,255,255,0,0,255,255,0,0,255,255,0,0,255};
         const auto redp=r.upload(red);const auto redkey=ds::texture_key(2,2,0x1908,std::vector<uint8_t>(red,red+16));hd_files[redkey]=blue_ktx();
         r.call("glGenTextures",{1,ids});r.call("glBindTexture",{0x0de1,r.word(ids)}); // fresh static object; earlier texture was dynamic

@@ -270,8 +270,17 @@ uint64_t GuestJni::jni_dispatch(const std::string& op,uint32_t env,uint32_t vm) 
         return result;
     }
     if(op=="MonitorEnter"||op=="MonitorExit") {
-        if(b)object(b);
-        return 0; // single-threaded runtime: no contention, lock/unlock succeed
+        if(!b){raise_exception("java/lang/NullPointerException","Null monitor");return uint32_t(-1);}
+        object(b);const auto owner=current_thread();
+        auto it=monitors.find(b);
+        if(op=="MonitorEnter") {
+            if(it!=monitors.end()&&it->second.owner!=owner){block_monitor(b);return 0;}
+            auto& m=monitors[b];if(m.depth==UINT32_MAX)throw std::runtime_error("JNI monitor recursion overflow");
+            m.owner=owner;++m.depth;return 0;
+        }
+        if(it==monitors.end()||it->second.owner!=owner){raise_exception("java/lang/IllegalMonitorStateException","Monitor not owned by this guest thread");return uint32_t(-1);}
+        if(!--it->second.depth){const auto waiter=monitor_waiter(b);if(waiter){it->second.owner=waiter;it->second.depth=1;wake_monitor(waiter);}else monitors.erase(it);}
+        return 0;
     }
     throw std::runtime_error("Unsupported JNI: "+op);
 }

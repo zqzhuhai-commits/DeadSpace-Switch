@@ -2,11 +2,13 @@
 
 **0.3.2 开发基线：已加入 JNI、映像/堆修复及可选原生 GL 桥；当前仍是开发诊断版，不是可玩完整版或 NSP。默认 L 诊断使用模拟 GL，R 使用原生 GLES1 子集。**
 
+[最新协作线程进展](switch/docs/PROGRESS-THREADS-0.3.2.md)：已复核 `1fbe1bb` 调试更新，替换同步线程和强改完成标志的实验路径；ARM32 指令线程交互、上下文及等待/唤醒测试通过。真实 donor 及 Switch 运行尚待验证，未生成 NSP。
+
 [0.3.2 源码审查和 NSP 阻塞项](switch/docs/REVIEW-0.3.2.md)。高清资源准备现支持与实际 PSV 数据匹配，并纳入内置 RomFS 校验；尚未验证完整游戏运行。
 
 [后续 JNI 修复](switch/docs/PROGRESS-JNI-0.3.2.md)：已修正函数表、参数解码、实例接收者、字符串/数组和真实资源读取，通过主机 ASan/UBSan 回归；尚未重跑真实 PSV 库或验证游戏画面。
 
-[后续内存修复](switch/docs/PROGRESS-MEMORY-0.3.2.md)：已删除与栈冲突的第二份映像，修复嵌套调用现场恢复、堆复用及 realloc 越界读取，通过主机回归；线程调度仍待实现。
+[后续内存修复](switch/docs/PROGRESS-MEMORY-0.3.2.md)：已删除与栈冲突的第二份映像，修复嵌套调用现场恢复、堆复用及 realloc 越界读取，通过主机回归；协作线程进展见上方最新报告。
 
 [原生 GL 接入](switch/docs/PROGRESS-NATIVE-GL.md)：真实 GL 子集已接到生命周期执行器，并通过主机 Mesa 像素回读；尚未验证 Switch 游戏画面。
 

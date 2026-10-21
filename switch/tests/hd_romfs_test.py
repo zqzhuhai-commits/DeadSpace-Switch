@@ -26,8 +26,10 @@ key = hd.texture_key(2, 2, 0x1908, pixels)
 obj = struct.pack("<III", 0, 0, 0) + struct.pack("<BBII", 100, 0, 2, 2) + struct.pack("<II", 0, 16) + pixels
 objects = struct.pack("<BI", 10, len(obj)) + obj
 m3g = b"\xabJSR184\xbb\r\n\x1a\n" + struct.pack("<BII", 0, len(objects) + 13, len(objects)) + objects + bytes(4)
-pack = {"files": [{"name": key + ".ktx", "width": 4, "height": 4}],
-        "apk_sha256": "fixture-only", "file_count": 1, "total_bytes": 7}
+unmatched = "0000000000000000.ktx"
+pack = {"files": [{"name": key + ".ktx", "width": 4, "height": 4, "encoding": "fixture"},
+                  {"name": unmatched, "width": 4, "height": 4, "encoding": "fixture"}],
+        "apk_sha256": "fixture-only", "file_count": 2, "total_bytes": 14}
 
 with tempfile.TemporaryDirectory() as folder:
     work = Path(folder)
@@ -55,12 +57,20 @@ with tempfile.TemporaryDirectory() as folder:
     def fixture_extract(apk, target):
         target.mkdir()
         (target / (key + ".ktx")).write_bytes(b"fixture")
+        (target / unmatched).write_bytes(b"unused!")
         return pack
 
     with patch.object(prepare_romfs, "import_data", fixture_import), patch.object(hd, "extract", fixture_extract):
         output = work / "romfs"
         manifest = prepare_romfs.prepare(work / "source", output, work / "fixture.apk")
         assert manifest["hd_textures"]["matched_donor_textures"] == 1
+        assert manifest["hd_textures"]["file_count"] == 1
+        assert manifest["hd_textures"]["total_bytes"] == 7
+        assert manifest["hd_textures"]["source_file_count"] == 2
+        assert not (output / "texture_hd" / unmatched).exists()
+        embedded = json.loads((output / "texture_hd/manifest.json").read_text())
+        assert embedded["file_count"] == 1 and embedded["total_bytes"] == 7
+        assert [entry["name"] for entry in embedded["files"]] == [key + ".ktx"]
         assert manifest["campaign_verified"] is False
         assert manifest["hd_textures"]["runtime_integrated"] is False
         for item in manifest["files"]:

@@ -17,6 +17,8 @@ class TestRuntime:public ds::GuestJni {
 public:
     std::string root;
     uint32_t receiver=0;
+    uint32_t thread=1;
+    uint32_t current_thread() const override {return thread;}
     std::vector<uint64_t> values;
     static constexpr uint32_t env=256,vm=512;
     uint32_t alloc(uint32_t size) override {
@@ -95,6 +97,15 @@ int main() {
         check(r.call("GetObjectArrayElement",{objects,0})==same,"Object array store incorrect");
         reject([&]{r.call("GetObjectArrayElement",{objects,2});});
         const auto recv=r.instance("test/Receiver");
+        check(r.call("MonitorEnter",{recv})==0&&r.call("MonitorEnter",{recv})==0,"Recursive monitor entry failed");
+        r.thread=2;reject([&]{r.call("MonitorEnter",{recv});});
+        check(uint32_t(r.call("MonitorExit",{recv}))==0xffffffff&&r.exception_class()=="java/lang/IllegalMonitorStateException","Wrong-thread exit accepted");
+        r.call("ExceptionClear");r.thread=1;
+        check(r.call("MonitorExit",{recv})==0,"Recursive monitor exit failed");
+        r.thread=2;reject([&]{r.call("MonitorEnter",{recv});});r.thread=1;
+        check(r.call("MonitorExit",{recv})==0,"Final monitor release failed");
+        r.thread=2;check(r.call("MonitorEnter",{recv})==0&&r.call("MonitorExit",{recv})==0,"Monitor retained old owner");r.thread=1;
+        check(uint32_t(r.call("MonitorEnter",{0}))==0xffffffff&&r.exception_class()=="java/lang/NullPointerException","Null monitor accepted");r.call("ExceptionClear");
         const auto ctor=r.method(recv,"<init>","(I)V");
         const auto receiver_class=uint32_t(r.call("GetObjectClass",{recv}));
         const auto created=uint32_t(r.call("NewObject",{receiver_class,ctor,99}));

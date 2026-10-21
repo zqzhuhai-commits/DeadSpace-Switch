@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <stdexcept>
 #include <map>
 #include <optional>
 #include <string>
@@ -32,6 +33,12 @@ protected:
     std::map<MethodKey,uint32_t> methods;
     std::unordered_map<uint32_t,MethodKey> method_info;
     uint32_t jni_exception=0;
+    struct Monitor {uint32_t owner=0,depth=0;};
+    std::unordered_map<uint32_t,Monitor> monitors;
+    virtual uint32_t current_thread() const {return 1;}
+    virtual void block_monitor(uint32_t) {throw std::runtime_error("Contended JNI monitor requires guest scheduler");}
+    virtual uint32_t monitor_waiter(uint32_t) const {return 0;}
+    virtual void wake_monitor(uint32_t) {throw std::runtime_error("JNI monitor scheduler unavailable");}
     uint64_t asset_opens=0, asset_lists=0, asset_read_bytes=0;
     virtual uint32_t alloc(uint32_t)=0;
     virtual uint32_t arg(unsigned)=0;

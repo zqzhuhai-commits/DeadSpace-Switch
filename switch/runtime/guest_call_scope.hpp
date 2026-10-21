@@ -5,9 +5,10 @@
 #include <string>
 
 namespace ds {
-inline uint32_t guest_call_sp(uint32_t current,unsigned argument_count,bool top_level) {
-    constexpr uint32_t bottom=GuestLayout::stack_base;
-    constexpr uint32_t top=bottom+GuestLayout::stack_size;
+inline uint32_t guest_call_sp(uint32_t current,unsigned argument_count,bool top_level,
+        uint32_t bottom=GuestLayout::stack_base,uint32_t size=GuestLayout::stack_size) {
+    if(uint64_t(bottom)+size>UINT32_MAX)throw std::runtime_error("Guest stack range overflow");
+    const uint32_t top=bottom+size;
     if(argument_count>64)throw std::runtime_error("Guest call argument limit");
     const uint32_t arguments=argument_count>4?(argument_count-4)*4:0;
     const uint32_t parent=top_level?top:current;

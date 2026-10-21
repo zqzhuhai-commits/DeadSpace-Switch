@@ -36,6 +36,12 @@ def run(native_gl=False):
                         "-I" + str(ROOT / "runtime"), str(ROOT / "tests/guest_memory_test.cpp"),
                         "-o", str(memory_exe)], check=True)
         subprocess.run([str(memory_exe)], check=True)
+        thread_exe = work / "thread-test"
+        subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                        "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
+                        "-I" + str(ROOT / "runtime"), str(ROOT / "tests/guest_threads_test.cpp"),
+                        "-o", str(thread_exe)], check=True)
+        subprocess.run([str(thread_exe)], check=True)
         hd_exe = work / "hd-test"
         subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                         "-fsanitize=address,undefined", "-fno-omit-frame-pointer",

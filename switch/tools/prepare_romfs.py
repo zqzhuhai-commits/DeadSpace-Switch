@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Stage user-supplied game files for an embedded RomFS; never publish assets."""
 import argparse
+from collections import Counter
 import hashlib
 import json
 from pathlib import Path
@@ -26,9 +27,23 @@ def prepare(source, output, hd_apk=None):
             compatibility = reanimated_hd.match_assets(pack, stage / "gamedata/assets")
             if not compatibility["mapped_texture_count"]:
                 raise ValueError("No HD keys match this donor; refusing to embed an unusable pack")
+            matched = {entry["key"] + ".ktx" for entry in compatibility["mappings"]}
+            selected = []
+            for entry in pack["files"]:
+                if entry["name"] in matched:
+                    selected.append(entry)
+                else:
+                    (stage / "texture_hd" / entry["name"]).unlink()
+            selected_bytes = sum((stage / "texture_hd" / entry["name"]).stat().st_size for entry in selected)
+            selected_pack = {**pack, "files": selected, "file_count": len(selected),
+                             "total_bytes": selected_bytes, "selection": "exact donor texture keys",
+                             "source_file_count": pack["file_count"], "source_total_bytes": pack["total_bytes"],
+                             "encoding_counts": dict(Counter(entry["encoding"] for entry in selected))}
+            (stage / "texture_hd/manifest.json").write_text(json.dumps(selected_pack, indent=2) + "\n")
             (stage / "texture_hd/donor-compatibility.json").write_text(json.dumps(compatibility, indent=2) + "\n")
             hd_summary = {"directory": "texture_hd", "apk_sha256": pack["apk_sha256"],
-                          "file_count": pack["file_count"], "total_bytes": pack["total_bytes"],
+                          "file_count": len(selected), "total_bytes": selected_bytes,
+                          "source_file_count": pack["file_count"],
                           "matched_donor_textures": compatibility["mapped_texture_count"],
                           "runtime_integrated": False, "switch_hardware_tested": False}
         entries = []
