@@ -4,6 +4,7 @@
 #include "guest_arena.hpp"
 #include "guest_sort.hpp"
 #include "guest_input.hpp"
+#include "guest_numeric.hpp"
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -21,6 +22,16 @@ struct Cpu {
 };
 int main() {
     try {
+        errno=EDOM;
+        const auto parsed=ds::parse_guest_double(" \t-12.5tail");
+        check(parsed.low==0&&parsed.high==0xc0290000&&parsed.consumed==7&&!parsed.error&&errno==EDOM,"strtod ARM double/endptr/host errno");
+        const auto negative_zero=ds::parse_guest_double("-0 suffix");
+        check(negative_zero.low==0&&negative_zero.high==0x80000000&&negative_zero.consumed==2,"strtod lost signed zero");
+        check(ds::parse_guest_double("xyz").consumed==0,"strtod no-conversion endptr");
+        const auto overflow=ds::parse_guest_double("1e9999");
+        check(overflow.error==ERANGE&&overflow.high==0x7ff00000&&overflow.low==0,"strtod overflow ABI/errno");
+        const auto underflow=ds::parse_guest_double("1e-9999");
+        check(underflow.error==ERANGE&&underflow.high==0&&underflow.low==0,"strtod underflow ABI/errno");
         ds::GuestArena arena(0x40000000,0x50000000);
         check(arena.grow(4096)==0x40000000,"sbrk old-break ABI");
         for(unsigned i=0;i<1000;++i){const auto p=arena.map(16*1024*1024);check(p==0x4f000000,"Anonymous mapping not reused");check(arena.contains(*p),"Mapped page rejected");check(arena.unmap(*p,16*1024*1024)&&!arena.contains(*p),"Unmapped page retained");}
@@ -118,6 +129,6 @@ int main() {
         check(heap.allocate(64)==b,"Failed calloc leaked reserved block");
         ds::GuestHeap full;full.allocate(32*1024*1024);full.allocate(32*1024*1024);
         reject([&]{full.allocate(16);});
-        std::cout<<"PASS: canonical image bounds, nested stack ABI and exception restoration, heap reuse/coalescing, bounded realloc and zeroed calloc\n";
+        std::cout<<"PASS: ARM double parsing, mapping reuse, guest sorting/input, canonical image bounds, nested stack ABI and exception restoration, heap reuse/coalescing, bounded realloc and zeroed calloc\n";
     } catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

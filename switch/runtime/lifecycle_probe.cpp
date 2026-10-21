@@ -7,6 +7,7 @@
 #include "guest_heap.hpp"
 #include "guest_arena.hpp"
 #include "guest_sort.hpp"
+#include "guest_numeric.hpp"
 #include "guest_files.hpp"
 #include "guest_stat.hpp"
 #include "guest_threads.hpp"
@@ -269,6 +270,12 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="strstr"){if(!a||!b){trace.push_back("  STRSTR-NULL a="+to_hex(a)+" b="+to_hex(b)+" lr="+to_hex(cpu->Regs()[14]-8));result=0;}else{const std::string x=guest_text(a),n=guest_text(b);const auto p=x.find(n);result=p==std::string::npos?0:a+uint32_t(p);}}
         else if(base=="strdup")result=guest_string(guest_text(a));
         else if(base=="atoi"){const std::string t=guest_text(a);result=0;bool neg=false;size_t i=0;if(i<t.size()&&(t[i]=='-'||t[i]=='+')){neg=t[i]=='-';++i;}while(i<t.size()&&t[i]>='0'&&t[i]<='9'){result=result*10+uint32_t(t[i]-'0');++i;}if(neg)result=uint32_t(0)-result;}
+        else if(base=="strtod"){
+            const auto parsed=ds::parse_guest_double(guest_text(a));
+            if(b)MemoryWrite32(b,a+parsed.consumed);
+            if(parsed.error)MemoryWrite32(errno_address,parsed.error);
+            cpu->Regs()[0]=parsed.low;cpu->Regs()[1]=parsed.high;goto done;
+        }
         else if(base=="__errno")result=errno_address;
         else if(base=="setjmp"||base=="_setjmp"||base=="sigsetjmp") {
             if(base=="sigsetjmp"&&b)throw std::runtime_error("Guest signal masks unsupported");

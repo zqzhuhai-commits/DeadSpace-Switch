@@ -15,7 +15,7 @@ Switch AArch64 交叉编译通过（devkitA64 25.1 / GCC 13.2.0）；仅说明�
 ```sh
 SDL_AUDIODRIVER=dummy LIBGL_ALWAYS_SOFTWARE=1 host-build/ds-media-probe \
   gamedata/lib/armeabi/libEAMGameDeadSpace.so gamedata 30000 texture_hd \
-  frame.ppm touch.tsv
+  frame.ppm switch/tests/difficulty-confirm.tsv
 ```
 
 `dummy` 只用于无扬声器的主机联调，不能作为实际听音证据。触摸脚本每行是 `frame down|move|up x y`，坐标使用 1280×720 输出表面。
@@ -23,3 +23,9 @@ SDL_AUDIODRIVER=dummy LIBGL_ALWAYS_SOFTWARE=1 host-build/ds-media-probe \
 高清目标保留 Reanimated v1.3 的 222 张 KTX；当前原版数据只精确匹配其中 54 个键。不能把有限场景中的命中数量当作全部材质已兼容。游戏资源和材质不提交 Git。
 
 已生成开发诊断 NRO；未生成 NSP，尚未完成实机、第一关可操作及存取档验收。
+
+## 2026-10-22 数值解析恢复与检查点
+
+此前补齐 tanf 后的真实主机复测已通过该调用，在第 20,633 帧遇到缺失的 strtod；此时 12 张高清命中/124 层 mip，74,521 次绘制，PCM 3,620,864 字节。后续 23,000 帧测试因运行环境重置而未取得结果，不能记录为通过。
+
+现在将 strtod 恢复为可测试的 ARM32 softfp 转换：双精度值分拆 r0/r1，endptr 转换为 guest 内偏移，错误写回 guest errno，同时保留宿主 errno。复现点击脚本已纳入 switch/tests/difficulty-confirm.tsv。新环境的回归和实际资源复测结果将在后续检查点补充；此检查点不声称新的 Switch 编译或实机结果。
