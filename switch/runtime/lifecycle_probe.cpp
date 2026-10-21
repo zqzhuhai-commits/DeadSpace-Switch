@@ -5,6 +5,8 @@
 #include "guest_image.hpp"
 #include "guest_call_scope.hpp"
 #include "guest_heap.hpp"
+#include "guest_arena.hpp"
+#include "guest_sort.hpp"
 #include "guest_files.hpp"
 #include "guest_stat.hpp"
 #include "guest_threads.hpp"
@@ -59,7 +61,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     ds::GuestFiles files;
     std::vector<std::string> trace;
     std::string data_root;
-    uint32_t brk=arena,mmap_top=arena_end;
+    ds::GuestArena arena_memory{arena,arena_end};
     uint32_t pending=0,errno_address=0,env_addr=0,vm_addr=0,jni_table=0,vm_table=0;
     uint32_t ext_string=0;
     bool returned=false;
@@ -73,7 +75,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
 
     bool mapped(uint32_t a) const {
         return threads.mapped(a) || (a>=heap && a<guest_heap.high_water()) ||
-               (a>=arena && a<arena_end);
+               arena_memory.contains(a);
     }
     void fail(const std::string& message) {
         if(fault.empty()){
@@ -121,6 +123,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             if(m.name=="GetInstance"){const uint32_t r=singleton("com/ea/blast/MainActivity");trace.push_back("  GetInstance -> "+to_hex(r));return r;}
             if(m.name=="getAssets"){const uint32_t r=singleton("android/content/res/AssetManager");trace.push_back("  getAssets -> "+to_hex(r));return r;}
         }
+        if(const auto result=audio_delegate(obj,m,values))return *result;
         if(const auto result=asset_delegate(obj,m,values,data_root))return *result;
         if(cls=="com/ea/EAIO/EAIO"&&m.name=="Startup"){
             const auto it=image.exports.find("Java_com_ea_EAIO_EAIO_Startup");
@@ -147,8 +150,9 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             if(m.name=="GetAppDataDirectory"||m.name=="GetExternalStorageDirectory")return java_string(data_root);
         }
         if(cls=="com/ea/blast/DisplayAndroidDelegate"){
-            if(m.name=="GetDefaultWidth")return 480;
-            if(m.name=="GetDefaultHeight")return 640;
+            // Android reports natural portrait dimensions; the engine swaps them.
+            if(m.name=="GetDefaultWidth")return graphics.height;
+            if(m.name=="GetDefaultHeight")return graphics.width;
             if(m.name=="GetStdOrientation")return 0;
             if(m.name=="GetDpiX"||m.name=="GetDpiY"){const float v=229.0f;uint32_t bits=0;std::memcpy(&bits,&v,4);return bits;}
             if(m.name=="SetStdOrientation")return 0;
@@ -249,6 +253,11 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         if(base=="memset"){bounded(c);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,b);result=a;}
         else if(base=="memcpy"||base=="memmove"){bounded(c);std::vector<uint8_t> v(c);for(uint32_t i=0;i<c;++i)v[i]=MemoryRead8(b+i);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,v[i]);result=a;}
         else if(base=="memcmp"){bounded(c);int cmp=0;for(uint32_t i=0;i<c;++i){uint8_t x=MemoryRead8(a+i),y=MemoryRead8(b+i);if(x!=y){cmp=x>y?1:-1;break;}}result=cmp;}
+        else if(base=="qsort") {
+            if(b>1&&!image.executable(d&~1u,4))throw std::runtime_error("Invalid qsort comparator");
+            ds::guest_sort(a,b,c,[&](uint32_t p){return MemoryRead8(p);},[&](uint32_t p,uint8_t v){MemoryWrite8(p,v);},
+                [&](uint32_t x,uint32_t y){return int32_t(guest_call(d,{x,y},"qsort comparator",false));});
+        }
         else if(base=="malloc")result=alloc(a);
         else if(base=="calloc")result=guest_heap.zeroed(a,b,[&](uint32_t p,uint32_t n){for(uint32_t i=0;i<n;++i)MemoryWrite8(p+i,0);});
         else if(base=="realloc")result=guest_heap.reallocate(a,b,[&](uint32_t dst,uint32_t src,uint32_t n){for(uint32_t i=0;i<n;++i)MemoryWrite8(dst+i,MemoryRead8(src+i));});
@@ -268,9 +277,26 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="longjmp"||base=="_longjmp"||base=="siglongjmp") {
             jumps.restore(*cpu,a,b,threads.current(),call_depth,[&](uint32_t p){return MemoryRead32(p);});goto done;
         }
-        else if(base=="sbrk"){const int64_t end=int64_t(brk)+int32_t(a);if(end<arena||end>mmap_top){MemoryWrite32(errno_address,12);result=0xffffffff;}else{result=brk;brk=uint32_t(end);}}
-        else if(base=="mmap"){if(a||!b||(d&0x20)==0)throw std::runtime_error("Unsupported guest mmap");const uint64_t size=(uint64_t(b)+4095)&~uint64_t(4095);if(!size||size>mmap_top-brk){MemoryWrite32(errno_address,12);result=0xffffffff;}else{mmap_top-=uint32_t(size);result=mmap_top;}}
-        else if(base=="munmap")result=0;
+        else if(base=="sbrk") {
+            const auto pointer=arena_memory.grow(int32_t(a));
+            if(!pointer){MemoryWrite32(errno_address,12);result=UINT32_MAX;}else result=*pointer;
+        }
+        else if(base=="mmap") {
+            if(a||!b||(d&0x20)==0||int32_t(arg(4))!=-1||arg(5)!=0)throw std::runtime_error("Unsupported guest mmap");
+            const auto pointer=arena_memory.map(b);
+            if(!pointer){MemoryWrite32(errno_address,12);result=UINT32_MAX;}
+            else {
+                result=*pointer;const uint64_t end=uint64_t(result)+((uint64_t(b)+4095)&~uint64_t(4095));
+                for(auto it=pages.begin();it!=pages.end();){const uint64_t at=uint64_t(it->first)<<12;if(at>=result&&at<end)it=pages.erase(it);else ++it;}
+            }
+        }
+        else if(base=="munmap") {
+            if(!arena_memory.unmap(a,b)){MemoryWrite32(errno_address,22);result=UINT32_MAX;}
+            else {
+                const uint64_t end=uint64_t(a)+((uint64_t(b)+4095)&~uint64_t(4095));
+                for(auto it=pages.begin();it!=pages.end();){const uint64_t at=uint64_t(it->first)<<12;if(at>=a&&at<end)it=pages.erase(it);else ++it;}
+            }
+        }
         else if(base=="getenv")result=0;
         else if(base=="__aeabi_atexit")destructors.insert(destructors.end(),{a,b,c});
         else if(base=="__cxa_guard_acquire")result=MemoryRead8(a)==0;
@@ -430,7 +456,13 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         }
         else if(name.rfind("JNI:",0)==0){
             ++jni_calls;
-            const auto value=GuestJni::jni_dispatch(name.substr(4),env_addr,vm_addr);
+            uint64_t value;
+            try {value=GuestJni::jni_dispatch(name.substr(4),env_addr,vm_addr);}
+            catch(const ds::AudioBackpressure&) {
+                if(call_depth!=1)throw std::runtime_error("Audio wait across nested host callback boundary");
+                // No bytes queued: yield and retry the same ARM SVC arguments.
+                threads.sleep(1000000);rotate=true;cpu->Regs()[15]-=4;return;
+            }
             cpu->Regs()[0]=uint32_t(value);
             if(name.find("LongMethod")!=std::string::npos || name.find("DoubleMethod")!=std::string::npos)cpu->Regs()[1]=uint32_t(value>>32);
             goto done;
@@ -472,9 +504,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         ++gl_calls;
         if(native_gl)return native_gl->call(name);
         if(name=="glGetIntegerv"){
-            if(a==0x0BA2){MemoryWrite32(b,0);MemoryWrite32(b+4,0);MemoryWrite32(b+8,480);MemoryWrite32(b+12,640);}
-            else if(a==0x0D33||a==0x0D34){MemoryWrite32(b,0);MemoryWrite32(b+4,0);MemoryWrite32(b+8,480);MemoryWrite32(b+12,640);}
-            else if(a==0x0BA0){MemoryWrite32(b,2048);}
+            if(a==0x0BA2){MemoryWrite32(b,0);MemoryWrite32(b+4,0);MemoryWrite32(b+8,graphics.width);MemoryWrite32(b+12,graphics.height);}
+            else if(a==0x0D33)MemoryWrite32(b,2048);
+            else if(a==0x0D34){MemoryWrite32(b,graphics.width);MemoryWrite32(b+4,graphics.height);}
+            else if(a==0x0BA0){MemoryWrite32(b,0x1700);}
             else if(a==0x0C23||a==0x0BDF||a==0x0BDE||a==0x0BDD||a==0x0BDA){MemoryWrite32(b,1);}
             else if(a==0x0B21){MemoryWrite32(b,0xFFFFFFFF);}
             else MemoryWrite32(b,0);
@@ -555,9 +588,11 @@ public:
         return p;
     }
 
-    void initialize(const std::string& data,ds::GraphicsBackend backend) {
+    void initialize(const std::string& data,ds::GraphicsBackend backend,ds::AudioBackend audio_backend) {
+        audio.set_backend(std::move(audio_backend));
         data_root=data;
         graphics=std::move(backend);
+        if(!graphics.width||!graphics.height||graphics.width>4096||graphics.height>4096)throw std::runtime_error("Surface dimensions invalid");
         if(graphics.resolve)native_gl=std::make_unique<ds::GuestGl>(graphics,ds::GlGuestMemory{
             [&](unsigned n){return arg(n);},[&](uint32_t n){return alloc(n);},
             [&](uint32_t p,void* out,size_t n){
@@ -635,6 +670,7 @@ public:
         const auto audio=image.exports.find("Java_com_ea_EAAudioCore_AndroidEAAudioCore_Init");
         if(audio==image.exports.end())throw std::runtime_error("Audio init export missing");
         const uint32_t track=alloc(4);objects[track].cls="android/media/AudioTrack";
+        GuestJni::audio.attach(track,44100,2);
         guest_call(audio->second,{env_addr,0x42424242,track,1024*1024,2,44100},"EAAudioCore_Init",true);
         trace.push_back("EAAudioCore_Init returned");
         const auto create=image.exports.find("Java_com_ea_blast_MainActivity_NativeOnCreate");
@@ -653,6 +689,25 @@ public:
         const auto frame=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
         for(unsigned i=0;i<frames;++i){
+            if(graphics.input) {
+                const auto events=graphics.input(i);if(events.size()>64)throw std::runtime_error("Input event budget");
+                for(const auto& event:events) {
+                    if(event.kind==ds::InputEvent::touch_down||event.kind==ds::InputEvent::touch_move||event.kind==ds::InputEvent::touch_up) {
+                        const auto words=ds::pointer_arguments(event,graphics.width,graphics.height);
+                        const auto entry=image.exports.find("Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent");
+                        if(entry==image.exports.end())throw std::runtime_error("Guest pointer export missing");
+                        guest_call(entry->second,{env_addr,0x42424242,words[0],words[1],words[2],words[3],words[4]},"pointer input",true);
+                    } else {
+                        if(event.kind!=ds::InputEvent::key_down&&event.kind!=ds::InputEvent::key_up)throw std::runtime_error("Invalid key event kind");
+                        if(!event.code||event.code>255)throw std::runtime_error("Guest key code invalid");
+                        const auto name=event.kind==ds::InputEvent::key_down?"Java_com_ea_blast_KeyboardAndroid_NativeOnKeyDown":"Java_com_ea_blast_KeyboardAndroid_NativeOnKeyUp";
+                        const auto entry=image.exports.find(name);if(entry==image.exports.end())throw std::runtime_error("Guest keyboard export missing");
+                        guest_call(entry->second,{env_addr,0x42424242,600,event.code,1},"key input",true);
+                    }
+                    trace.push_back("Input kind="+std::to_string(event.kind)+" frame="+std::to_string(i));
+                }
+            }
+
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
             ++frames_done;
             if(graphics.present)graphics.present();
@@ -675,6 +730,7 @@ public:
         out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
         out+="Threads: cooperative scheduler; created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
         out+=graphics_report();
+        out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_lists)+" directories listed; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
         for(const auto& kv:service_counts)if(kv.second)out+="  svc "+kv.first+" "+std::to_string(kv.second)+"\n";
         for(const auto& t:trace)out+=t+"\n";
@@ -682,6 +738,8 @@ public:
     }
     std::string trace_report() const {
         std::string out=graphics_report();
+        out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
+        out+="Arena brk="+to_hex(arena_memory.program_break())+" lowest mapping="+to_hex(arena_memory.lowest_mapping())+"\n";
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;
@@ -690,12 +748,12 @@ public:
 };
 }
 
-std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics) {
+std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics,ds::AudioBackend audio) {
     LifecycleRuntime env;
     try {
         std::string error;if(!env.image.load(library,error))throw std::runtime_error(error);
         //env.trace.push_back("image memory bytes="+std::to_string(env.image.memory.size()));
-        env.initialize(data_root,std::move(graphics));
+        env.initialize(data_root,std::move(graphics),std::move(audio));
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
         conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;

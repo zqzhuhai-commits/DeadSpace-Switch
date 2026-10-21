@@ -133,6 +133,34 @@ std::optional<uint64_t> GuestJni::asset_delegate(uint32_t receiver,const MethodK
     }
     return std::nullopt;
 }
+std::optional<uint64_t> GuestJni::audio_delegate(uint32_t receiver,const MethodKey& m,const std::vector<uint64_t>& values) {
+    if(object(receiver).cls!="android/media/AudioTrack")return std::nullopt;
+    if(m.sig=="()V") {
+        if(m.name=="play"){audio.play(receiver);return 0;}
+        if(m.name=="pause"){audio.pause(receiver);return 0;}
+        if(m.name=="stop"){audio.stop(receiver);return 0;}
+        if(m.name=="flush"){audio.flush(receiver);return 0;}
+        if(m.name=="release"){audio.release(receiver);return 0;}
+    }
+    if(m.name=="getState"&&m.sig=="()I")return audio.initialized(receiver);
+    if(m.name=="getPlayState"&&m.sig=="()I")return audio.play_state(receiver);
+    if(m.name!="write"||(m.sig!="([SII)I"&&m.sig!="([BII)I"&&m.sig!="([BIII)I"))return std::nullopt;
+    const auto& array=object(uint32_t(values.at(0)));const bool shorts=m.sig[2]=='S';
+    if(array.cls!=(shorts?"[S":"[B"))return uint32_t(-2);
+    const int32_t offset=int32_t(values.at(1)),count=int32_t(values.at(2));
+    if(offset<0||count<0||uint64_t(offset)+uint32_t(count)>array.length)return uint32_t(-2);
+    const uint32_t unit=shorts?2:1;
+    if(uint64_t(count)*unit>1024*1024)return uint32_t(-2);
+    const uint32_t mode=m.sig=="([BIII)I"?uint32_t(values.at(3)):0;
+    if(mode>1)return uint32_t(-2);
+    if(!audio.initialized(receiver))return uint32_t(-3);
+    if(!count)return 0;
+    const uint64_t start=uint64_t(array.elements.at(0))+uint64_t(offset)*unit;
+    if(start+uint64_t(count)*unit>0x100000000ull)throw std::runtime_error("PCM guest range wraps");
+    std::vector<uint8_t> pcm(uint32_t(count)*unit);
+    for(uint32_t i=0;i<pcm.size();++i)pcm[i]=MemoryRead8(uint32_t(start)+i);
+    return audio.write(receiver,pcm,unit,mode==0);
+}
 std::vector<char> GuestJni::parameter_types(const std::string& sig) {
     size_t p=0;std::vector<char> types;
     auto type=[&](bool allow_void) {

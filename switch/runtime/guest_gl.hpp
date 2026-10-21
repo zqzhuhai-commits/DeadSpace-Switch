@@ -1,4 +1,5 @@
 #pragma once
+#include "guest_input.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -15,6 +16,8 @@ struct GraphicsBackend {
     bool desktop_compatibility=false; // host reference only; Switch uses GLES1
     std::function<std::vector<uint8_t>(const std::string&)> hd_texture={};
     uint64_t hd_budget_bytes=128*1024*1024;
+    uint32_t width=640,height=480;
+    std::function<std::vector<InputEvent>(unsigned)> input={};
 };
 struct GlGuestMemory {
     std::function<uint32_t(unsigned)> arg;
