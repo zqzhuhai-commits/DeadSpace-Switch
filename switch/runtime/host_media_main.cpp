@@ -8,13 +8,19 @@
 #include <sstream>
 #include <map>
 int main(int argc,char** argv){
-    if(argc<4||argc>8){std::cerr<<"Usage: ds-media-probe library data_root frames [hd_root] [frame.ppm] [touch.tsv] [save_root]\n";return 64;}
+    if(argc<4||argc>9){std::cerr<<"Usage: ds-media-probe library data_root frames [hd_root] [frame.ppm] [touch.tsv] [save_root] [frame_step_ns]\n";return 64;}
     unsigned frames=0;const std::string count=argv[3];const auto number=std::from_chars(count.data(),count.data()+count.size(),frames);
     if(number.ec!=std::errc{}||number.ptr!=count.data()+count.size()||!frames||frames>100000)return 64;
     try{
         HostEgl egl;ds::SdlAudioOutput audio;ds::GraphicsBackend graphics;
         graphics.width=1280;graphics.height=720;graphics.resolve=[&](const char* name){return egl.resolve(name);};graphics.desktop_compatibility=true;
         unsigned presented=0;graphics.present=[&]{++presented;};
+        if(argc>8){
+            uint64_t step=0;const std::string value=argv[8];const auto parsed=std::from_chars(value.data(),value.data()+value.size(),step);
+            if(parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size()||!step||step>1000000000)throw std::runtime_error("Invalid frame clock step");
+            graphics.monotonic_ns=[&,step]{return uint64_t(presented)*step;};
+        }
+        graphics.progress=[](const std::string& stage){std::cerr<<stage<<"\n";};
         if(argc>4){const std::string root=argv[4];graphics.hd_texture=[root](const std::string& key){return ds::read_hd_texture(root,key);};}
         std::map<unsigned,std::vector<ds::InputEvent>> inputs;
         if(argc>6&&argv[6][0]){

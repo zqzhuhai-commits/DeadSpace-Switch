@@ -10,6 +10,7 @@
 #include "guest_numeric.hpp"
 #include "guest_files.hpp"
 #include "guest_trace.hpp"
+#include "guest_clock.hpp"
 #include "guest_paths.hpp"
 #include "guest_stat.hpp"
 #include "guest_threads.hpp"
@@ -78,6 +79,12 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0,strstr_log=0,asset_reads=0,guard_log=0,svc_log=0,call277efc=0,call28778=0;std::string last_service;
     std::map<std::string,uint64_t> service_counts;
     ds::GraphicsBackend graphics;
+    ds::GuestClockFloor clock_floor;
+    uint64_t guest_time() {
+        const auto previous=threads.time();
+        if(graphics.monotonic_ns)threads.tick(clock_floor.sample(graphics.monotonic_ns(),previous)-previous);
+        return threads.time();
+    }
     std::unique_ptr<ds::GuestGl> native_gl;
 
     bool mapped(uint32_t a) const {
@@ -380,7 +387,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 if(sec<0||ns<0||ns>=1000000000){MemoryWrite32(errno_address,22);result=UINT32_MAX;}
                 else {
                     const uint64_t absolute=uint64_t(sec)*1000000000+uint32_t(ns);
-                    if(absolute<=epoch_ns+threads.time()){MemoryWrite32(errno_address,110);result=UINT32_MAX;}
+                    if(absolute<=epoch_ns+guest_time()){MemoryWrite32(errno_address,110);result=UINT32_MAX;}
                     else {
                         if(call_depth!=1)throw std::runtime_error("Timed semaphore wait across host callback boundary");
                         threads.wait_until(ds::GuestThreads::State::semaphore,a,absolute-epoch_ns);rotate=true;
@@ -406,9 +413,9 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="__atomic_inc"||base=="__atomic_dec"){result=MemoryRead32(a);MemoryWrite32(a,result+(base=="__atomic_inc"?1:-1));}
         else if(base=="__atomic_cmpxchg"){result=MemoryRead32(c)!=a;if(!result)MemoryWrite32(c,b);}
         else if(base=="clock")result=uint32_t(uint64_t(std::clock())*1000000/CLOCKS_PER_SEC);
-        else if(base=="time"){result=uint32_t((epoch_ns+threads.time())/1000000000);if(a)MemoryWrite32(a,result);}
-        else if(base=="gettimeofday"){const auto ns=epoch_ns+threads.time();if(a){MemoryWrite32(a,uint32_t(ns/1000000000));MemoryWrite32(a+4,uint32_t(ns%1000000000/1000));}if(b)MemoryWrite64(b,0);result=0;}
-        else if(base=="clock_gettime"){if(a>1){MemoryWrite32(errno_address,22);result=UINT32_MAX;}else{const auto ns=threads.time()+(a==0?epoch_ns:0);MemoryWrite32(b,uint32_t(ns/1000000000));MemoryWrite32(b+4,uint32_t(ns%1000000000));}}
+        else if(base=="time"){result=uint32_t((epoch_ns+guest_time())/1000000000);if(a)MemoryWrite32(a,result);}
+        else if(base=="gettimeofday"){const auto ns=epoch_ns+guest_time();if(a){MemoryWrite32(a,uint32_t(ns/1000000000));MemoryWrite32(a+4,uint32_t(ns%1000000000/1000));}if(b)MemoryWrite64(b,0);result=0;}
+        else if(base=="clock_gettime"){if(a>1){MemoryWrite32(errno_address,22);result=UINT32_MAX;}else{const auto ns=guest_time()+(a==0?epoch_ns:0);MemoryWrite32(b,uint32_t(ns/1000000000));MemoryWrite32(b+4,uint32_t(ns%1000000000));}}
         else if(base=="stat"||base=="lstat"||base=="fstat") {
             struct stat st{};
             int rc;
@@ -643,6 +650,7 @@ public:
         data_root=data;
         storage={data,save_root};
         graphics=std::move(backend);
+        guest_time(); // anchor the optional monotonic source before guest startup
         if(!graphics.width||!graphics.height||graphics.width>4096||graphics.height>4096)throw std::runtime_error("Surface dimensions invalid");
         if(graphics.resolve)native_gl=std::make_unique<ds::GuestGl>(graphics,ds::GlGuestMemory{
             [&](unsigned n){return arg(n);},[&](uint32_t n){return alloc(n);},
@@ -752,8 +760,12 @@ public:
         const auto frame=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
         if(!frames&&!graphics.keep_running)throw std::runtime_error("Interactive session requires a stop callback");
+        auto last_frame_checkpoint=std::chrono::steady_clock::now();
         for(unsigned i=0;!frames||i<frames;++i){
+            guest_time();
+            if(i<3&&graphics.progress)graphics.progress("FRAME BEGIN: "+std::to_string(i));
             if(graphics.keep_running&&!graphics.keep_running())break;
+            if(i<3&&graphics.progress)graphics.progress("FRAME INPUT: "+std::to_string(i));
             if(graphics.input) {
                 const auto events=graphics.input(i);if(events.size()>64)throw std::runtime_error("Input event budget");
                 for(const auto& event:events) {
@@ -774,11 +786,17 @@ public:
             }
 
             if(graphics.keep_running&&!graphics.keep_running())break;
+            if(i<3&&graphics.progress)graphics.progress("FRAME DRAW: "+std::to_string(i));
             if(i==0&&graphics.progress)graphics.progress("BEGIN: first guest DrawFrame");
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
             if(i==0&&graphics.progress)graphics.progress("END: first guest DrawFrame");
             ++frames_done;
             if(graphics.present)graphics.present();
+            const auto frame_now=std::chrono::steady_clock::now();
+            if(graphics.progress&&(i<3||frame_now-last_frame_checkpoint>=std::chrono::seconds(5))) {
+                graphics.progress("FRAME COMPLETE: "+std::to_string(frames_done)+" guest_ns="+std::to_string(guest_time())+" clock="+(graphics.monotonic_ns?"host-monotonic-floor":"instruction-only")+"\n"+graphics_report());
+                last_frame_checkpoint=frame_now;
+            }
             trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
         }
 
@@ -796,6 +814,7 @@ public:
     std::string report() const {
         std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
         out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
+        out+="Clock: "+std::string(graphics.monotonic_ns?"host monotonic floor":"instruction-only")+"; guest_ns="+std::to_string(threads.time())+"\n";
         out+="Threads: cooperative scheduler; created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
         out+=graphics_report();
         out+="Storage: "+std::to_string(save_opens)+" save opens, "+std::to_string(save_read_bytes)+" bytes read, "+std::to_string(save_written_bytes)+" bytes written.\n";

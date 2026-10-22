@@ -12,6 +12,7 @@
 #include <switch.h>
 #include <sys/stat.h>
 #include <cerrno>
+#include <chrono>
 
 std::string game_graphics_probe(const std::string& root,bool interactive) {
     auto checkpoint=[](const std::string& message){ds::boot_log(ds::paths::log_file,message);};
@@ -34,8 +35,31 @@ std::string game_graphics_probe(const std::string& root,bool interactive) {
     SDL_GL_SetSwapInterval(1);
     auto get_string=reinterpret_cast<const unsigned char*(*)(unsigned)>(SDL_GL_GetProcAddress("glGetString"));
     if(get_string){const auto* renderer=get_string(0x1f01);log+="Renderer: "+std::string(renderer?reinterpret_cast<const char*>(renderer):"unknown")+"\n";}
+    if(get_string)for(const unsigned name:{0x1f00u,0x1f01u,0x1f02u}) {
+        const auto* value=get_string(name);
+        checkpoint("GL STRING "+std::to_string(name)+": "+(value?reinterpret_cast<const char*>(value):"unavailable"));
+    }
+    // Test rendering/readback/presentation before guest code changes GL state.
+    auto clear_color=reinterpret_cast<void(*)(float,float,float,float)>(SDL_GL_GetProcAddress("glClearColor"));
+    auto clear=reinterpret_cast<void(*)(unsigned)>(SDL_GL_GetProcAddress("glClear"));
+    auto read=reinterpret_cast<void(*)(int,int,int,int,unsigned,unsigned,void*)>(SDL_GL_GetProcAddress("glReadPixels"));
+    auto error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
+    if(!clear_color||!clear||!read||!error) {
+        SDL_GL_DeleteContext(context);SDL_DestroyWindow(window);SDL_Quit();
+        return "BLOCKED: required basic GL entries missing.\n";
+    }
+    checkpoint("BEGIN: blue GL readback/present test");
+    const auto previous_error=error();
+    clear_color(0.125f,0.25f,0.5f,1.0f);clear(0x4000);
+    unsigned char pixel[4]={0,0,0,0};read(640,360,1,1,0x1908,0x1401,pixel);
+    const auto test_error=error();
+    checkpoint("GL BLUE TEST: rgba="+std::to_string(pixel[0])+","+std::to_string(pixel[1])+","+std::to_string(pixel[2])+","+std::to_string(pixel[3])+" error="+std::to_string(test_error)+" previous_error="+std::to_string(previous_error));
+    SDL_GL_SwapWindow(window);SDL_Delay(250);
+    clear_color(0,0,0,0);
+    checkpoint("END: blue GL readback/present test");
     ds::GraphicsBackend graphics;
     graphics.progress=checkpoint;
+    graphics.monotonic_ns=[] {return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());};
     graphics.width=1280;graphics.height=720;
     graphics.resolve=[](const char* name){return SDL_GL_GetProcAddress(name);};
     unsigned presented=0;
