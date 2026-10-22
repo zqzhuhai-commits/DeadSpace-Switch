@@ -180,10 +180,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
               {"GetLocationAvailable","true"},{"GetMicrophoneCount","1"},{"GetApiLevel","19"},
               {"GetPlatformRawName","Android"},{"GetPlatformStdName","Android"},{"GetPlatformVersion","4.4.4"},
               {"GetPhysicalKeyboardCount","1"},{"GetProcessorArchitecture","armeabi-v7a"},
-              {"GetLanguage","zh"},{"GetLocale","zh"},{"GetTotalRAM","-1"},{"GetTouchPadCount","1"},
+              {"GetLanguage","zh"},{"GetLocale","zh_CN"},{"GetTotalRAM","-1"},{"GetTouchPadCount","1"},
               {"GetTouchScreenCount","1"},{"GetTrackBallCount","0"},{"GetVibratorCount","0"},
               {"GetVirtualKeyboardCount","1"}};
-            const auto it=props.find(m.name);if(it!=props.end())return java_string(it->second);
+            const auto it=props.find(m.name);if(it!=props.end()){if((m.name=="GetLanguage"||m.name=="GetLocale")&&graphics.progress)graphics.progress("LOCALE: "+m.name+"="+it->second);return java_string(it->second);}
         }
         if(cls=="com/ea/blast/GetAppDataDirectoryDelegate"){
             if(m.name=="GetAppDataDirectory"||m.name=="GetExternalStorageDirectory")return java_string(storage.save_root.empty()?data_root:storage.save_root);
@@ -793,6 +793,7 @@ public:
         const auto frame=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
         if(!frames&&!graphics.keep_running)throw std::runtime_error("Interactive session requires a stop callback");
+        unsigned input_checkpoints=0;
         auto last_frame_checkpoint=std::chrono::steady_clock::now();
         for(unsigned i=0;!frames||i<frames;++i){
             guest_time();
@@ -814,7 +815,9 @@ public:
                         const auto entry=image.exports.find(name);if(entry==image.exports.end())throw std::runtime_error("Guest keyboard export missing");
                         guest_call(entry->second,{env_addr,0x42424242,600,event.code,1},"key input",true);
                     }
-                    trace.push_back("Input kind="+std::to_string(event.kind)+" frame="+std::to_string(i));
+                    const std::string input_log="Input kind="+std::to_string(event.kind)+" frame="+std::to_string(i)+" code="+std::to_string(event.code)+" x="+std::to_string(event.x)+" y="+std::to_string(event.y);
+                    trace.push_back(input_log);
+                    if(graphics.progress&&(input_checkpoints++<64||i%120==0))graphics.progress(input_log);
                 }
             }
 

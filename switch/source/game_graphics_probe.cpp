@@ -6,6 +6,7 @@
 #include "boot_log.hpp"
 #include "sdl_audio_output.hpp"
 #include "sdl_game_input.hpp"
+#include "menu_cursor.hpp"
 #include <memory>
 #include <SDL2/SDL.h>
 #include <cstdio>
@@ -62,13 +63,15 @@ std::string game_graphics_probe(const std::string& root,bool interactive) {
     graphics.monotonic_ns=[] {return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());};
     graphics.width=1280;graphics.height=720;
     graphics.resolve=[](const char* name){return SDL_GL_GetProcAddress(name);};
+    auto input=std::make_unique<ds::SdlGameInput>(1280,720);
     unsigned presented=0;
     graphics.present=[&]{
         if(!presented)checkpoint("BEGIN: first SDL_GL_SwapWindow");
+        int drawable_width=0,drawable_height=0;SDL_GL_GetDrawableSize(window,&drawable_width,&drawable_height);
+        ds::draw_menu_cursor(*input,drawable_width,drawable_height);
         SDL_GL_SwapWindow(window);
         if(!presented++)checkpoint("END: first SDL_GL_SwapWindow");
     };
-    auto input=std::make_unique<ds::SdlGameInput>(1280,720);
     graphics.input=[&](unsigned){return input->poll();};
     graphics.keep_running=[&]{return appletMainLoop()&&input->running();};
     const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
