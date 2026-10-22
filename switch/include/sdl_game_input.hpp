@@ -15,7 +15,7 @@ class SdlGameInput {
     bool panel_touch=false;
     float panel_x=0,panel_y=0;
 #endif
-    bool confirm_touch=false,trigger_left=false,trigger_right=false;
+    bool confirm_touch=false,trigger_left=false,trigger_right=false,shoulder_left=false,shoulder_right=false;
     float cursor_x=0,cursor_y=0;
     bool menu=true,left_active=false,right_active=false;
     float lx=0,ly=0,rx=0,ry=0,right_x=0,right_y=0;
@@ -98,7 +98,11 @@ public:
                     case SDL_CONTROLLER_AXIS_TRIGGERRIGHT:{
                         bool& held=event.caxis.axis==SDL_CONTROLLER_AXIS_TRIGGERLEFT?trigger_left:trigger_right;
                         const bool down=event.caxis.value>16000;
-                        if(held!=down){held=down;events.push_back({down?InputEvent::key_down:InputEvent::key_up,0,event.caxis.axis==SDL_CONTROLLER_AXIS_TRIGGERLEFT?102u:103u,0,0});}
+                        if(held!=down){
+                            const bool shoulder=event.caxis.axis==SDL_CONTROLLER_AXIS_TRIGGERLEFT?shoulder_left:shoulder_right;
+                            const bool before=held||shoulder;held=down;
+                            if(before!=(held||shoulder))events.push_back({down?InputEvent::key_down:InputEvent::key_up,0,event.caxis.axis==SDL_CONTROLLER_AXIS_TRIGGERLEFT?102u:103u,0,0});
+                        }
                         break;
                     }
                     default:break;
@@ -122,6 +126,12 @@ public:
                 if(menu&&event.cbutton.button==SDL_CONTROLLER_BUTTON_B){
                     const bool down=event.type==SDL_CONTROLLERBUTTONDOWN;
                     if(down!=confirm_touch){confirm_touch=down;events.push_back({down?InputEvent::touch_down:InputEvent::touch_up,3,0,cursor_x,cursor_y});}
+                }
+                if(code==102||code==103){
+                    bool& shoulder=code==102?shoulder_left:shoulder_right;
+                    const bool trigger=code==102?trigger_left:trigger_right;
+                    const bool before=shoulder||trigger;shoulder=pressed;
+                    if(before==(shoulder||trigger))code=0;
                 }
                 if(code)events.push_back({event.type==SDL_CONTROLLERBUTTONDOWN?InputEvent::key_down:InputEvent::key_up,0,code,0,0});}
         }

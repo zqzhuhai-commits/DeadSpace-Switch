@@ -32,7 +32,10 @@ int main(){
             event.caxis.value=0;push(event);events=input.poll();check(events.size()==1&&events[0].kind==ds::InputEvent::touch_up,"Right stick must release at neutral");
             event.caxis.axis=SDL_CONTROLLER_AXIS_TRIGGERLEFT;event.caxis.value=32767;push(event);events=input.poll();
             check(events.size()==1&&events[0].code==102&&events[0].kind==ds::InputEvent::key_down,"Left trigger mapping");
-            event.caxis.value=0;push(event);events=input.poll();check(events.size()==1&&events[0].kind==ds::InputEvent::key_up,"Trigger release");
+            SDL_Event shoulder{};shoulder.type=SDL_CONTROLLERBUTTONDOWN;shoulder.cbutton.button=SDL_CONTROLLER_BUTTON_LEFTSHOULDER;push(shoulder);
+            check(input.poll().empty(),"Shoulder must not duplicate held trigger key");
+            event.caxis.value=0;push(event);check(input.poll().empty(),"Trigger release must retain held shoulder");
+            shoulder.type=SDL_CONTROLLERBUTTONUP;push(shoulder);events=input.poll();check(events.size()==1&&events[0].kind==ds::InputEvent::key_up,"Last shared input must release key");
             event={};event.type=SDL_CONTROLLERBUTTONDOWN;event.cbutton.button=SDL_CONTROLLER_BUTTON_START;push(event);input.poll();check(input.cursor_visible()&&input.running(),"Pause restores menu cursor without exiting");
 
         }
