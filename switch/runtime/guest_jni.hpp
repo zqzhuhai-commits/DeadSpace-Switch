@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "guest_audio.hpp"
 
 namespace ds {
 struct JavaObject {
@@ -39,7 +40,8 @@ protected:
     virtual void block_monitor(uint32_t) {throw std::runtime_error("Contended JNI monitor requires guest scheduler");}
     virtual uint32_t monitor_waiter(uint32_t) const {return 0;}
     virtual void wake_monitor(uint32_t) {throw std::runtime_error("JNI monitor scheduler unavailable");}
-    uint64_t asset_opens=0, asset_lists=0, asset_read_bytes=0; unsigned open_log=0;
+    GuestAudio audio;
+    uint64_t asset_opens=0, asset_lists=0, asset_read_bytes=0;
     virtual uint32_t alloc(uint32_t)=0;
     virtual uint32_t arg(unsigned)=0;
     virtual uint8_t MemoryRead8(uint32_t)=0;
@@ -63,6 +65,7 @@ protected:
     static std::vector<char> parameter_types(const std::string& signature);
     std::vector<uint64_t> arguments(const std::string& signature,char mode,unsigned first);
     static uint32_t stride(const JavaObject&);
+    std::optional<uint64_t> audio_delegate(uint32_t,const MethodKey&,const std::vector<uint64_t>&);
     std::optional<uint64_t> asset_delegate(uint32_t,const MethodKey&,const std::vector<uint64_t>&,const std::string& root);
 };
 }

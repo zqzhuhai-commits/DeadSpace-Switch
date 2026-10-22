@@ -76,6 +76,14 @@ int main(){
         const float ambient[]={.2f,.2f,.2f,1};r.call("glLightModelfv",{0x0b53,r.upload(ambient)});
         reject([&]{r.call("glColorPointer",{2,0x1401,0,matrix});});
         reject([&]{r.call("glGetIntegerv",{0xdeadbeef,query});});
+        r.call("glClearColorx",{32768,16384,65536,65536});r.call("glClear",{0x4000});const auto fp=r.pixel();
+        require(fp[0]>=127&&fp[0]<=128&&fp[1]>=63&&fp[1]<=64&&fp[2]==255,"Fixed clear color conversion");
+        const int32_t fixed_identity[]={65536,0,0,0,0,65536,0,0,0,0,65536,0,0,0,0,65536};
+        r.call("glLoadMatrixx",{r.upload(fixed_identity)});const auto matrix_query=r.allocate(64);
+        r.call("glTranslatex",{32768,0,0});r.call("glGetFloatv",{0x0ba6,matrix_query});float translation=0;r.read(matrix_query+48,&translation,4);
+        require(translation==.5f,"Fixed matrix translation");r.call("glLoadIdentity");
+        r.call("glTexEnvx",{0x2300,0x2200,0x2100});r.call("glAlphaFuncx",{0x0204,32768});
+        float alpha=0;reinterpret_cast<void(*)(unsigned,float*)>(egl.resolve("glGetFloatv"))(0x0bc2,&alpha);require(alpha==.5f,"Fixed alpha reference");
         const float triangle[]={9,9,-.8f,-.8f,.8f,-.8f,0,.8f};const auto points=r.upload(triangle);
         r.call("glEnableClientState",{0x8074});r.call("glVertexPointer",{2,0x1406,0,points});r.color(.2f,.8f,1);r.clear();r.call("glDrawArrays",{4,1,3});
         auto pixel=r.pixel();require(pixel[0]>=49&&pixel[0]<=53&&pixel[1]>=202&&pixel[2]>=253,"Client-array triangle framebuffer wrong");
@@ -90,7 +98,7 @@ int main(){
         r.call("glBindBuffer",{0x8892,0});r.call("glBindBuffer",{0x8893,0});
         const float quad[]={-1,-1,1,-1,1,1,-1,-1,1,1,-1,1};const float coords[]={0,0,1,0,1,1,0,0,1,1,0,1};
         const auto quadp=r.upload(quad),uv=r.upload(coords);r.call("glVertexPointer",{2,0x1406,0,quadp});r.call("glTexCoordPointer",{2,0x1406,0,uv});r.call("glEnableClientState",{0x8078});r.call("glEnable",{0x0de1});r.color(1,1,1);
-        r.call("glGenTextures",{1,ids});const auto texture=r.word(ids);r.call("glBindTexture",{0x0de1,texture});r.call("glTexParameteri",{0x0de1,0x2801,0x2600});r.call("glTexParameteri",{0x0de1,0x2800,0x2600});r.call("glTexParameteri",{0x0de1,0x2802,0x812f});r.call("glTexParameteri",{0x0de1,0x2803,0x812f});
+        r.call("glGenTextures",{1,ids});const auto texture=r.word(ids);r.call("glBindTexture",{0x0de1,texture});r.call("glTexParameterx",{0x0de1,0x2801,0x2600});r.call("glTexParameteri",{0x0de1,0x2800,0x2600});r.call("glTexParameteri",{0x0de1,0x2802,0x812f});r.call("glTexParameteri",{0x0de1,0x2803,0x812f});
         const uint8_t rgb[]={255,0,0,0x7a,0,255,0};const auto image=r.upload(rgb);
         r.call("glTexImage2D",{0x0de1,0,0x1907,1,2,0,0x1907,0x1401,image});r.clear();r.call("glDrawArrays",{4,0,6});
         pixel=r.pixel(32,16);require(pixel[0]>250&&pixel[1]<3,"RGB row zero upload wrong");pixel=r.pixel(32,48);require(pixel[0]<3&&pixel[1]>250,"RGB padded row upload wrong");

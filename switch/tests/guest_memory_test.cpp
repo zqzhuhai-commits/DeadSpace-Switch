@@ -1,6 +1,12 @@
 #include "guest_address.hpp"
 #include "guest_call_scope.hpp"
 #include "guest_heap.hpp"
+#include "guest_arena.hpp"
+#include "guest_sort.hpp"
+#include "guest_input.hpp"
+#include "guest_numeric.hpp"
+#include "guest_trace.hpp"
+#include "guest_paths.hpp"
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -18,6 +24,46 @@ struct Cpu {
 };
 int main() {
     try {
+        for(const std::string root:{"romfs:/gamedata","sdmc:/switch/deadspacemobile/gamedata","/tmp/donor"}) {
+            check(ds::resolve_data_path(root,root+"/assets/a")==root+"/assets/a","Device root was prepended twice");
+            check(ds::resolve_data_path(root,"appbundle:/published/a")==root+"/assets/published/a","Appbundle path mapping");
+            check(ds::resolve_data_path(root,"assets/./texture..ktx")==root+"/assets/texture..ktx","Relative asset normalization");
+            reject([&]{ds::resolve_data_path(root,"../other-game/save");});
+            reject([&]{ds::resolve_data_path(root,"sdmc:/switch/deadspace/save");});
+        }
+        ds::GuestTrace trace;
+        for(size_t i=0;i<100000;++i)trace.push_back(std::to_string(i));
+        check(trace.dropped()==100000-ds::GuestTrace::capacity,"Long sessions retain unbounded trace history");
+        check(*trace.begin()==std::to_string(100000-ds::GuestTrace::capacity),"Trace lost recent failure context");
+        trace.push_back(std::string(10000,'x'));
+        check((--trace.end())->size()==ds::GuestTrace::message_limit,"Trace message size is unbounded");
+        errno=EDOM;
+        const auto parsed=ds::parse_guest_double(" \t-12.5tail");
+        check(parsed.low==0&&parsed.high==0xc0290000&&parsed.consumed==7&&!parsed.error&&errno==EDOM,"strtod ARM double/endptr/host errno");
+        const auto negative_zero=ds::parse_guest_double("-0 suffix");
+        check(negative_zero.low==0&&negative_zero.high==0x80000000&&negative_zero.consumed==2,"strtod lost signed zero");
+        check(ds::parse_guest_double("xyz").consumed==0,"strtod no-conversion endptr");
+        const auto overflow=ds::parse_guest_double("1e9999");
+        check(overflow.error==ERANGE&&overflow.high==0x7ff00000&&overflow.low==0,"strtod overflow ABI/errno");
+        const auto underflow=ds::parse_guest_double("1e-9999");
+        check(underflow.error==ERANGE&&underflow.high==0&&underflow.low==0,"strtod underflow ABI/errno");
+        ds::GuestArena arena(0x40000000,0x50000000);
+        check(arena.grow(4096)==0x40000000,"sbrk old-break ABI");
+        for(unsigned i=0;i<1000;++i){const auto p=arena.map(16*1024*1024);check(p==0x4f000000,"Anonymous mapping not reused");check(arena.contains(*p),"Mapped page rejected");check(arena.unmap(*p,16*1024*1024)&&!arena.contains(*p),"Unmapped page retained");}
+        const auto span=arena.map(12288);check(span.has_value(),"Partial-unmap fixture");
+        check(arena.unmap(*span+4096,4096),"Partial unmap failed");
+        check(arena.contains(*span)&&!arena.contains(*span+4096)&&arena.contains(*span+8192),"Partial unmap damaged neighbors");
+        check(arena.map(4096)==*span+4096,"Freed hole not reused");
+        check(!arena.unmap(*span+1,4096)&&!arena.unmap(*span,0)&&!arena.map(0)&&!arena.map(UINT32_MAX),"Invalid mmap/munmap accepted");
+        check(!arena.grow(INT32_MAX)&&!arena.grow(-8192),"Break crossed bounds");
+        std::vector<uint8_t> sortable={0,0,9,0x91,1,0x11,4,0x41,1,0x12,0,0};
+        ds::guest_sort(2,4,2,[&](uint32_t p){return sortable.at(p);},[&](uint32_t p,uint8_t v){sortable.at(p)=v;},[&](uint32_t a,uint32_t b){check(a>=2&&a<10&&b>=2&&b<10,"Comparator received temporary/host pointer");return int(sortable.at(a))-int(sortable.at(b));});
+        check(sortable[2]==1&&sortable[4]==1&&sortable[6]==4&&sortable[8]==9&&sortable[9]==0x91&&sortable[0]==0&&sortable[10]==0,"qsort payload/guards damaged");
+        ds::guest_sort(0,0,4,[](uint32_t)->uint8_t{throw std::runtime_error("empty read");},[](uint32_t,uint8_t){throw std::runtime_error("empty write");},[](uint32_t,uint32_t)->int{throw std::runtime_error("empty compare");});
+        const auto touch=ds::pointer_arguments({ds::InputEvent::touch_down,2,0,640.5f,360},1280,720);float tx=0;std::memcpy(&tx,&touch[3],4);
+        check(touch[0]==0x6000c&&touch[1]==1000&&touch[2]==2&&tx==640.5f,"Softfp pointer ABI");
+        reject([]{ds::pointer_arguments({ds::InputEvent::touch_up,0,0,1280,0},1280,720);});
+        reject([]{ds::pointer_arguments({ds::InputEvent::touch_move,10,0,1,1},1280,720);});
         using L=ds::GuestLayout;
         const std::vector<ds::GuestSegment> segments={{0,256,5},{512,256,6}};
         check(ds::image_range(segments,768,L::image_base,4,1)==0,"Image base not applied exactly once");
@@ -98,6 +144,6 @@ int main() {
         check(heap.allocate(64)==b,"Failed calloc leaked reserved block");
         ds::GuestHeap full;full.allocate(32*1024*1024);full.allocate(32*1024*1024);
         reject([&]{full.allocate(16);});
-        std::cout<<"PASS: canonical image bounds, nested stack ABI and exception restoration, heap reuse/coalescing, bounded realloc and zeroed calloc\n";
+        std::cout<<"PASS: ARM double parsing, mapping reuse, guest sorting/input, canonical image bounds, nested stack ABI and exception restoration, heap reuse/coalescing, bounded realloc and zeroed calloc\n";
     } catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }
