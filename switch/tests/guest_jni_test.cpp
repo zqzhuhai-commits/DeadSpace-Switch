@@ -16,6 +16,8 @@ class TestRuntime:public ds::GuestJni {
     std::array<uint32_t,24> words{};
 public:
     std::string root;
+    uint32_t audio_init(ds::AudioBackend backend){const auto ref=singleton("android/media/AudioTrack");audio.set_backend(std::move(backend));audio.attach(ref,44100,2);return ref;}
+    const ds::GuestAudio& audio_stats()const{return audio;}
     uint32_t receiver=0;
     uint32_t thread=1;
     uint32_t current_thread() const override {return thread;}
@@ -36,6 +38,7 @@ public:
     void put64(uint32_t p,uint64_t v) {MemoryWrite32(p,uint32_t(v));MemoryWrite32(p+4,uint32_t(v>>32));}
     uint64_t java_delegate(uint32_t r,const ds::MethodKey& m,const std::vector<uint64_t>& args) override {
         receiver=r;values=args;
+        if(const auto result=audio_delegate(r,m,args))return *result;
         if(const auto result=asset_delegate(r,m,args,root))return *result;
         if(m.name=="echo")return 0xfedcba9876543210ull;
         if(m.name=="<init>" && m.sig=="(I)V")return 0;
@@ -162,6 +165,28 @@ int main() {
         check(r.exception_class()=="java/io/IOException","Asset traversal accepted");r.call("ExceptionClear");
         const auto close=r.method(stream2,"close","()V");r.call("CallVoidMethod",{stream2,close});
         r.call("CallIntMethod",{stream2,read,array,0,1});check(r.exception_class()=="java/io/IOException","Closed asset readable");
+        TestRuntime sound;uint32_t queued=0;bool paused=true;unsigned opens=0;std::vector<uint8_t> captured;
+        const auto track=sound.audio_init({[&](unsigned hz,unsigned channels){check(hz==44100&&channels==2,"PCM format");++opens;},[&](bool v){paused=v;},[&](const uint8_t* data,uint32_t n){captured.insert(captured.end(),data,data+n);queued+=n;},[&](){return queued;},[&](){queued=0;}});
+        const auto play=sound.method(track,"play","()V"),stop=sound.method(track,"stop","()V");
+        sound.call("CallVoidMethod",{track,play});check(!paused&&opens==1,"Audio play did not open output");
+        const auto samples=uint32_t(sound.call("NewShortArray",{8})),pcm_source=sound.data(samples);
+        sound.MemoryWrite16(pcm_source+4,0x8000);sound.MemoryWrite16(pcm_source+6,0x7fff);sound.MemoryWrite16(pcm_source+8,1);sound.MemoryWrite16(pcm_source+10,0xffff);
+        const auto write=sound.method(track,"write","([SII)I");
+        check(sound.call("CallIntMethod",{track,write,samples,2,4})==4,"PCM short count is not byte count");
+        check(captured==std::vector<uint8_t>({0,128,255,127,1,0,255,255}),"PCM endian/offset damaged");
+        check(sound.audio_stats().peak==32768&&sound.audio_stats().nonzero_samples==4,"PCM telemetry");
+        check(uint32_t(sound.call("CallIntMethod",{track,write,samples,7,4}))==uint32_t(-2),"PCM range accepted");
+        check(uint32_t(sound.call("CallIntMethod",{track,write,samples,UINT32_MAX,4}))==uint32_t(-2),"Negative PCM offset accepted");
+        const auto bytes=uint32_t(sound.call("NewByteArray",{8})),nonblock=sound.method(track,"write","([BIII)I");
+        queued=100000;bool blocked=false;try{sound.call("CallIntMethod",{track,write,samples,2,4});}catch(const ds::AudioBackpressure&){blocked=true;}
+        check(blocked&&captured.size()==8,"Full queue lost or duplicated PCM");
+        check(sound.call("CallIntMethod",{track,nonblock,bytes,0,8,1})==0,"Full nonblocking write must return zero");
+        queued=0;check(sound.call("CallIntMethod",{track,write,samples,2,4})==4&&captured.size()==16,"PCM retry damaged data");
+        sound.call("CallVoidMethod",{track,stop});check(paused&&queued==0,"Audio stop did not clear queue");
+        sound.call("CallVoidMethod",{track,sound.method(track,"release","()V")});
+        check(uint32_t(sound.call("CallIntMethod",{track,write,samples,2,4}))==uint32_t(-3),"Released track accepted write");
+        ds::GuestAudio absent;absent.attach(1,44100,2);reject([&]{absent.play(1);});
+        std::cout<<"PASS: PCM JNI dispatch, offsets/endian, output callbacks, bounds, backpressure/retry, lifecycle and missing-device rejection\n";
         std::cout<<"PASS: actual JNI dispatch, all 92 variant slots, ARM32 direct/V/A arguments, UTF-16/MUTF-8, arrays, real asset streams/listing/exceptions\n";
     } catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

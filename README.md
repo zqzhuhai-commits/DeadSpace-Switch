@@ -1,114 +1,118 @@
 # Dead Space Mobile — Switch 移植开发项目
 
-**0.3.2 开发基线：已加入 JNI、映像/堆修复及可选原生 GL 桥；当前仍是开发诊断版，不是可玩完整版或 NSP。默认 L 诊断使用模拟 GL，R 使用原生 GLES1 子集。**
+目标是内置游戏库和资源、无需外部 NRO 或手动数据目录的单文件 NSP。当前为开发版本：主机桥接测试与交叉编译不等于 Switch 安装、完整关卡或实际听音验收。
 
-[最新协作线程进展](switch/docs/PROGRESS-THREADS-0.3.2.md)：已复核 `1fbe1bb` 调试更新，替换同步线程和强改完成标志的实验路径；ARM32 指令线程交互、上下文及等待/唤醒测试通过。真实 donor 及 Switch 运行尚待验证，未生成 NSP。
+代码位于 `switch/`。原 Linux/PortMaster 项目说明保留在 [README.portmaster.md](README.portmaster.md)。上游来源与第三方许可证见 `NOTICE.md`、`switch/docs/UPSTREAM.json` 及 `third_party/`。
 
-[0.3.2 源码审查和 NSP 阻塞项](switch/docs/REVIEW-0.3.2.md)。高清资源准备现支持与实际 PSV 数据匹配，并纳入内置 RomFS 校验；尚未验证完整游戏运行。
+## 当前源码能力
 
-[后续 JNI 修复](switch/docs/PROGRESS-JNI-0.3.2.md)：已修正函数表、参数解码、实例接收者、字符串/数组和真实资源读取，通过主机 ASan/UBSan 回归；尚未重跑真实 PSV 库或验证游戏画面。
+- devkitA64/libnx 独立应用与 NRO 诊断入口，使用 SDL2/Mesa/nouveau。
+- 固定版本 Dynarmic ARM32 执行、受控 ELF 映像、JNI、资源流、协作线程及原生 GLES 子集。
+- AudioTrack PCM 到 SDL 队列、触摸和基础数字按键。模拟摇杆、体感替代及完整游戏控制仍待完善。
+- 只读数据与可写存档分离；实现 guest open 标志转换、读写、刷新、重命名和删除。
+- 独立应用 NPDM、NSO 输出与本地 NSP 打包脚本；支持从 CI 编译的独立 NSO 进行本地资源打包。
+- 合成文件持久化、内存/JNI/线程、原生 GL 像素回读、资源导入与包格式回归。
 
-[后续内存修复](switch/docs/PROGRESS-MEMORY-0.3.2.md)：已删除与栈冲突的第二份映像，修复嵌套调用现场恢复、堆复用及 realloc 越界读取，通过主机回归；协作线程进展见上方最新报告。
+源码与公开 CI 不包含游戏资源、keyset、用户存档或私有实测报告。应用名称为 **Dead Space Mobile**，图标使用 `switch/assets/icon.jpg`。开发标识和存储目录统一为 `deadspacemobile`。
 
-[原生 GL 接入](switch/docs/PROGRESS-NATIVE-GL.md)：真实 GL 子集已接到生命周期执行器，并通过主机 Mesa 像素回读；尚未验证 Switch 游戏画面。
+## 获取当前开发源码
 
-[高清运行时接入](switch/docs/PROGRESS-HD-RUNTIME.md)：已加入哈希匹配、KTX 完整 mip 上传、独立高清对象和原图回退，通过主机原生回读；222 张高清图的 2,310 层与独立解码器一致。尚未进行实际 PSV 联调或 Switch 画面验证。
+```sh
+git clone --recurse-submodules --branch codex/fix-filesystem-preload \
+  https://github.com/zqzhuhai-commits/DeadSpace-Switch.git
+cd DeadSpace-Switch
+```
 
-0.2.1 源码已按实机日志修正路径与版本标识：开发目录改为 `deadspacemobile`，增加完整库路径提示、CPU探测开始/结束日志及包内 RomFS 数据源选择。基础图形/PVRTC实机通过；CPU尚无实机结果，4个矩阵调色板入口缺失。详见 [实机日志分析](switch/docs/DEVICE-LOG-20261020.md)。
-
-基于 EapRules/deadspace-native-arm 提交 `cc8fd2c8a16530936aa3c2ce205ef4cffc2814e9`。上游目录保留；原 Linux/PortMaster 说明见 `README.portmaster.md`。Switch 新代码位于 `switch/`。Vita 版作为补丁和操作参考。Reanimated 当前没有公开核心运行时代码，本项目不包含该运行时。
-
-## 已实现
-
-- devkitA64/libnx AArch64 NRO 工程，SDL2/Mesa/nouveau 图形与音频诊断。
-- Xperia Play v1.1.33 游戏库 SHA1 白名单、ELF32 ARM 结构和段边界校验。
-- ZIP/APK/已解压 PSV 数据目录导入：临时目录校验后发布，不覆盖目标或修改原始文件。
-- Joy-Con 双摇杆和触摸坐标诊断。
-- GLES2 纹理三角形回读、上游 PowerVR PVRTC 真实解码器测试、低音量测试音队列。
-- 独立 GLES1.1 探测：游戏所需 190 个 GL 名称、matrix-palette 扩展和固定管线三角形回读。
-- Dynarmic 执行核心原型：主机实际运行真实游戏库的 5 个短函数，返回值全部正确；Thumb、VFP 与非法执行拒绝测试通过。Switch JIT 适配及含 B 键 CPU 测试的 NRO 已编译，等待实机运行。
-
-用户实机日志已验证 GLES2/PVRTC 和 GLES1 基础三角形；CPU/JIT 和新构造函数测试尚无实机结果。非空函数指针或扩展声明不能证明骨骼渲染正确；音频队列消耗不能代替实际听音。数据检查仅验证必要资源文件存在，不保证章节资源完整。
+GitHub 自动生成的源码 ZIP 不包含 Dynarmic 子模块内容；构建请使用递归克隆，或单独取得 `.gitmodules` 指定的固定依赖。当前开发工作尚未合并到主分支。
 
 ## 编译
 
-通过 devkitPro 官方包管理安装 devkitA64、libnx、switch-tools、switch-sdl2、switch-mesa、switch-libdrm_nouveau，设置 `DEVKITPRO`：
+安装 devkitA64、libnx、switch-tools、Switch SDL2/Mesa/nouveau，以及 CMake、Ninja 和 Boost 头文件。设置：
 
 ```sh
-make -C switch -j2
+export DEVKITPRO=/opt/devkitpro
+export BOOST_ROOT=/usr
+bash switch/tools/build_cpu_probe.sh
 ```
 
-产物：`switch/build/deadspace-switch.nro`。本次工具版本：GCC 16.1.0、libnx 4.12.0、SDL2 2.28.5、Mesa 20.1.0。编译和链接均需 `-fPIC`，以选择 PIC C++ 运行库。根目录原 Makefile 仍用于 Linux ARM32。
+脚本会隔离 Boost 头文件，避免把宿主 `/usr/include` 带进 Switch 交叉编译器。不要直接将宿主系统头目录加入目标编译选项。
 
-包含 ARM32 执行核心的版本另按 [CPU-BACKEND.md](switch/docs/CPU-BACKEND.md) 编译，需要初始化固定版本的 Dynarmic 子模块、应用 Switch JIT 补丁，并安装 Boost 头文件。默认 Makefile 仍生成较小的平台诊断版。
-
-主机测试（Python3、g++）：
+独立程序与 NPDM：
 
 ```sh
-ASAN_OPTIONS=detect_leaks=0 python3 switch/tests/run_tests.py
-g++ -std=c++17 -O2 -Iswitch/include switch/source/preflight.cpp switch/source/host_check.cpp -o ds-preflight
-./ds-preflight /path/to/extracted/deadspace
+make -C switch CPU_PROBE=1 STANDALONE=1 build/deadspace-switch.nso
+npdmtool switch/package/npdm.json switch/build/main.npdm
 ```
 
-ASan/UBSan 用于检查测试中的内存访问和未定义行为。当前容器无法读取 `/proc/.../task`，所以仅 LeakSanitizer 关闭；这不代表完成了泄漏检查。
+独立入口仅接受包内 `romfs:/gamedata`。不带执行核心的平台诊断仍可用 `make -C switch` 构建；根目录 Makefile 用于原 Linux ARM32 目标。
 
-## PSV 数据导入
+## 数据准备与资源内置
 
-用户提供的原版库必须位于 `lib/armeabi/libEAMGameDeadSpace.so`，SHA1 必须为 `0ed42b611415015807f759ec9b5457857143ce39`。
+导入器只接受受支持的原版游戏库及资源，检查位于 `switch/tools/prepare_data.py` 的版本白名单；不通过校验的数据不会发布到目标目录。
 
 ```sh
-python3 switch/tools/prepare_data.py /path/to/PSV-data.zip /path/to/sdcard/switch/deadspacemobile/gamedata
+python3 switch/tools/prepare_data.py /path/to/extracted-data /path/to/new-gamedata
+python3 switch/tools/prepare_romfs.py /path/to/new-gamedata /path/to/new-romfs
 ```
 
-输出目录必须不存在。工具支持外层含 `ux0/data/deadspace/` 或其他前缀的 ZIP/APK/目录；只复制游戏库和 assets，不执行或转换 VPK。单独的 VPK 启动器不够。RAR/7z 需先解压为目录。必需资源包括 `assets/EAMCore.ini`、`assets/published/data/achievements.sb`。
+RAR/7z 请先解压为目录；导入器直接支持目录、ZIP 和 APK。独立 VPK 启动器不包含完整游戏数据。输出目录必须不存在，原始输入不会被覆盖。
 
-2026-10-20 用户提供的后续直链 RAR 已完整下载（139,943,803 字节），MD5 为 `3a96fad461ac674b62464349a55d96e1`，与链接标注一致。实际游戏库 SHA1 精确匹配支持版本，1,746 个游戏库与资源文件已安全提取，导入和数据预检通过。章节完整性尚未验证。
-
-真实库审计：2 个加载段，392 个导入符号（含 190 个 GL 名称），69 个 JNI 导出（68 个 Java_* 加 JNI_OnLoad）。主机字节数组中已完成段映射、BSS 清零和 22,677 条 RELATIVE 重定位；上述审计是静态检查。0.3.0 的独立 C++ 构造函数运行时已完成剩余符号重定位与受控导入绑定，实际完成 209 个构造函数和 112 次外部调用；不等于 Switch 实机加载或游戏生命周期。
+内置 NRO 的开发检查：
 
 ```sh
-python3 switch/tools/audit_donor.py /path/to/libEAMGameDeadSpace.so --output donor-audit.json
-```
-
-审计计数已与 binutils readelf 独立比对，190 个 GL 名称与上游清单一致，40 个旧 VFP 补丁位置的原始指令全部匹配。详见 `switch/docs/DONOR-AUDIT.json`。
-
-## 实机诊断
-
-将 NRO 放到 `/switch/deadspacemobile/deadspace-switch.nro`，在已经配置好自制软件的 Switch 上，通过 Homebrew Menu 应用模式/title takeover 启动，给 SDL/Mesa 留足内存。
-
-- A：重扫数据。
-- X：GLES2/PVRTC/音频平台测试，约3秒。
-- Y：游戏 GLES1.1 固定管线兼容性探测。
-- B（0.3.0 CPU 版本）：运行真实库短函数、Thumb/VFP 及全部构造函数，结果写入诊断日志。
-- +：退出。
-- 摇杆与触摸：检查屏幕上的坐标读数。
-
-日志：`/switch/deadspacemobile/diagnostics.log`。没有游戏文件也能运行平台诊断；本程序不要求密钥、超频或系统配置修改。
-
-## 内置资源构建
-
-最终目标仍为自包含 NSP，无需外部数据文件夹。当前先验证同一 RomFS 资源布局的内置 NRO：
-
-```sh
-python3 switch/tools/prepare_romfs.py /path/to/extracted/PSV-data /path/to/new-romfs
-make -C switch CPU_PROBE=1 CPU_BUILD_DIR=/path/to/cpu-build ROMFS_ROOT=/path/to/new-romfs
+make -C switch CPU_PROBE=1 ROMFS_ROOT=/path/to/new-romfs
 python3 switch/tools/verify_romfs.py switch/build/deadspace-switch.nro
 ```
 
-先按 CPU 构建说明编译执行核心。RomFS 中内置 `gamedata/`，运行时优先从包内读取。工具会从构建产物逐文件回读并核验 SHA256；本轮 1,746 个原始文件及 1 个导入记录全部一致，共 259,247,598 字节。资源打包验证不代表游戏可玩。
+资源从包内 RomFS 读取。运行产生的存档写入 `sdmc:/switch/deadspacemobile/saves`；不需要预先复制外部游戏资源目录。
 
-详见 [0.3.0 实测与限制](switch/docs/PROGRESS-0.3.0.md)。
+## 打包单文件 NSP
 
-## 下一开发关卡
+在本地准备 hacBrewPack、switch-tools、对应源码版本的独立 NSO 和本地 keyset：
 
-Dynarmic 主机短函数与构造函数通过。独立 Unicorn 调查已通过 JNI_OnLoad、创建及第一轮 DrawFrame，第二轮停在真实 glGetIntegerv；没有伪造 GL 返回值。该调查尚未移入 Switch C++ 生命周期。下一步验证 Switch JIT，并迁移 JNI/JavaVM、资源流与实际 GL 桥。接通 GLES1、音频、控制和存档后，以第一关可操作、射击、实际声音、存档读档和切关为可玩门槛。详见 `switch/docs/CPU-BACKEND.md`。
+```sh
+python3 switch/tools/package_nsp.py \
+  --data /path/to/new-gamedata \
+  --prebuilt-nso /path/to/CI/deadspace-switch.nso \
+  --npdm-json switch/package/npdm.json \
+  --keyset /path/to/local-keyset \
+  --hacbrewpack /path/to/hacbrewpack \
+  --output /path/to/DeadSpace-Mobile-development.nsp
+```
 
-当前 NRO 只建立平台诊断能力。没有将 Linux qemu 测试、三角形或占位接口宣称为游戏运行，也没有制作“可玩 NSP”。
+也可以用 `--cpu-build /absolute/path/to/switch/build/cpu` 替代 `--prebuilt-nso`，在本机重新交叉编译。脚本校验资源、独立回读 RomFS、组装 NSO/NPDM/NACP/control，并检查 NSP 的 PFS0 结构；临时目录每次独立创建，已有输出不会被覆盖。
 
-## Reanimated 高清包
+NPDM 的应用标识、服务及 JIT 配置见 `switch/package/npdm.json`。安装和启动仍需要在实际设备上验证。包结构检查不能代替关卡可玩验收。
 
-已核验并单独提取 v1.3 APK 的 222 份 KTX 高清材质，在 APK 自带原始资源中全部找到精确映射。已加入实验性哈希替换、KTX 完整 mip 上传和原图回退；尚未验证 Switch 游戏画面，也未与 PSV 数据逐对象比对。详见 [高清包审计与接入限制](switch/docs/REANIMATED-HD.md)。
+## 主机测试与 CI
+
+```sh
+ASAN_OPTIONS=detect_leaks=0 LIBGL_ALWAYS_SOFTWARE=1 EGL_PLATFORM=surfaceless \
+  python3 switch/tests/run_tests.py --native-gl
+python3 switch/tests/package_nsp_test.py
+python3 switch/tests/build_modes_test.py
+```
+
+原生回读需要主机 EGL/GL 运行库。`romfs_test.py` 需要传入独立 `build_romfs` 工具路径；真实高清包对照测试需要另行提供本地资源，不属于无资源公开 CI。
+
+`.github/workflows/switch.yml` 执行主机回归、运行时/媒体前端构建、CTest，以及固定官方 devkitPro 镜像中的交叉编译和开发产物上传。公开工作流只接触源码与合成测试数据。
+
+## 开发诊断
+
+NRO 诊断入口：R 为原生 GL 短探测，ZR 为持续会话，+ 结束会话。独立程序直接进入包内资源会话。诊断日志为 `sdmc:/switch/deadspacemobile/diagnostics.log`。0.3.3 在进入 SDL、图形上下文、JIT、构造函数、JNI 和首帧前后追加启动检查点，每条记录立即关闭文件保存，不再等持续会话退出才写日志。游戏执行期间的长调用定期记录心跳；若卡住，请保留日志最后一段。若连 `BOOT` 都没有，需继续检查到达 main 前的启动与 SD 写入权限；这些检查点不是黑屏已修复的证明。
+
+可写文件桥接和显式 EAIO 启动的实现说明见 [PROGRESS-SAVE-NSP-0.3.2.md](switch/docs/PROGRESS-SAVE-NSP-0.3.2.md)。仍需验收第一关移动/瞄准/射击、实际听音、完整进度恢复、切关及无外置数据安装；开发包不应标为已完成这些验收的可玩整合版。
+
+0.3.4 实机会话以主机单调时钟提供游戏时间下限，计入等待垂直同步等未执行 ARM 指令的时间，避免启动动画仅按指令计时而推进过慢。默认主机探测保留确定性指令计时，可在媒体探测器最后传入 `frame_step_ns` 模拟固定帧周期。启动时另做一次短暂蓝色清屏/像素回读/交换测试，日志记录实际 GL 厂商、渲染器、版本和持续帧数、游戏时间及绘制计数，用于区分循环停顿与画面问题；这些变化仍需实机复测。
+
+0.3.5 优化 Switch CodeMemory 模式的 JIT 发布：同步新生成代码及被修改的既有代码块对应的 RW/RX 范围，避免每次生成小块代码都同步整个 32 MiB 缓存；旧的权限切换模式保留 libnx 原有流程。启动心跳另记录当前导入/JNI 服务名、资源读取字节数和 GL 调用数，区分加载进展与停顿。主机模拟 libnx 的回归验证范围、别名、旧块重链接和权限回退；加速幅度仍需实机测量。
+
+## 高清替换
+
+可选 `prepare_romfs.py --hd-apk` 使用精确纹理键匹配、原图回退和显存预算。高清来源与映射支持范围见现有开发文档；源码不附带高清材质。
 
 ## License
 
-GPL-3.0，并保留第三方各自的许可证。见 `LICENSE`、`NOTICE.md` 和 `third_party/`。没有分发 EA 游戏库和游戏资源。
+GPL-3.0，并保留第三方各自许可证。见 `LICENSE`、`NOTICE.md` 与 `third_party/`。
+
+0.3.6 将 JNI 资源、文件与 GL 数据搬运及内存填充改为按页批量处理，并为常见 16/32 位访存增加映射内快速路径。跨页回退、只读映射权限和重叠复制语义保留；回归测试覆盖零页、边界、地址溢出和权限拒绝，并纳入 ASan/UBSan 与 CTest。心跳增加批量访存字节计数，便于检查新路径是否生效。主机渲染通过不能替代 Switch 实机蓝屏复测。

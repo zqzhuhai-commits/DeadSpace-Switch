@@ -24,7 +24,7 @@ public:
         State state=State::ready;
         uint32_t id=0,stack_begin=0,stack_size=0,wait_key=0,join_result=0,joiner=0,result=0,exception=0,error=0;
         uint64_t wake=0;
-        bool detached=false;
+        bool detached=false,timed_wait=false,timed_out=false;
         std::map<uint32_t,uint32_t> tls;
     };
 private:
@@ -51,18 +51,19 @@ public:
         const auto id=t.id;tasks.emplace(id,t);*slot=id;return id;
     }
     bool mapped(uint32_t p)const {
-        if(p>=0x10600000u&&p<0x20200000u)return true;
+        if(p>=0x20000000u&&p<0x20200000u)return true;
         if(p<0x21000000u||p>=0x25000000u)return false;
         const auto id=stacks[(p-0x21000000u)/0x200000u];
         const auto it=tasks.find(id);
         return it!=tasks.end()&&uint64_t(p)-it->second.stack_begin<it->second.stack_size;
     }
-    void block(State state,uint32_t key){auto& t=thread();t.state=state;t.wait_key=key;}
+    void block(State state,uint32_t key){auto& t=thread();t.state=state;t.wait_key=key;t.timed_wait=false;t.timed_out=false;}
+    void wait_until(State state,uint32_t key,uint64_t deadline){block(state,key);thread().wake=deadline;thread().timed_wait=true;}
     void sleep(uint64_t nanos){if(nanos>std::numeric_limits<uint64_t>::max()-now)throw std::runtime_error("Guest sleep overflow");thread().state=State::sleep;thread().wake=now+nanos;}
     void tick(uint64_t nanos){now=std::min(std::numeric_limits<uint64_t>::max()-nanos,now)+nanos;}
     uint64_t time()const{return now;}
     uint32_t waiter(State state,uint32_t key)const{for(const auto& kv:tasks)if(kv.second.state==state&&kv.second.wait_key==key)return kv.first;return 0;}
-    void wake(uint32_t id){auto& t=tasks.at(id);if(t.state==State::exited)throw std::runtime_error("Wake exited guest thread");t.state=State::ready;t.wait_key=0;}
+    void wake(uint32_t id){auto& t=tasks.at(id);if(t.state==State::exited)throw std::runtime_error("Wake exited guest thread");t.state=State::ready;t.wait_key=0;t.timed_wait=false;}
     int join(uint32_t id,uint32_t result_pointer){
         auto* target=find(id);if(!target)return 3;
         if(id==active)return 35;
@@ -81,11 +82,15 @@ public:
     // Called after saving the old CPU. Sleeping threads advance virtual time
     // only when every runnable thread has yielded; unsatisfiable waits fail.
     uint32_t select(){
-        auto ready=[&](){for(auto& kv:tasks)if(kv.second.state==State::sleep&&kv.second.wake<=now)kv.second.state=State::ready;};
+        auto ready=[&](){for(auto& kv:tasks){auto& t=kv.second;
+            if(t.wake>now)continue;
+            if(t.state==State::sleep)t.state=State::ready;
+            else if(t.timed_wait){t.state=State::ready;t.wait_key=0;t.timed_wait=false;t.timed_out=true;t.cpu.regs[0]=UINT32_MAX;}
+        }};
         ready();
         auto pick=[&]()->uint32_t{for(auto it=tasks.upper_bound(active);it!=tasks.end();++it)if(it->second.state==State::ready)return it->first;for(auto& kv:tasks)if(kv.second.state==State::ready)return kv.first;return 0;};
         auto chosen=pick();
-        if(!chosen){uint64_t earliest=std::numeric_limits<uint64_t>::max();for(const auto& kv:tasks)if(kv.second.state==State::sleep)earliest=std::min(earliest,kv.second.wake);if(earliest!=std::numeric_limits<uint64_t>::max()){now=std::max(now,earliest);ready();chosen=pick();}}
+        if(!chosen){uint64_t earliest=std::numeric_limits<uint64_t>::max();for(const auto& kv:tasks)if(kv.second.state==State::sleep||kv.second.timed_wait)earliest=std::min(earliest,kv.second.wake);if(earliest!=std::numeric_limits<uint64_t>::max()){now=std::max(now,earliest);ready();chosen=pick();}}
         if(!chosen)throw std::runtime_error("Guest scheduler deadlock: no runnable thread");
         active=chosen;return chosen;
     }
