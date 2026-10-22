@@ -672,6 +672,17 @@ public:
         const uint32_t version=guest_call(onload->second,{vm_addr,0},"JNI_OnLoad",true);
         trace.push_back("JNI_OnLoad returned: 0x"+to_hex(version));
         if(version!=0x10004)throw std::runtime_error("Unexpected JNI version");
+        // EAIO_Startup must run before audio/Create so EASTL's default allocator
+        // interface and the EA file-system are constructed. Without it, EASTL
+        // containers see a null allocator (this=null) inside the first frame.
+        const auto eaio=image.exports.find("Java_com_ea_EAIO_EAIO_Startup");
+        if(eaio!=image.exports.end()){
+            const uint32_t am=singleton("android/content/res/AssetManager");
+            guest_call(eaio->second,{env_addr,0,am},"EAIO_Startup",true);
+            trace.push_back("EAIO_Startup returned");
+        } else {
+            trace.push_back("EAIO_Startup export not found; skipping explicit pre-Start");
+        }
         const auto audio=image.exports.find("Java_com_ea_EAAudioCore_AndroidEAAudioCore_Init");
         if(audio==image.exports.end())throw std::runtime_error("Audio init export missing");
         const uint32_t track=alloc(4);objects[track].cls="android/media/AudioTrack";
