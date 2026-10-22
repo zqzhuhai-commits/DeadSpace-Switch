@@ -11,9 +11,8 @@ class GuestTrace {
 public:
     static constexpr size_t capacity=512, message_limit=2048;
     void push_back(std::string message) {
-        if(message.size()>message_limit)message.resize(message_limit);
         if(entries.size()==capacity){entries.pop_front();++discarded;}
-        entries.push_back(std::move(message));
+        entries.emplace_back(message.data(),message.size()>message_limit?message_limit:message.size());
     }
     auto begin() const {return entries.begin();}
     auto end() const {return entries.end();}

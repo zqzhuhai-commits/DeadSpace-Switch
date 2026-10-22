@@ -28,6 +28,7 @@
 #include <ctime>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -62,8 +63,11 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     void wake_monitor(uint32_t id) override {threads.wake(id);}
     std::vector<uint32_t> destructors;
     ds::GuestFiles files;
+    std::set<uint32_t> save_descriptors,save_streams;
+    uint64_t save_read_bytes=0,save_written_bytes=0,save_opens=0;
     ds::GuestTrace trace;
     std::string data_root;
+    ds::GuestStoragePaths storage;
     ds::GuestArena arena_memory{arena,arena_end};
     uint32_t pending=0,errno_address=0,env_addr=0,vm_addr=0,jni_table=0,vm_table=0;
     uint32_t ext_string=0;
@@ -101,9 +105,6 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         for(uint32_t i=0;i<v.size();++i)MemoryWrite8(p+i,uint8_t(v[i]));
         MemoryWrite8(p+uint32_t(v.size()),0);
         return p;
-    }
-    std::string resolve_path(const std::string& raw) {
-        return ds::resolve_data_path(data_root,raw);
     }
     uint64_t java_delegate(uint32_t obj,const MethodKey& m,const std::vector<uint64_t>& values) {
         ++jni_calls;
@@ -146,7 +147,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             const auto it=props.find(m.name);if(it!=props.end())return java_string(it->second);
         }
         if(cls=="com/ea/blast/GetAppDataDirectoryDelegate"){
-            if(m.name=="GetAppDataDirectory"||m.name=="GetExternalStorageDirectory")return java_string(data_root);
+            if(m.name=="GetAppDataDirectory"||m.name=="GetExternalStorageDirectory")return java_string(storage.save_root.empty()?data_root:storage.save_root);
         }
         if(cls=="com/ea/blast/DisplayAndroidDelegate"){
             // Android reports natural portrait dimensions; the engine swaps them.
@@ -402,29 +403,57 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             int rc;
             if(base=="fstat")rc=files.stat(a,st);
             else {
-                const auto path=resolve_path(guest_text(a));
+                const auto path=storage.metadata(guest_text(a)).path;
                 rc=base=="lstat"? ::lstat(path.c_str(),&st) : ::stat(path.c_str(),&st);
             }
             if(rc){MemoryWrite32(errno_address,errno);result=UINT32_MAX;}
             else write_stat(b,st);
         }
         else if(base=="mkdir") {
-            const auto raw=guest_text(a),path=resolve_path(raw);
-            if(raw.rfind("appbundle:",0)==0 || (path!=data_root && path.rfind(data_root+"/",0)!=0)) {
-                MemoryWrite32(errno_address,30);result=UINT32_MAX;
-            } else {
-                result=uint32_t(::mkdir(path.c_str(),b&0777));
-                if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);
-                trace.push_back("mkdir '"+raw+"' -> "+std::to_string(int32_t(result)));
+            const auto path=storage.metadata(guest_text(a));
+            if(!path.writable){
+                struct stat st{};
+                MemoryWrite32(errno_address,::stat(path.path.c_str(),&st)==0&&S_ISDIR(st.st_mode)?EEXIST:EROFS);result=UINT32_MAX;
             }
+            else {result=uint32_t(::mkdir(path.path.c_str(),b&0777));if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);}
         }
         else if(base=="open"||base=="open64") {
-            if(b!=0){MemoryWrite32(errno_address,30);result=UINT32_MAX;}
-            else {result=files.open(resolve_path(guest_text(a)).c_str());if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);}
+            const auto path=storage.resolve(guest_text(a));
+            const bool writing=(b&3)||(b&(64|128|512|1024));
+            if(writing&&!path.writable){MemoryWrite32(errno_address,EROFS);result=UINT32_MAX;}
+            else {result=files.open(path.path.c_str(),b,c);if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);else if(path.writable){save_descriptors.insert(result);++save_opens;}}
+        }
+        else if(base=="remove"||base=="unlink"||base=="rename") {
+            const auto from=storage.resolve(guest_text(a));
+            if(!from.writable){MemoryWrite32(errno_address,EROFS);result=UINT32_MAX;}
+            else if(base=="rename") {
+                const auto to=storage.resolve(guest_text(b));
+                if(!to.writable){errno=EROFS;result=UINT32_MAX;}
+                else result=uint32_t(std::rename(from.path.c_str(),to.path.c_str()));
+            } else result=uint32_t(base=="remove"?std::remove(from.path.c_str()): ::unlink(from.path.c_str()));
+            if(result==UINT32_MAX&&from.writable)MemoryWrite32(errno_address,errno);
+        }
+        else if(base=="fflush") {result=uint32_t(files.flush(a));if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);}
+        else if(base=="write"||base=="fwrite") {
+            const bool stdio=base=="fwrite";
+            const uint64_t bytes=stdio?uint64_t(b)*c:c;
+            const uint32_t src=stdio?a:b;
+            if(bytes>64*1024*1024||uint64_t(src)+bytes>0x100000000ull)throw std::runtime_error("File write guest range/size limit");
+            auto* fp=stdio?files.stream(d):files.descriptor(a);
+            if(!fp){MemoryWrite32(errno_address,errno);result=stdio?0:UINT32_MAX;}
+            else if(bytes) {
+                std::vector<uint8_t> data(static_cast<size_t>(bytes));
+                for(size_t i=0;i<data.size();++i)data[i]=MemoryRead8(src+uint32_t(i));
+                const size_t written=std::fwrite(data.data(),1,data.size(),fp);
+                if(stdio?save_streams.count(d):save_descriptors.count(a))save_written_bytes+=written;
+                result=stdio?uint32_t(written/b):uint32_t(written);
+                if(std::ferror(fp)){MemoryWrite32(errno_address,errno);if(!stdio&&!written)result=UINT32_MAX;}
+            }
         }
         else if(base=="close"||base=="fclose") {
             result=uint32_t(base=="close"?files.close(a):files.fclose(a));
             if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);
+            if(base=="close")save_descriptors.erase(a);else save_streams.erase(a);
         }
         else if(base=="read"||base=="fread") {
             const bool stdio=base=="fread";
@@ -437,6 +466,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             else if(bytes) {
                 std::vector<uint8_t> data(static_cast<size_t>(bytes));
                 const size_t got=std::fread(data.data(),1,data.size(),fp);
+                if(stdio?save_streams.count(d):save_descriptors.count(a))save_read_bytes+=got;
                 for(size_t i=0;i<got;++i)MemoryWrite8(dst+uint32_t(i),data[i]);
                 if(std::ferror(fp))MemoryWrite32(errno_address,errno);
                 result=stdio?uint32_t(got/b):uint32_t(got);
@@ -455,9 +485,13 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         }
         else if(base=="fopen") {
             const std::string mode=guest_text(b);
-            // Read-only diagnostic runtime; writes need a separate save root.
-            if(mode!="r"&&mode!="rb"){MemoryWrite32(errno_address,30);result=0;}
-            else {result=files.fopen(resolve_path(guest_text(a)).c_str(),mode.c_str());if(!result)MemoryWrite32(errno_address,errno);}
+            static const std::array<const char*,15> modes={"r","rb","r+","rb+","r+b","w","wb","w+","wb+","w+b","a","ab","a+","ab+","a+b"};
+            if(std::find(modes.begin(),modes.end(),mode)==modes.end()){MemoryWrite32(errno_address,EINVAL);result=0;}
+            else {
+                const auto path=storage.resolve(guest_text(a));const bool writing=mode!="r"&&mode!="rb";
+                if(writing&&!path.writable){MemoryWrite32(errno_address,EROFS);result=0;}
+                else {result=files.fopen(path.path.c_str(),mode.c_str());if(!result)MemoryWrite32(errno_address,errno);else if(path.writable){save_streams.insert(result);++save_opens;}}
+            }
         }
         else if(name.rfind("JNI:",0)==0){
             ++jni_calls;
@@ -593,9 +627,10 @@ public:
         return p;
     }
 
-    void initialize(const std::string& data,ds::GraphicsBackend backend,ds::AudioBackend audio_backend) {
+    void initialize(const std::string& data,ds::GraphicsBackend backend,ds::AudioBackend audio_backend,const std::string& save_root) {
         audio.set_backend(std::move(audio_backend));
         data_root=data;
+        storage={data,save_root};
         graphics=std::move(backend);
         if(!graphics.width||!graphics.height||graphics.width>4096||graphics.height>4096)throw std::runtime_error("Surface dimensions invalid");
         if(graphics.resolve)native_gl=std::make_unique<ds::GuestGl>(graphics,ds::GlGuestMemory{
@@ -749,6 +784,7 @@ public:
         out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
         out+="Threads: cooperative scheduler; created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
         out+=graphics_report();
+        out+="Storage: "+std::to_string(save_opens)+" save opens, "+std::to_string(save_read_bytes)+" bytes read, "+std::to_string(save_written_bytes)+" bytes written.\n";
         out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_lists)+" directories listed; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
         for(const auto& kv:service_counts)if(kv.second)out+="  svc "+kv.first+" "+std::to_string(kv.second)+"\n";
@@ -758,6 +794,7 @@ public:
     }
     std::string trace_report() const {
         std::string out=graphics_report();
+        out+="Storage: "+std::to_string(save_opens)+" save opens, "+std::to_string(save_read_bytes)+" bytes read, "+std::to_string(save_written_bytes)+" bytes written.\n";
         out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
         out+="Arena brk="+to_hex(arena_memory.program_break())+" lowest mapping="+to_hex(arena_memory.lowest_mapping())+"\n";
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
@@ -769,12 +806,12 @@ public:
 };
 }
 
-std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics,ds::AudioBackend audio) {
+std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics,ds::AudioBackend audio,std::string save_root) {
     LifecycleRuntime env;
     try {
         std::string error;if(!env.image.load(library,error))throw std::runtime_error(error);
         //env.trace.push_back("image memory bytes="+std::to_string(env.image.memory.size()));
-        env.initialize(data_root,std::move(graphics),std::move(audio));
+        env.initialize(data_root,std::move(graphics),std::move(audio),save_root);
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
         conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;

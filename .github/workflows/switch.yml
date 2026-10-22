@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "switch/docs/**"
   workflow_dispatch:
 permissions:
   contents: read
@@ -60,11 +63,13 @@ jobs:
           make -C switch -j2
           bash switch/tools/build_cpu_probe.sh
           make -C switch -j2 CPU_PROBE=1 STANDALONE=1 build/deadspace-switch.nso
+          npdmtool switch/package/npdm.json switch/build/main.npdm
       - uses: actions/upload-artifact@v4
         with:
           name: switch-development-executables
           path: |
             switch/build/deadspace-switch.nro
             switch/build/deadspace-switch.nso
+            switch/build/main.npdm
           if-no-files-found: error
 # This public workflow builds code only. Game assets and keysets stay local.

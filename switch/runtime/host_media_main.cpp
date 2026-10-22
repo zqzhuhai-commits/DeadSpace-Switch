@@ -8,7 +8,7 @@
 #include <sstream>
 #include <map>
 int main(int argc,char** argv){
-    if(argc<4||argc>7){std::cerr<<"Usage: ds-media-probe library data_root frames [hd_root] [frame.ppm] [touch.tsv]\n";return 64;}
+    if(argc<4||argc>8){std::cerr<<"Usage: ds-media-probe library data_root frames [hd_root] [frame.ppm] [touch.tsv] [save_root]\n";return 64;}
     unsigned frames=0;const std::string count=argv[3];const auto number=std::from_chars(count.data(),count.data()+count.size(),frames);
     if(number.ec!=std::errc{}||number.ptr!=count.data()+count.size()||!frames||frames>100000)return 64;
     try{
@@ -17,7 +17,7 @@ int main(int argc,char** argv){
         unsigned presented=0;graphics.present=[&]{++presented;};
         if(argc>4){const std::string root=argv[4];graphics.hd_texture=[root](const std::string& key){return ds::read_hd_texture(root,key);};}
         std::map<unsigned,std::vector<ds::InputEvent>> inputs;
-        if(argc>6){
+        if(argc>6&&argv[6][0]){
             std::ifstream script(argv[6]);if(!script)throw std::runtime_error("Cannot read touch script");std::string line;unsigned lines=0;
             while(std::getline(script,line)){
                 if(++lines>10000||line.size()>256)throw std::runtime_error("Touch script bound");
@@ -30,7 +30,7 @@ int main(int argc,char** argv){
             }
             graphics.input=[&](unsigned frame){const auto it=inputs.find(frame);return it==inputs.end()?std::vector<ds::InputEvent>{}:it->second;};
         }
-        const auto result=lifecycle_probe(argv[1],argv[2],frames,std::move(graphics),audio.backend());
+        const auto result=lifecycle_probe(argv[1],argv[2],frames,std::move(graphics),audio.backend(),argc>7?argv[7]:"");
         std::cout<<result<<"Frames presented: "<<presented<<"\nAudio driver: "<<(SDL_GetCurrentAudioDriver()?SDL_GetCurrentAudioDriver():"not initialized")<<" (host output only; listening unverified)\n";
         if(argc>5){
             auto read=reinterpret_cast<void(*)(int,int,int,int,unsigned,unsigned,void*)>(egl.resolve("glReadPixels"));auto finish=reinterpret_cast<void(*)()>(egl.resolve("glFinish"));require(read&&finish,"Framebuffer capture unavailable");finish();

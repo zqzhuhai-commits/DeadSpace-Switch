@@ -79,17 +79,23 @@ def build(args):
     keyset = args.keyset.resolve(strict=True)
     if not keyset.is_file():
         raise ValueError('Keyset must be a local file')
-    devkit = Path(os.environ['DEVKITPRO'])
-    os.environ['PATH'] = str(devkit/'tools/bin') + os.pathsep + os.environ['PATH']
+    if os.environ.get('DEVKITPRO'):
+        devkit = Path(os.environ['DEVKITPRO'])
+        os.environ['PATH'] = str(devkit/'tools/bin') + os.pathsep + os.environ['PATH']
     packer = shutil.which(args.hacbrewpack)
-    for tool in ['elf2nso', 'npdmtool', 'nacptool', 'make']:
+    needed = ['npdmtool', 'nacptool', 'build_romfs'] + ([] if args.prebuilt_nso else ['elf2nso', 'make'])
+    for tool in needed:
         if not shutil.which(tool):
             raise ValueError(f'Missing build tool: {tool}')
     if not packer:
         raise ValueError('hacbrewpack executable not found')
-    cpu_build = args.cpu_build.resolve(strict=True)
-    if not (cpu_build/'libds_cpu_probe.a').is_file():
+    cpu_build = args.cpu_build.resolve(strict=True) if args.cpu_build else None
+    if cpu_build and not (cpu_build/'libds_cpu_probe.a').is_file():
         raise ValueError('Build the Switch CPU runtime first with build_cpu_probe.sh')
+    if args.prebuilt_nso:
+        with args.prebuilt_nso.open('rb') as executable:
+            if executable.read(4) != b'NSO0':
+                raise ValueError('Prebuilt standalone executable is not an NSO')
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.deadspacemobile-package-', dir=output.parent) as temp:
         stage = Path(temp)
@@ -98,16 +104,24 @@ def build(args):
         if args.hd_apk:
             command += ['--hd-apk', str(args.hd_apk.resolve())]
         subprocess.run(command, check=True)
-        subprocess.run(['make', '-C', str(ROOT/'switch'), '-j2', 'CPU_PROBE=1', 'STANDALONE=1',
-                        f'CPU_BUILD_DIR={cpu_build}', f'ROMFS_ROOT={romfs}', f'TITLE_ID={title}',
-                        'all', 'build/deadspace-switch.nso'], check=True)
-        subprocess.run(['python3', str(ROOT/'switch/tools/verify_romfs.py'),
-                        str(ROOT/'switch/build/deadspace-switch.nro')], check=True)
         exefs, control = stage/'exefs', stage/'control'
         exefs.mkdir(); control.mkdir()
-        shutil.copyfile(ROOT/'switch/build/deadspace-switch.nso', exefs/'main')
+        if args.prebuilt_nso:
+            shutil.copyfile(args.prebuilt_nso, exefs/'main')
+            subprocess.run(['nacptool', '--create', 'Dead Space Mobile', 'Switch Port Contributors',
+                            '0.3.2', str(control/'control.nacp'), f'--titleid={title}'], check=True)
+        else:
+            subprocess.run(['make', '-C', str(ROOT/'switch'), '-j2', 'CPU_PROBE=1', 'STANDALONE=1',
+                            f'CPU_BUILD_DIR={cpu_build}', f'ROMFS_ROOT={romfs}', f'TITLE_ID={title}',
+                            'all', 'build/deadspace-switch.nso'], check=True)
+            subprocess.run(['python3', str(ROOT/'switch/tools/verify_romfs.py'),
+                            str(ROOT/'switch/build/deadspace-switch.nro')], check=True)
+            shutil.copyfile(ROOT/'switch/build/deadspace-switch.nso', exefs/'main')
+            shutil.copyfile(ROOT/'switch/build/deadspace-switch.nacp', control/'control.nacp')
+        image=stage/'verified.romfs'
+        subprocess.run(['build_romfs', str(romfs), str(image)], check=True)
+        subprocess.run(['python3', str(ROOT/'switch/tools/verify_romfs.py'), str(image)], check=True)
         subprocess.run(['npdmtool', str(args.npdm_json.resolve()), str(exefs/'main.npdm')], check=True)
-        shutil.copyfile(ROOT/'switch/build/deadspace-switch.nacp', control/'control.nacp')
         shutil.copyfile(ROOT/'switch/assets/icon.jpg', control/'icon_AmericanEnglish.dat')
         # All hacBrewPack temporary directories start empty and stay private.
         stage.chmod(0o700)
@@ -128,7 +142,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data', type=Path, required=True, help='Supported original donor data directory/archive')
     parser.add_argument('--hd-apk', type=Path)
-    parser.add_argument('--cpu-build', type=Path, required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument('--cpu-build', type=Path)
+    source.add_argument('--prebuilt-nso', type=Path, help='Standalone NSO built from the reviewed source revision')
     parser.add_argument('--npdm-json', type=Path, required=True, help='Reviewed standalone application permissions including libnx JIT access')
     parser.add_argument('--keyset', type=Path, required=True)
     parser.add_argument('--hacbrewpack', default='hacbrewpack')

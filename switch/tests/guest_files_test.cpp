@@ -1,5 +1,6 @@
 #include "guest_files.hpp"
 #include "guest_stat.hpp"
+#include "guest_paths.hpp"
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -11,6 +12,36 @@ int main(int argc,char** argv) {
         const auto path=(std::filesystem::path(argv[1])/"file-fixture.bin").string();
         {auto* f=std::fopen(path.c_str(),"wb");check(f,"fixture create");std::fwrite("abcdefg",1,7,f);std::fclose(f);}
         ds::GuestFiles files;
+        const std::string save=(std::filesystem::path(argv[1])/"saves").string();
+        std::filesystem::create_directory(save);
+        ds::GuestStoragePaths paths{"romfs:/gamedata",save};
+        const auto parent=std::filesystem::path(save).parent_path().string();
+        check(paths.metadata(parent).path==parent&&!paths.metadata(parent).writable,"EAIO parent stat regression");
+        bool parent_open=false;try{paths.resolve(parent);}catch(const std::exception&){parent_open=true;}check(parent_open,"Parent metadata enabled arbitrary file access");
+        check(paths.resolve("appbundle:/published/data/file").path=="romfs:/gamedata/assets/published/data/file"&&!paths.resolve("assets/file").writable,"Packaged resources became writable");
+        const auto target=paths.resolve(save+"/slot1.dat");
+        check(target.writable&&target.path==save+"/slot1.dat"&&paths.resolve("slot1.dat").path==target.path,"Save directory routing");
+        bool escaped=false;try{paths.resolve("sdmc:/switch/deadspace/slot1.dat");}catch(const std::exception&){escaped=true;}check(escaped,"Save escaped into another game's directory");
+        {
+            ds::GuestFiles session;
+            const auto fd=session.open(target.path.c_str(),2|64|128,0600);
+            check(fd!=UINT32_MAX,"Create exclusive guest save descriptor");
+            check(session.open(target.path.c_str(),1|64|128)==UINT32_MAX&&errno==EEXIST,"Guest O_EXCL ignored");
+            check(std::fwrite("saved",1,5,session.descriptor(fd))==5,"Write guest save");
+            struct stat persisted{};check(::stat(target.path.c_str(),&persisted)==0&&persisted.st_size==5,"Descriptor writes remained in host stdio buffer");
+            check(session.close(fd)==0,"Close save descriptor");
+        }
+        {
+            ds::GuestFiles session;
+            const auto fd=session.open(target.path.c_str());char content[8]{};
+            check(fd!=UINT32_MAX&&std::fread(content,1,5,session.descriptor(fd))==5&&std::string(content,5)=="saved","Save did not survive runtime restart");
+            const auto stream=session.fopen(target.path.c_str(),"ab");
+            check(stream&&std::fwrite("!",1,1,session.stream(stream))==1&&session.flush(stream)==0,"Append and flush save");
+            check(session.fclose(stream)==0,"Close appended save");
+            check(session.open(target.path.c_str(),3)==UINT32_MAX&&errno==EINVAL,"Invalid guest access mode accepted");
+            check(session.open(target.path.c_str(),0x80000000)==UINT32_MAX&&errno==EINVAL,"Unknown guest flags accepted");
+        }
+        check(std::filesystem::file_size(target.path)==6,"Persistent save append size");
         const auto a=files.open(path.c_str()),b=files.open(path.c_str()),c=files.open(path.c_str());
         check(a!=UINT32_MAX&&b!=a&&c!=b,"descriptor allocation");
         check(files.close(b)==0,"close middle descriptor");
@@ -43,6 +74,6 @@ int main(int argc,char** argv) {
         check(files.fopen((path+"-missing").c_str(),"rb")==0&&errno==ENOENT,"missing stdio file");
         check(files.open((path+"-missing").c_str())==UINT32_MAX&&errno==ENOENT,"missing descriptor file");
         std::filesystem::remove(path);
-        std::cout<<"PASS: opaque stdio tokens, descriptor collision regression, independent cursors, non-destructive stat, invalid handles\n";
+        std::cout<<"PASS: opaque stdio tokens, descriptor collision regression, independent cursors, non-destructive stat, invalid handles, persistent save/reopen, append/flush and guest open flags\n";
     } catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

@@ -9,8 +9,11 @@
 #include <SDL2/SDL.h>
 #include <cstdio>
 #include <switch.h>
+#include <sys/stat.h>
+#include <cerrno>
 
 std::string game_graphics_probe(const std::string& root,bool interactive) {
+    if(mkdir(ds::paths::save_directory,0777)&&errno!=EEXIST)return "BLOCKED: cannot create writable save directory.\n";
     std::string log="Original-library lifecycle with native GLES1 subset (not verified gameplay)\n";
     if(SDL_Init(SDL_INIT_VIDEO)<0){log+=SDL_GetError();SDL_Quit();return log;}
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_ES);
@@ -34,7 +37,7 @@ std::string game_graphics_probe(const std::string& root,bool interactive) {
     graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};
     log+="Optional HD root: "+hd_root+" (missing files use original textures)\n";
     ds::SdlAudioOutput audio;
-    log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,interactive?0:8,std::move(graphics),audio.backend());
+    log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,interactive?0:8,std::move(graphics),audio.backend(),ds::paths::save_directory);
     audio.close();input.reset();
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
     if(get_error){char text[80];std::snprintf(text,sizeof(text),"Native context GL error after probe: 0x%x\n",get_error());log+=text;}
