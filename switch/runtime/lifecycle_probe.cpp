@@ -211,7 +211,8 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             if((beats&1023)==0&&graphics.progress) {
                 const auto now=std::chrono::steady_clock::now();
                 if(now-last_checkpoint>=std::chrono::seconds(10)) {
-                    graphics.progress("HEARTBEAT: "+label+" pc=0x"+to_hex(cpu->Regs()[15])+" instructions_left="+std::to_string(budget));
+                    const std::string current=pending&&pending<=functions.size()?functions[pending-1]:last_service;
+                    graphics.progress("HEARTBEAT: "+label+" pc=0x"+to_hex(cpu->Regs()[15])+" service="+current+" instructions_left="+std::to_string(budget)+" asset_bytes="+std::to_string(asset_read_bytes)+" guest_gl="+std::to_string(gl_calls));
                     last_checkpoint=now;
                 }
             }

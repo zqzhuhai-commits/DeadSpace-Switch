@@ -74,6 +74,7 @@ std::string game_graphics_probe(const std::string& root,bool interactive) {
     const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
     graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};
     log+="Optional HD root: "+hd_root+" (missing files use original textures)\n";
+    checkpoint(std::string("JIT environment: CodeMemory hints=")+(envIsSyscallHinted(0x4b)&&envIsSyscallHinted(0x4c)?"yes; range cache synchronization":"no; legacy permission transitions"));
     checkpoint("BEGIN: audio backend construction");
     ds::SdlAudioOutput audio;
     checkpoint("END: audio backend construction; BEGIN: guest runtime");

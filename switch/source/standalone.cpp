@@ -11,7 +11,7 @@
 int main() {
     mkdir("sdmc:/switch",0777);
     mkdir(ds::paths::app_directory,0777);
-    const bool logging=ds::boot_log(ds::paths::log_file,"\nBOOT: standalone main entered; checkpoint logging enabled");
+    const bool logging=ds::boot_log(ds::paths::log_file,"\nBOOT: standalone main entered; checkpoint logging enabled; version=" DS_APP_VERSION "");
     ds::boot_log(ds::paths::log_file,"BEGIN: consoleInit");
     consoleInit(nullptr);
     std::puts("Dead Space Mobile - startup diagnostics");
