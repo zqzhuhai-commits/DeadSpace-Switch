@@ -99,7 +99,7 @@ python3 switch/tests/build_modes_test.py
 
 ## 开发诊断
 
-NRO 诊断入口：R 为原生 GL 短探测，ZR 为持续会话，+ 结束会话。独立程序直接进入包内资源会话。诊断日志为 `sdmc:/switch/deadspacemobile/diagnostics.log`。
+NRO 诊断入口：R 为原生 GL 短探测，ZR 为持续会话，+ 结束会话。独立程序直接进入包内资源会话。诊断日志为 `sdmc:/switch/deadspacemobile/diagnostics.log`。0.3.3 在进入 SDL、图形上下文、JIT、构造函数、JNI 和首帧前后追加启动检查点，每条记录立即关闭文件保存，不再等持续会话退出才写日志。游戏执行期间的长调用定期记录心跳；若卡住，请保留日志最后一段。若连 `BOOT` 都没有，需继续检查到达 main 前的启动与 SD 写入权限；这些检查点不是黑屏已修复的证明。
 
 可写文件桥接和显式 EAIO 启动的实现说明见 [PROGRESS-SAVE-NSP-0.3.2.md](switch/docs/PROGRESS-SAVE-NSP-0.3.2.md)。仍需验收第一关移动/瞄准/射击、实际听音、完整进度恢复、切关及无外置数据安装；开发包不应标为已完成这些验收的可玩整合版。
 

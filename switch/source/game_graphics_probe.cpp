@@ -3,6 +3,7 @@
 #include "lifecycle_probe.hpp"
 #include "hd_texture.hpp"
 #include "app_paths.hpp"
+#include "boot_log.hpp"
 #include "sdl_audio_output.hpp"
 #include "sdl_game_input.hpp"
 #include <memory>
@@ -13,30 +14,45 @@
 #include <cerrno>
 
 std::string game_graphics_probe(const std::string& root,bool interactive) {
+    auto checkpoint=[](const std::string& message){ds::boot_log(ds::paths::log_file,message);};
+    checkpoint("BEGIN: game_graphics_probe");
     if(mkdir(ds::paths::save_directory,0777)&&errno!=EEXIST)return "BLOCKED: cannot create writable save directory.\n";
     std::string log="Original-library lifecycle with native GLES1 subset (not verified gameplay)\n";
+    checkpoint("BEGIN: SDL video init");
     if(SDL_Init(SDL_INIT_VIDEO)<0){log+=SDL_GetError();SDL_Quit();return log;}
+    checkpoint("END: SDL video init OK");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+    checkpoint("BEGIN: SDL_CreateWindow GLES 1.1");
     SDL_Window* window=SDL_CreateWindow("Dead Space Mobile native GL diagnostics",0,0,1280,720,SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN);
+    checkpoint(window?"END: SDL_CreateWindow OK; BEGIN: SDL_GL_CreateContext":"ERROR: SDL_CreateWindow failed");
     SDL_GLContext context=window?SDL_GL_CreateContext(window):nullptr;
     if(!context){log+="Native GLES1 context unavailable: "+std::string(SDL_GetError())+"\n";if(window)SDL_DestroyWindow(window);SDL_Quit();return log;}
+    checkpoint("END: SDL_GL_CreateContext OK");
     SDL_GL_SetSwapInterval(1);
     auto get_string=reinterpret_cast<const unsigned char*(*)(unsigned)>(SDL_GL_GetProcAddress("glGetString"));
     if(get_string){const auto* renderer=get_string(0x1f01);log+="Renderer: "+std::string(renderer?reinterpret_cast<const char*>(renderer):"unknown")+"\n";}
     ds::GraphicsBackend graphics;
+    graphics.progress=checkpoint;
     graphics.width=1280;graphics.height=720;
     graphics.resolve=[](const char* name){return SDL_GL_GetProcAddress(name);};
-    graphics.present=[&]{SDL_GL_SwapWindow(window);};
+    unsigned presented=0;
+    graphics.present=[&]{
+        if(!presented)checkpoint("BEGIN: first SDL_GL_SwapWindow");
+        SDL_GL_SwapWindow(window);
+        if(!presented++)checkpoint("END: first SDL_GL_SwapWindow");
+    };
     auto input=std::make_unique<ds::SdlGameInput>(1280,720);
     graphics.input=[&](unsigned){return input->poll();};
     graphics.keep_running=[&]{return appletMainLoop()&&input->running();};
     const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
     graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};
     log+="Optional HD root: "+hd_root+" (missing files use original textures)\n";
+    checkpoint("BEGIN: audio backend construction");
     ds::SdlAudioOutput audio;
+    checkpoint("END: audio backend construction; BEGIN: guest runtime");
     log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,interactive?0:8,std::move(graphics),audio.backend(),ds::paths::save_directory);
     audio.close();input.reset();
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));

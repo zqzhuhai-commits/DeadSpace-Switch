@@ -19,6 +19,7 @@ struct GraphicsBackend {
     uint32_t width=640,height=480;
     std::function<std::vector<InputEvent>(unsigned)> input={};
     std::function<bool()> keep_running={};
+    std::function<void(const std::string&)> progress={}; // durable startup checkpoints, not per-import tracing
 };
 struct GlGuestMemory {
     std::function<uint32_t(unsigned)> arg;

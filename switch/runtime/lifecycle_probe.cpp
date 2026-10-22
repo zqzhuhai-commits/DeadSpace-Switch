@@ -176,6 +176,8 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     uint32_t guest_call(uint32_t address,const std::vector<uint32_t>& args,const std::string& label,bool top_level=false) {
         struct Depth {unsigned& d;Depth(unsigned& v):d(v){++d;}~Depth(){--d;}} depth(call_depth);
         struct Quantum {uint64_t& q;uint64_t old;Quantum(uint64_t& v):q(v),old(v){}~Quantum(){q=old;}} saved_quantum(quantum);
+        const bool diagnostic=top_level&&label!="constructor"&&label.rfind("NativeOnDrawFrame",0)!=0;
+        if(diagnostic&&graphics.progress)graphics.progress("BEGIN: "+label);
         const bool outer=call_depth==1;
         if(outer)jumps.clear_owner(threads.current());
         ds::GuestCallScope scope(*cpu,returned,pending,budget,fault);
@@ -189,6 +191,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         budget=6000000000;returned=false;pending=0;
         unsigned calls=0;
         unsigned beats=0;
+        auto last_checkpoint=std::chrono::steady_clock::now();
         while(!returned&&fault.empty()&&budget){
             quantum=std::min<uint64_t>(budget,100000);
             cpu->Run();
@@ -198,6 +201,13 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 throw std::runtime_error("Guest stack escaped thread mapping: sp="+to_hex(sp)+" pc="+to_hex(cpu->Regs()[15])+" lr="+to_hex(cpu->Regs()[14])+" last="+last_service);
             }
             if((++beats&1023)==0)fprintf(stderr,"HB %s instr=%llu left=%llu reads=%u bytes=%llu pc=0x%x sp=0x%x\n",label.c_str(),(unsigned long long)(6000000000ull-budget),(unsigned long long)budget,asset_reads,(unsigned long long)asset_read_bytes,cpu->Regs()[15],cpu->Regs()[13]);
+            if((beats&1023)==0&&graphics.progress) {
+                const auto now=std::chrono::steady_clock::now();
+                if(now-last_checkpoint>=std::chrono::seconds(10)) {
+                    graphics.progress("HEARTBEAT: "+label+" pc=0x"+to_hex(cpu->Regs()[15])+" instructions_left="+std::to_string(budget));
+                    last_checkpoint=now;
+                }
+            }
             if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>50000000)throw std::runtime_error("Import dispatch limit "+label);++service_calls;if(cpu->Regs()[15]>=0x10235800u&&cpu->Regs()[15]<0x10235960u&&++svc_log<=40)trace.push_back("  SVC "+functions[id-1]+" guest_pc=0x"+to_hex(cpu->Regs()[15]-8)+" a=0x"+to_hex(cpu->Regs()[0])+" b=0x"+to_hex(cpu->Regs()[1])+" c=0x"+to_hex(cpu->Regs()[2])+" d=0x"+to_hex(cpu->Regs()[3]));service(functions[id-1]);}
             if(!outer)continue;
             if(!fault.empty())break;
@@ -233,6 +243,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         if(!returned)throw std::runtime_error(label+": instruction budget exhausted");
         const uint32_t result=cpu->Regs()[0];
         if(label=="EAIO_Startup"||label=="NativeOnDrawFrame")trace.push_back("RET "+label+" pc=0x"+to_hex(cpu->Regs()[14]-8));
+        if(diagnostic&&graphics.progress)graphics.progress("END: "+label);
         if(top_level)scope.keep_top_level_result();
         return result;
     }
@@ -691,6 +702,7 @@ public:
         trace.push_back("pre-ctor GOT 0x1043f100="+to_hex(MemoryRead32(0x1043f100))+" raw="+to_hex(image.memory[0x43f100]|image.memory[0x43f101]<<8|image.memory[0x43f102]<<16|image.memory[0x43f103]<<24));
         for(const auto fn:image.constructors){
             if(!image.executable(fn&~1u,4))throw std::runtime_error("Invalid constructor address");
+            if(graphics.progress&&constructors_completed%32==0)graphics.progress("CONSTRUCTOR: index="+std::to_string(constructors_completed));
             guest_call(fn,{},"constructor",true);
             ++constructors_completed;
         }
@@ -762,7 +774,9 @@ public:
             }
 
             if(graphics.keep_running&&!graphics.keep_running())break;
+            if(i==0&&graphics.progress)graphics.progress("BEGIN: first guest DrawFrame");
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
+            if(i==0&&graphics.progress)graphics.progress("END: first guest DrawFrame");
             ++frames_done;
             if(graphics.present)graphics.present();
             trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
@@ -808,19 +822,27 @@ public:
 
 std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics,ds::AudioBackend audio,std::string save_root) {
     LifecycleRuntime env;
+    const auto progress=graphics.progress;
+    auto checkpoint=[&](const std::string& message){if(progress)progress(message);};
     try {
+        checkpoint("BEGIN: load guest ELF");
         std::string error;if(!env.image.load(library,error))throw std::runtime_error(error);
         //env.trace.push_back("image memory bytes="+std::to_string(env.image.memory.size()));
+        checkpoint("END: load guest ELF; BEGIN: runtime initialization");
         env.initialize(data_root,std::move(graphics),std::move(audio),save_root);
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
         conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
+        checkpoint("END: runtime initialization; BEGIN: Dynarmic JIT construction");
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;
+        checkpoint("END: Dynarmic JIT construction; BEGIN: guest constructors");
         env.run_constructors();
+        checkpoint("END: guest constructors; BEGIN: guest lifecycle");
         env.run_lifecycle(frames);
         return env.report();
     } catch(const std::exception& e) {
         std::string out="BLOCKED after "+std::to_string(env.done())+" constructors: "+e.what()+"\n";
         out+=env.trace_report();
+        checkpoint(out);
         return out;
     }
 }

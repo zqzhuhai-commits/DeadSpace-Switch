@@ -33,6 +33,7 @@ jobs:
           python3 switch/tests/reanimated_hd_test.py
           python3 switch/tests/package_nsp_test.py
           python3 switch/tests/build_modes_test.py
+          python3 switch/tests/boot_log_test.py
       - name: Build runtime and media frontend
         run: |
           cmake -S switch/runtime -B switch/build/host -G Ninja -DBoost_NO_BOOST_CMAKE=ON -DBOOST_ROOT=/usr -DDS_BUILD_MEDIA_PROBE=ON
