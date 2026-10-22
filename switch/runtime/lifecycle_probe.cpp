@@ -9,6 +9,8 @@
 #include "guest_sort.hpp"
 #include "guest_numeric.hpp"
 #include "guest_files.hpp"
+#include "guest_trace.hpp"
+#include "guest_paths.hpp"
 #include "guest_stat.hpp"
 #include "guest_threads.hpp"
 #include "guest_jump.hpp"
@@ -60,7 +62,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     void wake_monitor(uint32_t id) override {threads.wake(id);}
     std::vector<uint32_t> destructors;
     ds::GuestFiles files;
-    std::vector<std::string> trace;
+    ds::GuestTrace trace;
     std::string data_root;
     ds::GuestArena arena_memory{arena,arena_end};
     uint32_t pending=0,errno_address=0,env_addr=0,vm_addr=0,jni_table=0,vm_table=0;
@@ -101,11 +103,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         return p;
     }
     std::string resolve_path(const std::string& raw) {
-        std::string name=raw;
-        if(name.rfind("appbundle:",0)==0)name=data_root+"/assets/"+name.substr(10);
-        else if(name.empty()||name[0]!='/')name=data_root+"/"+name;
-        if(name.find("..")!=std::string::npos)throw std::runtime_error("Guest path escapes data root");
-        return name;
+        return ds::resolve_data_path(data_root,raw);
     }
     uint64_t java_delegate(uint32_t obj,const MethodKey& m,const std::vector<uint64_t>& values) {
         ++jni_calls;
@@ -550,8 +548,8 @@ public:
     uint16_t MemoryRead16(uint32_t a) override {return MemoryRead8(a)|uint16_t(MemoryRead8(a+1))<<8;}
     uint32_t MemoryRead32(uint32_t a) override {
         const uint32_t v=MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;
-        if(a==0x10444100u&&trace.size()<6000)trace.push_back("  RD32 0x10444100="+to_hex(v)+" @"+to_hex(cpu->Regs()[15])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4]));
-        if(cpu&&v==0x1031e5a4u&&trace.size()<6000)trace.push_back("  GOT 0x1031e5a4 read @"+to_hex(cpu->Regs()[15]));
+        if(a==0x10444100u&&trace.total()<6000)trace.push_back("  RD32 0x10444100="+to_hex(v)+" @"+to_hex(cpu->Regs()[15])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4]));
+        if(cpu&&v==0x1031e5a4u&&trace.total()<6000)trace.push_back("  GOT 0x1031e5a4 read @"+to_hex(cpu->Regs()[15]));
         return v;
     }
     uint64_t MemoryRead64(uint32_t a) override {return MemoryRead32(a)|uint64_t(MemoryRead32(a+4))<<32;}
@@ -695,7 +693,9 @@ public:
         }
         const auto frame=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
-        for(unsigned i=0;i<frames;++i){
+        if(!frames&&!graphics.keep_running)throw std::runtime_error("Interactive session requires a stop callback");
+        for(unsigned i=0;!frames||i<frames;++i){
+            if(graphics.keep_running&&!graphics.keep_running())break;
             if(graphics.input) {
                 const auto events=graphics.input(i);if(events.size()>64)throw std::runtime_error("Input event budget");
                 for(const auto& event:events) {
@@ -715,12 +715,13 @@ public:
                 }
             }
 
+            if(graphics.keep_running&&!graphics.keep_running())break;
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
             ++frames_done;
             if(graphics.present)graphics.present();
             trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
         }
-        frames_done=frames;
+
     }
 
     static std::string to_hex(uint32_t v){char buf[16];std::snprintf(buf,sizeof(buf),"%08x",v);return buf;}
@@ -740,6 +741,7 @@ public:
         out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_lists)+" directories listed; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
         for(const auto& kv:service_counts)if(kv.second)out+="  svc "+kv.first+" "+std::to_string(kv.second)+"\n";
+        out+="Trace: "+std::to_string(trace.dropped())+" older entries discarded.\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;
     }
@@ -748,6 +750,7 @@ public:
         out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
         out+="Arena brk="+to_hex(arena_memory.program_break())+" lowest mapping="+to_hex(arena_memory.lowest_mapping())+"\n";
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
+        out+="Trace: "+std::to_string(trace.dropped())+" older entries discarded.\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;
     }

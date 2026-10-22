@@ -1,0 +1,65 @@
+name: Switch development checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: switch-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      EGL_PLATFORM: surfaceless
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: sudo apt-get update && sudo apt-get install -y cmake ninja-build libboost-dev libsdl2-dev libegl1-mesa-dev libgl1-mesa-dev
+      - name: Sanitizers and native pixel readback
+        run: python3 switch/tests/run_tests.py --native-gl
+      - name: Resource tool regressions
+        run: |
+          python3 switch/tests/hd_romfs_test.py
+          python3 switch/tests/reanimated_hd_test.py
+          python3 switch/tests/package_nsp_test.py
+          python3 switch/tests/build_modes_test.py
+      - name: Build runtime and media frontend
+        run: |
+          cmake -S switch/runtime -B switch/build/host -G Ninja -DBoost_NO_BOOST_CMAKE=ON -DBOOST_ROOT=/usr -DDS_BUILD_MEDIA_PROBE=ON
+          cmake --build switch/build/host --parallel 2
+          ctest --test-dir switch/build/host --output-on-failure
+  switch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install development dependencies
+        run: |
+          apt-get update
+          apt-get install -y cmake ninja-build libboost-dev python3
+          dkp-pacman -Syu --noconfirm --needed switch-sdl2 switch-mesa switch-libdrm_nouveau
+      - name: Compile platform and CPU frontends
+        env:
+          BOOST_ROOT: /usr
+        run: |
+          python3 switch/tests/romfs_test.py "$DEVKITPRO/tools/bin/build_romfs"
+          make -C switch -j2
+          bash switch/tools/build_cpu_probe.sh
+          make -C switch -j2 CPU_PROBE=1 STANDALONE=1 build/deadspace-switch.nso
+      - uses: actions/upload-artifact@v4
+        with:
+          name: switch-development-executables
+          path: |
+            switch/build/deadspace-switch.nro
+            switch/build/deadspace-switch.nso
+          if-no-files-found: error
+# This public workflow builds code only. Game assets and keysets stay local.

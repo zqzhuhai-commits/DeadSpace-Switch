@@ -105,7 +105,7 @@ std::optional<uint64_t> GuestJni::asset_delegate(uint32_t receiver,const MethodK
         if(size<0 || uint64_t(size)>64*1024*1024 || std::fseek(file.get(),0,SEEK_SET)!=0)return raise_exception("java/io/IOException","Asset size/seek bound");
         std::vector<uint8_t> bytes(static_cast<size_t>(size));
         if(!bytes.empty() && std::fread(bytes.data(),1,bytes.size(),file.get())!=bytes.size())return raise_exception("java/io/IOException","Asset read failed");
-        const auto ref=alloc(4);objects[ref].cls=m.name=="open"?"java/io/InputStream":"android/content/res/AssetFileDescriptor";objects[ref].bytes=std::move(bytes);++asset_opens;if(++open_log<=40){FILE*fl=std::fopen("/tmp/open_log.txt","a");if(fl){std::fprintf(fl,"%s %s size=%ld\n",m.name.c_str(),name.c_str(),size);std::fclose(fl);}}return ref;
+        const auto ref=alloc(4);objects[ref].cls=m.name=="open"?"java/io/InputStream":"android/content/res/AssetFileDescriptor";objects[ref].bytes=std::move(bytes);++asset_opens;return ref;
     }
     if(o.cls!="java/io/InputStream" && o.cls!="android/content/res/AssetFileDescriptor")return std::nullopt;
     if(m.name=="close"){o.closed=true;return 0;}

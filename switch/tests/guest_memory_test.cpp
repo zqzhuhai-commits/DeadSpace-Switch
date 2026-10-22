@@ -5,6 +5,8 @@
 #include "guest_sort.hpp"
 #include "guest_input.hpp"
 #include "guest_numeric.hpp"
+#include "guest_trace.hpp"
+#include "guest_paths.hpp"
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -22,6 +24,19 @@ struct Cpu {
 };
 int main() {
     try {
+        for(const std::string root:{"romfs:/gamedata","sdmc:/switch/deadspacemobile/gamedata","/tmp/donor"}) {
+            check(ds::resolve_data_path(root,root+"/assets/a")==root+"/assets/a","Device root was prepended twice");
+            check(ds::resolve_data_path(root,"appbundle:/published/a")==root+"/assets/published/a","Appbundle path mapping");
+            check(ds::resolve_data_path(root,"assets/./texture..ktx")==root+"/assets/texture..ktx","Relative asset normalization");
+            reject([&]{ds::resolve_data_path(root,"../other-game/save");});
+            reject([&]{ds::resolve_data_path(root,"sdmc:/switch/deadspace/save");});
+        }
+        ds::GuestTrace trace;
+        for(size_t i=0;i<100000;++i)trace.push_back(std::to_string(i));
+        check(trace.dropped()==100000-ds::GuestTrace::capacity,"Long sessions retain unbounded trace history");
+        check(*trace.begin()==std::to_string(100000-ds::GuestTrace::capacity),"Trace lost recent failure context");
+        trace.push_back(std::string(10000,'x'));
+        check((--trace.end())->size()==ds::GuestTrace::message_limit,"Trace message size is unbounded");
         errno=EDOM;
         const auto parsed=ds::parse_guest_double(" \t-12.5tail");
         check(parsed.low==0&&parsed.high==0xc0290000&&parsed.consumed==7&&!parsed.error&&errno==EDOM,"strtod ARM double/endptr/host errno");

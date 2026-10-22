@@ -18,6 +18,7 @@ struct GraphicsBackend {
     uint64_t hd_budget_bytes=128*1024*1024;
     uint32_t width=640,height=480;
     std::function<std::vector<InputEvent>(unsigned)> input={};
+    std::function<bool()> keep_running={};
 };
 struct GlGuestMemory {
     std::function<uint32_t(unsigned)> arg;

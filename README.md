@@ -1,5 +1,7 @@
 # Dead Space Mobile — Switch 移植开发项目
 
+[最新：持续运行、构建回归与独立 NSP 打包路径](switch/docs/PROGRESS-STANDALONE-0.3.2.md)：新增 ZR 持续会话、包内资源独立入口、NSO/本地 NSP 打包脚本及 Actions 检查；修复 Horizon 资源路径重复拼接和构建模式复用。仍缺存档写入与实机/关卡验收，尚未交付完整 NSP。
+
 **0.3.2 开发基线：已接入 PCM 音频、原生 GL 固定点入口、高清材质替换和基础触摸/数字按键。当前仍是开发诊断版，完整游戏、存取档及 Switch 实机尚待验收。默认 L 使用模拟 GL，R 使用原生 GLES1 子集。**
 
 [最新音频、高清与输入进展](switch/docs/PROGRESS-AUDIO-MEDIA-0.3.2.md)：新增可选主机媒体探测器，支持 1280×720 横屏、实际 PCM 队列和脚本触摸。ASan/UBSan 与原生 GL 回读测试通过；高清包保留 222 张材质，R36S 原版资源目前能精确匹配 54 个键。

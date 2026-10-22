@@ -7,13 +7,19 @@ class SdlGameInput {
     unsigned width,height;
     SDL_GameController* controller=nullptr;
     bool initialized=false;
+    bool quit=false;
 public:
     SdlGameInput(unsigned w,unsigned h):width(w),height(h){initialized=SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER)==0;if(!initialized)return;for(int i=0;i<SDL_NumJoysticks();++i)if(SDL_IsGameController(i)){controller=SDL_GameControllerOpen(i);if(controller)break;}}
     ~SdlGameInput(){if(controller)SDL_GameControllerClose(controller);}
+    bool running() const {return !quit;}
     std::vector<InputEvent> poll(){
         if(!initialized)throw std::runtime_error("SDL controller input initialization failed");
         std::vector<InputEvent> events;SDL_Event event;
         while(SDL_PollEvent(&event)){
+            if(event.type==SDL_QUIT || (event.type==SDL_WINDOWEVENT&&event.window.event==SDL_WINDOWEVENT_CLOSE) ||
+               (event.type==SDL_CONTROLLERBUTTONDOWN&&event.cbutton.button==SDL_CONTROLLER_BUTTON_START)){
+                quit=true;continue;
+            }
             if(events.size()>=64)throw std::runtime_error("SDL input event budget exceeded");
             if(event.type==SDL_FINGERDOWN||event.type==SDL_FINGERMOTION||event.type==SDL_FINGERUP){const auto kind=event.type==SDL_FINGERDOWN?InputEvent::touch_down:event.type==SDL_FINGERMOTION?InputEvent::touch_move:InputEvent::touch_up;events.push_back({kind,0,0,std::clamp(event.tfinger.x*width,0.0f,float(width-1)),std::clamp(event.tfinger.y*height,0.0f,float(height-1))});}
             else if(event.type==SDL_CONTROLLERBUTTONDOWN||event.type==SDL_CONTROLLERBUTTONUP){uint32_t code=0;
