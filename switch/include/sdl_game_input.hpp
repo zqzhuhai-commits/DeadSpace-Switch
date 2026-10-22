@@ -132,7 +132,7 @@ public:
                 if(button==SDL_CONTROLLER_BUTTON_LEFTSTICK){if(pressed)gesture.start(false,SDL_GetTicks());continue;}
                 if(!menu&&button==SDL_CONTROLLER_BUTTON_DPAD_DOWN){if(pressed)gesture.start(true,SDL_GetTicks());continue;}
                 // User mapping: L3 rotates the weapon; R3 toggles the menu cursor.
-                if(button==SDL_CONTROLLER_BUTTON_RIGHTSTICK){if(pressed){menu=!menu;if(menu)lx=ly=rx=ry=0;}continue;}
+                if(button==SDL_CONTROLLER_BUTTON_RIGHTSTICK){if(pressed){menu=!menu;dx=dy=0;if(menu)lx=ly=rx=ry=0;}continue;}
                 if(button==SDL_CONTROLLER_BUTTON_START&&pressed){menu=true;lx=ly=rx=ry=0;}
                 if(menu&&button>=SDL_CONTROLLER_BUTTON_DPAD_UP&&button<=SDL_CONTROLLER_BUTTON_DPAD_RIGHT){
                     if(button==SDL_CONTROLLER_BUTTON_DPAD_LEFT)dx=pressed?-1:(dx<0?0:dx);
