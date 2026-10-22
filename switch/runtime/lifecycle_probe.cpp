@@ -231,8 +231,12 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         unsigned calls=0;
         unsigned beats=0;
         auto last_checkpoint=std::chrono::steady_clock::now();
+        // Import calls end a JIT run, not a scheduling timeslice. Keep the
+        // remaining budget across them so import-heavy resource loaders can
+        // make progress between display frames, while bounding CPU-only loops.
+        quantum=std::min<uint64_t>(budget,1000000);
         while(!returned&&fault.empty()&&budget){
-            quantum=std::min<uint64_t>(budget,100000);
+            if(!quantum)quantum=std::min<uint64_t>(budget,1000000);
             cpu->Run();
             const auto& active=threads.thread();
             const auto sp=cpu->Regs()[13];
@@ -268,11 +272,13 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 old->cpu.save(*cpu);old->exception=jni_exception;old->error=errno_address;
             }
             threads.reap_joins([&](uint32_t p,uint32_t v){MemoryWrite32(p,v);});
-            // Dispatch boundaries and instruction quanta are safe context-switch
-            // points. Nested Java-to-native calls retain their suspended context.
+            // Yield only on an explicit request, a block, or slice exhaustion.
+            // Rotating on every libc/JNI import fragments background loading
+            // over thousands of display frames. Nested calls stay suspended.
             const auto previous=threads.current();
-            threads.select();
+            if(rotate||!quantum||threads.thread().state!=ds::GuestThreads::State::ready)threads.select();
             if(previous!=threads.current() || rotate) {
+                quantum=std::min<uint64_t>(budget,1000000);
                 ++thread_switches;cpu->ClearExclusiveState();threads.thread().cpu.load(*cpu);
                 jni_exception=threads.thread().exception;errno_address=threads.thread().error;
             }
@@ -851,7 +857,7 @@ public:
         std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
         out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
         out+="Clock: "+std::string(graphics.monotonic_ns?"host monotonic floor":"instruction-only")+"; guest_ns="+std::to_string(threads.time())+"\n";
-        out+="Threads: cooperative scheduler; created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
+        out+="Threads: bounded instruction timeslices (1000000); created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
         out+=graphics_report();
         out+="Storage: "+std::to_string(save_opens)+" save opens, "+std::to_string(save_read_bytes)+" bytes read, "+std::to_string(save_written_bytes)+" bytes written.\n";
         out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
