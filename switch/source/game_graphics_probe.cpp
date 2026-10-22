@@ -63,25 +63,32 @@ std::string game_graphics_probe(const std::string& root,bool interactive) {
     graphics.monotonic_ns=[] {return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());};
     graphics.width=1280;graphics.height=720;
     graphics.resolve=[](const char* name){return SDL_GL_GetProcAddress(name);};
+    ds::SdlAudioOutput audio;
     auto input=std::make_unique<ds::SdlGameInput>(1280,720);
-    unsigned presented=0;
+    unsigned presented=0;Uint32 audio_checkpoint=SDL_GetTicks();
     graphics.present=[&]{
+        audio.tick();
+        const auto now=SDL_GetTicks();if(Uint32(now-audio_checkpoint)>=5000){checkpoint(audio.report());audio_checkpoint=now;}
         if(!presented)checkpoint("BEGIN: first SDL_GL_SwapWindow");
         int drawable_width=0,drawable_height=0;SDL_GL_GetDrawableSize(window,&drawable_width,&drawable_height);
         ds::draw_menu_cursor(*input,drawable_width,drawable_height);
         SDL_GL_SwapWindow(window);
         if(!presented++)checkpoint("END: first SDL_GL_SwapWindow");
     };
-    graphics.input=[&](unsigned){return input->poll();};
+    Uint32 input_checkpoint=SDL_GetTicks();bool first_input=true;
+    graphics.input=[&](unsigned){auto events=input->poll();const auto now=SDL_GetTicks();
+        if(first_input||Uint32(now-input_checkpoint)>=5000){checkpoint("INPUT: "+input->status());first_input=false;input_checkpoint=now;}
+        return events;};
     graphics.keep_running=[&]{return appletMainLoop()&&input->running();};
     const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
-    graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};
-    log+="Optional HD root: "+hd_root+" (missing files use original textures)\n";
+    FILE* hd_manifest=std::fopen((hd_root+"/manifest.json").c_str(),"rb");
+    if(hd_manifest){std::fclose(hd_manifest);graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};log+="HD textures enabled: "+hd_root+"\n";}
+    else {log+="Original textures only; HD replacement disabled.\n";checkpoint("TEXTURES: original only; HD disabled");}
     checkpoint(std::string("JIT environment: CodeMemory hints=")+(envIsSyscallHinted(0x4b)&&envIsSyscallHinted(0x4c)?"yes; range cache synchronization":"no; legacy permission transitions"));
     checkpoint("BEGIN: audio backend construction");
-    ds::SdlAudioOutput audio;
     checkpoint("END: audio backend construction; BEGIN: guest runtime");
     log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,interactive?0:8,std::move(graphics),audio.backend(),ds::paths::save_directory);
+    log+=audio.report();
     audio.close();input.reset();
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
     if(get_error){char text[80];std::snprintf(text,sizeof(text),"Native context GL error after probe: 0x%x\n",get_error());log+=text;}

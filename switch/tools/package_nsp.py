@@ -111,7 +111,7 @@ def build(args):
         if args.prebuilt_nso:
             shutil.copyfile(args.prebuilt_nso, exefs/'main')
             subprocess.run(['nacptool', '--create', 'Dead Space Mobile', 'Xiao Fan',
-                            '0.3.8', str(control/'control.nacp'), f'--titleid={title}'], check=True)
+                            '0.3.9', str(control/'control.nacp'), f'--titleid={title}'], check=True)
         else:
             subprocess.run(['make', '-C', str(ROOT/'switch'), '-j2', 'CPU_PROBE=1', 'STANDALONE=1',
                             f'CPU_BUILD_DIR={cpu_build}', f'ROMFS_ROOT={romfs}', f'TITLE_ID={title}',

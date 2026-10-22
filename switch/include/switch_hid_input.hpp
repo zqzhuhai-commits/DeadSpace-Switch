@@ -14,13 +14,13 @@ class SwitchHidInput {
     bool ready[4]{};
     uint64_t last_sample[4]{};
     static constexpr Sint32 source=-777;
-    static void button(Uint8 button,bool down){
+    static void button(std::vector<SDL_Event>& events,Uint8 button,bool down){
         SDL_Event e{};e.type=down?SDL_CONTROLLERBUTTONDOWN:SDL_CONTROLLERBUTTONUP;
-        e.cbutton.which=source;e.cbutton.button=button;SDL_PushEvent(&e);
+        e.cbutton.which=source;e.cbutton.button=button;events.push_back(e);
     }
-    static void axis(Uint8 axis,Sint16 value){
+    static void axis(std::vector<SDL_Event>& events,Uint8 axis,Sint16 value){
         SDL_Event e{};e.type=SDL_CONTROLLERAXISMOTION;e.caxis.which=source;
-        e.caxis.axis=axis;e.caxis.value=value;SDL_PushEvent(&e);
+        e.caxis.axis=axis;e.caxis.value=value;events.push_back(e);
     }
 public:
     SwitchHidInput(){
@@ -40,7 +40,8 @@ public:
         if(e.type==SDL_CONTROLLERBUTTONDOWN||e.type==SDL_CONTROLLERBUTTONUP)return e.cbutton.which!=source;
         return false;
     }
-    void poll(){
+    std::vector<SDL_Event> poll(){
+        std::vector<SDL_Event> events;
         padUpdate(&pad);
         const uint64_t down=padGetButtonsDown(&pad),up=padGetButtonsUp(&pad);
         struct Mapping {uint64_t hid;Uint8 sdl;};
@@ -52,13 +53,14 @@ public:
             {HidNpadButton_StickL,SDL_CONTROLLER_BUTTON_LEFTSTICK},{HidNpadButton_StickR,SDL_CONTROLLER_BUTTON_RIGHTSTICK},
             {HidNpadButton_Up,SDL_CONTROLLER_BUTTON_DPAD_UP},{HidNpadButton_Down,SDL_CONTROLLER_BUTTON_DPAD_DOWN},
             {HidNpadButton_Left,SDL_CONTROLLER_BUTTON_DPAD_LEFT},{HidNpadButton_Right,SDL_CONTROLLER_BUTTON_DPAD_RIGHT}};
-        for(const auto& m:map){if(down&m.hid)button(m.sdl,true);if(up&m.hid)button(m.sdl,false);}
+        for(const auto& m:map){if(down&m.hid)button(events,m.sdl,true);if(up&m.hid)button(events,m.sdl,false);}
         const auto l=padGetStickPos(&pad,0),r=padGetStickPos(&pad,1);
-        axis(SDL_CONTROLLER_AXIS_LEFTX,Sint16(l.x));axis(SDL_CONTROLLER_AXIS_LEFTY,Sint16(std::clamp(-l.y,-32767,32767)));
-        axis(SDL_CONTROLLER_AXIS_RIGHTX,Sint16(r.x));axis(SDL_CONTROLLER_AXIS_RIGHTY,Sint16(std::clamp(-r.y,-32767,32767)));
+        axis(events,SDL_CONTROLLER_AXIS_LEFTX,Sint16(l.x));axis(events,SDL_CONTROLLER_AXIS_LEFTY,Sint16(std::clamp(-l.y,-32767,32767)));
+        axis(events,SDL_CONTROLLER_AXIS_RIGHTX,Sint16(r.x));axis(events,SDL_CONTROLLER_AXIS_RIGHTY,Sint16(std::clamp(-r.y,-32767,32767)));
         const auto held=padGetButtons(&pad);
-        axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT,(held&HidNpadButton_ZL)?32767:0);
-        axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT,(held&HidNpadButton_ZR)?32767:0);
+        axis(events,SDL_CONTROLLER_AXIS_TRIGGERLEFT,(held&HidNpadButton_ZL)?32767:0);
+        axis(events,SDL_CONTROLLER_AXIS_TRIGGERRIGHT,(held&HidNpadButton_ZR)?32767:0);
+        return events;
     }
     void motion(std::vector<InputEvent>& events){
         // The original mobile game consumes acceleration, not angular velocity.

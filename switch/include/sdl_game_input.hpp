@@ -28,8 +28,8 @@ class SdlGameInput {
         else if(held&&--held==0)out.push_back({InputEvent::key_up,0,code});
     }
     float cursor_x=0,cursor_y=0;
-    bool menu=true,left_active=false,right_active=false;
-    float lx=0,ly=0,rx=0,ry=0,right_x=0,right_y=0;
+    bool menu=true,cursor_locked=false,left_active=false,right_active=false;
+    float lx=0,ly=0,rx=0,ry=0,right_x=0,right_y=0,left_x=0,left_y=0;
     int dx=0,dy=0;
     Uint32 last_poll=0;
     MotionGesture gesture;
@@ -39,8 +39,8 @@ class SdlGameInput {
         const float x=bx+width*(75.0f/960)*lx,y=by+height*(75.0f/544)*ly;
         const bool left=lx!=0||ly!=0,right=rx!=0||ry!=0;
         if(left&&!left_active)out.push_back({InputEvent::touch_down,1,0,bx,by});
-        if(left)out.push_back({InputEvent::touch_move,1,0,x,y});
-        else if(left_active)out.push_back({InputEvent::touch_up,1,0,x,y});
+        if(left){out.push_back({InputEvent::touch_move,1,0,x,y});left_x=x;left_y=y;}
+        else if(left_active)out.push_back({InputEvent::touch_up,1,0,left_x,left_y});
         left_active=left;
         // The game's rear touchpad treats each drag as a finite gesture.
         // Restart it each frame for continuous right-stick camera movement.
@@ -64,13 +64,15 @@ public:
     float cursor_position_x() const {return cursor_x;}
     float cursor_position_y() const {return cursor_y;}
     bool running() const {return !quit;}
+    std::string status() const {return std::string(menu?"cursor":"gameplay")+" L="+std::to_string(lx)+","+std::to_string(ly)+" R="+std::to_string(rx)+","+std::to_string(ry);}
     std::vector<InputEvent> poll(){
         if(!initialized)throw std::runtime_error("SDL controller input initialization failed");
         std::vector<InputEvent> events;SDL_Event event;
+        std::vector<SDL_Event> pending_events;
 #ifdef __SWITCH__
         // Read the panel directly: do not depend on SDL's platform-specific
         // choice between finger and emulated mouse events. HID is 1280x720.
-        native.poll();
+        pending_events=native.poll();
         HidTouchScreenState panel{};
         hidGetTouchScreenStates(&panel,1);
         if(panel.count){
@@ -85,6 +87,9 @@ public:
             if(SwitchHidInput::duplicate(event))continue;
             if(event.type==SDL_FINGERDOWN||event.type==SDL_FINGERMOTION||event.type==SDL_FINGERUP||event.type==SDL_MOUSEBUTTONDOWN||event.type==SDL_MOUSEBUTTONUP||event.type==SDL_MOUSEMOTION)continue;
 #endif
+            pending_events.push_back(event);
+        }
+        for(const auto& event:pending_events){
             if(event.type==SDL_QUIT || (event.type==SDL_WINDOWEVENT&&event.window.event==SDL_WINDOWEVENT_CLOSE)){
                 quit=true;continue;
             }
@@ -132,8 +137,8 @@ public:
                 if(button==SDL_CONTROLLER_BUTTON_LEFTSTICK){if(pressed)gesture.start(false,SDL_GetTicks());continue;}
                 if(!menu&&button==SDL_CONTROLLER_BUTTON_DPAD_DOWN){if(pressed)gesture.start(true,SDL_GetTicks());continue;}
                 // User mapping: L3 rotates the weapon; R3 toggles the menu cursor.
-                if(button==SDL_CONTROLLER_BUTTON_RIGHTSTICK){if(pressed){menu=!menu;dx=dy=0;if(menu)lx=ly=rx=ry=0;}continue;}
-                if(button==SDL_CONTROLLER_BUTTON_START&&pressed){menu=true;lx=ly=rx=ry=0;}
+                if(button==SDL_CONTROLLER_BUTTON_RIGHTSTICK){if(pressed){menu=!menu;cursor_locked=menu;dx=dy=0;}continue;}
+                if(button==SDL_CONTROLLER_BUTTON_START&&pressed){menu=true;cursor_locked=true;dx=dy=0;}
                 if(menu&&button>=SDL_CONTROLLER_BUTTON_DPAD_UP&&button<=SDL_CONTROLLER_BUTTON_DPAD_RIGHT){
                     if(button==SDL_CONTROLLER_BUTTON_DPAD_LEFT)dx=pressed?-1:(dx<0?0:dx);
                     if(button==SDL_CONTROLLER_BUTTON_DPAD_RIGHT)dx=pressed?1:(dx>0?0:dx);
@@ -168,13 +173,19 @@ public:
         const Uint32 now=SDL_GetTicks();
         const float elapsed=last_poll?std::min(now-last_poll,Uint32(50))/1000.0f:1.0f/60;
         last_poll=now;
+        const auto previous_cursor_x=cursor_x,previous_cursor_y=cursor_y;
         if(menu){
-            cursor_x=std::clamp(cursor_x+dx*width*0.5f*elapsed,0.0f,float(width-1));
-            cursor_y=std::clamp(cursor_y+dy*height*0.5f*elapsed,0.0f,float(height-1));
+            cursor_x=std::clamp(cursor_x+(dx+rx)*width*0.5f*elapsed,0.0f,float(width-1));
+            cursor_y=std::clamp(cursor_y+(dy+ry)*height*0.5f*elapsed,0.0f,float(height-1));
 
         }
-        if(std::fabs(lx)>0.5f||std::fabs(ly)>0.5f||std::fabs(rx)>0.5f||std::fabs(ry)>0.5f){menu=false;dx=dy=0;}
-        if(menu&&(left_active||right_active)){lx=ly=rx=ry=0;sticks(events);}
+        if(menu&&!cursor_locked&&(std::fabs(lx)>0.5f||std::fabs(ly)>0.5f)){menu=false;dx=dy=0;}
+        if(menu&&(left_active||right_active)){
+            const auto slx=lx,sly=ly,srx=rx,sry=ry;
+            lx=ly=rx=ry=0;sticks(events);
+            lx=slx;ly=sly;rx=srx;ry=sry;
+        }
+        if(menu&&confirm_touch&&(cursor_x!=previous_cursor_x||cursor_y!=previous_cursor_y))events.push_back({InputEvent::touch_move,3,0,cursor_x,cursor_y});
         if(!menu){
             if(confirm_touch){events.push_back({InputEvent::touch_up,3,0,cursor_x,cursor_y});confirm_touch=false;}
             sticks(events);

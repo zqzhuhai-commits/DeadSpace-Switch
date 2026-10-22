@@ -181,7 +181,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             static const std::map<std::string,std::string> props={
               {"GetAccelerometerCount","1"},{"IsBatteryStateAvailable","0"},{"GetCameraCount","0"},
               {"GetChipset","0"},{"GetCompassCount","0"},{"GetManufacturer","sony"},
-              {"GetDeviceModel","Switch"},{"GetDeviceName","Switch"},{"GetPhoneNumber","0"},
+              {"GetDeviceModel","Switch"},{"GetDeviceName","R800"},{"GetPhoneNumber","0"},
               {"GetDeviceUniqueId","-1"},{"GetDisplayCount","1"},{"GetGyroscopeCount","1"},
               {"GetLocationAvailable","true"},{"GetMicrophoneCount","1"},{"GetApiLevel","19"},
               {"GetPlatformRawName","Android"},{"GetPlatformStdName","Android"},{"GetPlatformVersion","4.4.4"},
@@ -189,7 +189,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
               {"GetLanguage","zh"},{"GetLocale","zh_CN"},{"GetTotalRAM","-1"},{"GetTouchPadCount","1"},
               {"GetTouchScreenCount","1"},{"GetTrackBallCount","0"},{"GetVibratorCount","0"},
               {"GetVirtualKeyboardCount","1"}};
-            const auto it=props.find(m.name);if(it!=props.end()){if((m.name=="GetLanguage"||m.name=="GetLocale")&&graphics.progress)graphics.progress("LOCALE: "+m.name+"="+it->second);return java_string(it->second);}
+            const auto it=props.find(m.name);if(it!=props.end()){if((m.name=="GetDeviceName"||m.name=="GetManufacturer")&&graphics.progress)graphics.progress("DEVICE: "+m.name+"="+it->second);if((m.name=="GetLanguage"||m.name=="GetLocale")&&graphics.progress)graphics.progress("LOCALE: "+m.name+"="+it->second);return java_string(it->second);}
         }
         if(cls=="com/ea/blast/GetAppDataDirectoryDelegate"){
             if(m.name=="GetAppDataDirectory"||m.name=="GetExternalStorageDirectory")return java_string(storage.save_root.empty()?data_root:storage.save_root);

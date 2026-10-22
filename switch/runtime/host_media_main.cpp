@@ -14,14 +14,14 @@ int main(int argc,char** argv){
     try{
         HostEgl egl;ds::SdlAudioOutput audio;ds::GraphicsBackend graphics;
         graphics.width=1280;graphics.height=720;graphics.resolve=[&](const char* name){return egl.resolve(name);};graphics.desktop_compatibility=true;
-        unsigned presented=0;graphics.present=[&]{++presented;};
+        unsigned presented=0;graphics.present=[&]{audio.tick();++presented;};
         if(argc>8){
             uint64_t step=0;const std::string value=argv[8];const auto parsed=std::from_chars(value.data(),value.data()+value.size(),step);
             if(parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size()||!step||step>1000000000)throw std::runtime_error("Invalid frame clock step");
             graphics.monotonic_ns=[&,step]{return uint64_t(presented)*step;};
         }
         graphics.progress=[](const std::string& stage){std::cerr<<stage<<"\n";};
-        if(argc>4){const std::string root=argv[4];graphics.hd_texture=[root](const std::string& key){return ds::read_hd_texture(root,key);};}
+        if(argc>4&&argv[4][0]){const std::string root=argv[4];graphics.hd_texture=[root](const std::string& key){return ds::read_hd_texture(root,key);};}
         std::map<unsigned,std::vector<ds::InputEvent>> inputs;
         if(argc>6&&argv[6][0]){
             std::ifstream script(argv[6]);if(!script)throw std::runtime_error("Cannot read touch script");std::string line;unsigned lines=0;
@@ -44,6 +44,7 @@ int main(int argc,char** argv){
             for(int y=719;y>=0;--y)out.write(reinterpret_cast<const char*>(rgb.data()+y*1280*3),1280*3);
             if(!out)throw std::runtime_error("Framebuffer capture write failed");
         }
-        audio.close();SDL_QuitSubSystem(SDL_INIT_AUDIO);return result.rfind("PASS:",0)==0?0:1;
+        std::cout<<audio.report();
+        audio.close();SDL_QuitSubSystem(SDL_INIT_AUDIO);return (result.rfind("PASS:",0)==0||result.rfind("SESSION: requested-exit\nPASS:",0)==0)?0:1;
     }catch(const std::exception& e){std::cerr<<"Host media probe failed: "<<e.what()<<'\n';return 1;}
 }
