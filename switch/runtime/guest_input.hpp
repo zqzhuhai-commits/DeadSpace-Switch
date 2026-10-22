@@ -5,7 +5,13 @@
 #include <stdexcept>
 #include <cmath>
 namespace ds {
-struct InputEvent {enum Kind {touch_down,touch_move,touch_up,key_down,key_up} kind;uint32_t id=0,code=0;float x=0,y=0;uint32_t module=1000;};
+struct InputEvent {enum Kind {touch_down,touch_move,touch_up,key_down,key_up,acceleration} kind;uint32_t id=0,code=0;float x=0,y=0;uint32_t module=1000;float z=0;};
+inline std::array<uint32_t,3> acceleration_arguments(const InputEvent& event){
+    if(event.kind!=InputEvent::acceleration||!std::isfinite(event.x)||!std::isfinite(event.y)||!std::isfinite(event.z))throw std::runtime_error("Invalid acceleration sample");
+    std::array<uint32_t,3> words{};
+    std::memcpy(&words[0],&event.x,4);std::memcpy(&words[1],&event.y,4);std::memcpy(&words[2],&event.z,4);
+    return words;
+}
 inline std::array<uint32_t,5> pointer_arguments(const InputEvent& event,uint32_t width,uint32_t height){
     if(event.kind!=InputEvent::touch_down&&event.kind!=InputEvent::touch_move&&event.kind!=InputEvent::touch_up)throw std::runtime_error("Invalid pointer event kind");
     if(event.id>=10||!std::isfinite(event.x)||!std::isfinite(event.y)||event.x<0||event.y<0||event.x>=width||event.y>=height)throw std::runtime_error("Invalid pointer coordinates/id");

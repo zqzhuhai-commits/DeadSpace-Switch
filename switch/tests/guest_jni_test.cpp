@@ -178,6 +178,9 @@ int main() {
         check(uint32_t(sound.call("CallIntMethod",{track,write,samples,7,4}))==uint32_t(-2),"PCM range accepted");
         check(uint32_t(sound.call("CallIntMethod",{track,write,samples,UINT32_MAX,4}))==uint32_t(-2),"Negative PCM offset accepted");
         const auto bytes=uint32_t(sound.call("NewByteArray",{8})),nonblock=sound.method(track,"write","([BIII)I");
+        queued=44100-4;bool partial_blocked=false;
+        try{sound.call("CallIntMethod",{track,write,samples,2,4});}catch(const ds::AudioBackpressure&){partial_blocked=true;}
+        check(partial_blocked&&captured.size()==8,"Blocking PCM write must preserve a block when queue space is insufficient");
         queued=100000;bool blocked=false;try{sound.call("CallIntMethod",{track,write,samples,2,4});}catch(const ds::AudioBackpressure&){blocked=true;}
         check(blocked&&captured.size()==8,"Full queue lost or duplicated PCM");
         check(sound.call("CallIntMethod",{track,nonblock,bytes,0,8,1})==0,"Full nonblocking write must return zero");

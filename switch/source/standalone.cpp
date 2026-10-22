@@ -41,6 +41,11 @@ int main() {
         }
     }
     ds::boot_log(ds::paths::log_file,"SESSION RETURNED:\n"+result);
+    if(result.find("SESSION: requested-exit\nPASS:")!=std::string::npos&&result.find("BLOCKED")==std::string::npos){
+        if(mounted)romfsExit();
+        consoleExit(nullptr);
+        return 0;
+    }
     // Keep a failed startup visible until the user dismisses it.
     consoleClear();std::puts(result.c_str());std::puts("+ : exit");
     PadState pad;padConfigureInput(1,HidNpadStyleSet_NpadStandard);padInitializeDefault(&pad);

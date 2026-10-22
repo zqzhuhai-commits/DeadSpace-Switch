@@ -1,5 +1,8 @@
 # 0.3.7 input and Chinese resource candidate
 
+Historical notes below. Superseded controls and Chinese fallback behavior:
+[Controller feedback candidate](CONTROLLER-FEEDBACK.md).
+
 Based on the released 0.3.6 revision c038ffa6. This is a repair candidate,
 not a claim of verified Switch gameplay or a completed Chinese NSP.
 

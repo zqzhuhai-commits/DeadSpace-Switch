@@ -46,8 +46,12 @@ public:
         if((unit!=1&&unit!=2)||pcm.size()>1024*1024||pcm.size()%(channels*2))throw std::runtime_error("PCM block size/alignment invalid");
         if(pcm.empty())return 0;
         if(!opened){play(ref);pause(ref);}
-        const uint32_t limit=std::max<uint32_t>(8192,rate*channels*2/10),used=backend.queued();
-        uint32_t count=uint32_t(std::min<uint64_t>(pcm.size(),used>=limit?0:limit-used));count-=count%(channels*2);
+        const uint32_t limit=std::max<uint32_t>(8192,rate*channels*2/4),used=backend.queued();
+        const uint32_t available=used>=limit?0:limit-used;
+        // AudioTrack's blocking writes must not silently drop the tail of a
+        // normal mixer block when only a few bytes remain in the queue.
+        if(blocking&&pcm.size()<=limit&&pcm.size()>available)throw AudioBackpressure{};
+        uint32_t count=uint32_t(std::min<uint64_t>(pcm.size(),available));count-=count%(channels*2);
         if(!count){if(blocking)throw AudioBackpressure{};return 0;}
         backend.queue(pcm.data(),count);++write_calls;submitted_bytes+=count;
         for(uint32_t i=0;i<count;i+=2){const int32_t s=int16_t(uint16_t(pcm[i])|uint16_t(pcm[i+1])<<8);if(s)++nonzero_samples;peak=std::max(peak,uint32_t(s<0?-s:s));}

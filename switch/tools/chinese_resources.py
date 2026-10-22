@@ -28,6 +28,14 @@ def overlay(apk, game_root):
         raise ValueError('Chinese database schema differs from the supported donor')
     if contents[FILES[1]][:4] not in (b'\x00\x01\x00\x00', b'OTTO', b'ttcf'):
         raise ValueError('Invalid Chinese font header')
+    # The Xperia donor or an existing save may select en-us despite the
+    # platform locale. A Chinese package uses the translated database for that
+    # fallback too. Alias existing font filenames so English-selected styles
+    # still have CJK glyphs; only font resources inside this staging tree change.
+    contents['stringdata/en-us/deadspace.bin'] = contents[FILES[0]]
+    for font in sorted((root / 'fonts').glob('*')):
+        if font.is_file() and font.suffix.lower() == '.ttf':
+            contents['fonts/' + font.name] = contents[FILES[1]]
     result = []
     for name, data in contents.items():
         target = root / name
@@ -36,4 +44,5 @@ def overlay(apk, game_root):
         result.append({'path': 'gamedata/assets/published/' + name,
                        'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
     return {'locale': 'zh_CN', 'files': result, 'schema_matches_donor': True,
+            'english_fallback_is_chinese': True,
             'translation_and_hardware_verified': False}
