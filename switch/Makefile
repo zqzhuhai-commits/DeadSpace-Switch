@@ -57,7 +57,7 @@ build/deadspace-switch.elf: $(OBJECTS) $(CPU_LIBS)
 build/deadspace-switch.nso: build/deadspace-switch.elf
 	elf2nso $< $@
 build/deadspace-switch.nacp: Makefile build/config | build
-	nacptool --create "$(APP_TITLE)" "Switch Port Contributors" "$(APP_VERSION)" $@ $(NACP_OPTIONS)
+	nacptool --create "$(APP_TITLE)" "Xiao Fan" "$(APP_VERSION)" $@ $(NACP_OPTIONS)
 build/deadspace-switch.nro: build/deadspace-switch.elf build/deadspace-switch.nacp $(APP_ICON) FORCE
 	elf2nro $< $@ --nacp=build/deadspace-switch.nacp --icon=$(APP_ICON) $(ROMFS_OPTION)
 host-test:

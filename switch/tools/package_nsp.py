@@ -108,7 +108,7 @@ def build(args):
         exefs.mkdir(); control.mkdir()
         if args.prebuilt_nso:
             shutil.copyfile(args.prebuilt_nso, exefs/'main')
-            subprocess.run(['nacptool', '--create', 'Dead Space Mobile', 'Switch Port Contributors',
+            subprocess.run(['nacptool', '--create', 'Dead Space Mobile', 'Xiao Fan',
                             '0.3.5', str(control/'control.nacp'), f'--titleid={title}'], check=True)
         else:
             subprocess.run(['make', '-C', str(ROOT/'switch'), '-j2', 'CPU_PROBE=1', 'STANDALONE=1',
