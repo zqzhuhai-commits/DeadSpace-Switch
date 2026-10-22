@@ -30,6 +30,12 @@ def run(native_gl=False):
                         "-I" + str(ROOT / "runtime"), str(ROOT / "runtime/guest_jni.cpp"),
                         str(ROOT / "tests/guest_jni_test.cpp"), "-o", str(jni_exe)], check=True)
         subprocess.run([str(jni_exe)], check=True)
+        transfer_exe = work / "transfer-test"
+        subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                        "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
+                        "-I" + str(ROOT / "runtime"), str(ROOT / "tests/guest_transfer_test.cpp"),
+                        "-o", str(transfer_exe)], check=True)
+        subprocess.run([str(transfer_exe)], check=True)
         memory_exe = work / "memory-test"
         subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                         "-fsanitize=address,undefined", "-fno-omit-frame-pointer",

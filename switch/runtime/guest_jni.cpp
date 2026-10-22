@@ -128,7 +128,7 @@ std::optional<uint64_t> GuestJni::asset_delegate(uint32_t receiver,const MethodK
         if(off>array.length || count>array.length-off)return raise_exception("java/lang/IndexOutOfBoundsException","Asset read outside array");
         if(!count)return 0; // zero-sized read also returns zero at EOF
         const uint32_t n=uint32_t(std::min<uint64_t>(count,o.bytes.size()-o.position));
-        for(uint32_t i=0;i<n;++i)MemoryWrite8(array.elements.at(0)+off+i,o.bytes[o.position+i]);
+        if(n)MemoryWriteBytes(advance(array.elements.at(0),off),o.bytes.data()+o.position,n);
         o.position+=n;asset_read_bytes+=n;return n?n:uint32_t(-1);
     }
     return std::nullopt;
@@ -158,7 +158,7 @@ std::optional<uint64_t> GuestJni::audio_delegate(uint32_t receiver,const MethodK
     const uint64_t start=uint64_t(array.elements.at(0))+uint64_t(offset)*unit;
     if(start+uint64_t(count)*unit>0x100000000ull)throw std::runtime_error("PCM guest range wraps");
     std::vector<uint8_t> pcm(uint32_t(count)*unit);
-    for(uint32_t i=0;i<pcm.size();++i)pcm[i]=MemoryRead8(uint32_t(start)+i);
+    MemoryReadBytes(uint32_t(start),pcm.data(),pcm.size());
     return audio.write(receiver,pcm,unit,mode==0);
 }
 std::vector<char> GuestJni::parameter_types(const std::string& sig) {
@@ -281,10 +281,10 @@ uint64_t GuestJni::jni_dispatch(const std::string& op,uint32_t env,uint32_t vm) 
             }
             const uint32_t count=arg(3),p=arg(4),step=stride(o);range(c,count,o.length);
             const bool set=op.rfind("Set",0)==0;
-            for(uint32_t n=0;n<count*step;++n) {
-                const uint32_t element=o.elements.at(0)+c*step+n, buffer=advance(p,n);
-                MemoryWrite8(set?element:buffer,MemoryRead8(set?buffer:element));
-            }
+            const uint32_t element=advance(o.elements.at(0),c*step);
+            std::vector<uint8_t> bytes(count*step);
+            MemoryReadBytes(set?p:element,bytes.data(),bytes.size());
+            MemoryWriteBytes(set?element:p,bytes.data(),bytes.size());
             return 0;
         }
     }

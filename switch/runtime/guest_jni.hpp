@@ -1,4 +1,5 @@
 #pragma once
+#include "guest_transfer.hpp"
 #include <cstdint>
 #include <stdexcept>
 #include <map>
@@ -51,6 +52,12 @@ protected:
     virtual void MemoryWrite8(uint32_t,uint8_t)=0;
     virtual void MemoryWrite16(uint32_t,uint16_t)=0;
     virtual void MemoryWrite32(uint32_t,uint32_t)=0;
+    virtual void MemoryReadBytes(uint32_t address,void* out,size_t count) {
+        ds::read_guest_bytes(address,out,count,[](uint32_t,void*,size_t){return false;},[&](uint32_t p){return MemoryRead8(p);});
+    }
+    virtual void MemoryWriteBytes(uint32_t address,const void* in,size_t count) {
+        ds::write_guest_bytes(address,in,count,[](uint32_t,const void*,size_t){return false;},[&](uint32_t p,uint8_t v){MemoryWrite8(p,v);});
+    }
     virtual uint64_t java_delegate(uint32_t,const MethodKey&,const std::vector<uint64_t>&)=0;
     virtual uint32_t guest_pc() const {return 0;}
     std::string last_asset_call;

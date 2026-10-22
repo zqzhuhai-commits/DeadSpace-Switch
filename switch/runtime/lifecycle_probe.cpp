@@ -91,6 +91,38 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         return threads.mapped(a) || (a>=heap && a<guest_heap.high_water()) ||
                arena_memory.contains(a);
     }
+    uint64_t direct_read_bytes=0,direct_write_bytes=0;
+    bool read_span(uint32_t address,void* output,size_t count) {
+        if(!count)return true;
+        if(uint64_t(address)+count>0x100000000ull)return false;
+        const uint32_t last=address+uint32_t(count-1);
+        if((address>>12)==(last>>12)&&mapped(address)&&mapped(last)) {
+            const auto it=pages.find(address>>12);
+            if(it==pages.end())std::memset(output,0,count);
+            else std::memcpy(output,it->second.data()+(address&4095),count);
+        } else if(!image.read(address,output,count))return false;
+        direct_read_bytes+=count;return true;
+    }
+    bool write_span(uint32_t address,const void* input,size_t count) {
+        if(!count)return true;
+        if(uint64_t(address)+count>0x100000000ull)return false;
+        const uint32_t last=address+uint32_t(count-1);
+        if((address>>12)==(last>>12)&&mapped(address)&&mapped(last))
+            std::memcpy(pages[address>>12].data()+(address&4095),input,count);
+        else if(!image.write(address,input,count))return false;
+        direct_write_bytes+=count;return true;
+    }
+    void MemoryReadBytes(uint32_t address,void* output,size_t count) override {
+        ds::read_guest_bytes(address,output,count,[&](uint32_t p,void* out,size_t n){return read_span(p,out,n);},[&](uint32_t p){return MemoryRead8(p);});
+    }
+    void MemoryWriteBytes(uint32_t address,const void* input,size_t count) override {
+        ds::write_guest_bytes(address,input,count,[&](uint32_t p,const void* in,size_t n){return write_span(p,in,n);},[&](uint32_t p,uint8_t v){MemoryWrite8(p,v);});
+    }
+    void fill_bytes(uint32_t address,uint8_t value,uint32_t count) {
+        ds::transfer_range(address,count);
+        std::array<uint8_t,4096> bytes;bytes.fill(value);
+        while(count){const auto n=std::min<uint32_t>(count,4096);MemoryWriteBytes(address,bytes.data(),n);address+=n;count-=n;}
+    }
     void fail(const std::string& message) {
         if(fault.empty()){
             std::string ctx=message;
@@ -212,7 +244,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 const auto now=std::chrono::steady_clock::now();
                 if(now-last_checkpoint>=std::chrono::seconds(10)) {
                     const std::string current=pending&&pending<=functions.size()?functions[pending-1]:last_service;
-                    graphics.progress("HEARTBEAT: "+label+" pc=0x"+to_hex(cpu->Regs()[15])+" service="+current+" instructions_left="+std::to_string(budget)+" asset_bytes="+std::to_string(asset_read_bytes)+" guest_gl="+std::to_string(gl_calls));
+                    graphics.progress("HEARTBEAT: "+label+" pc=0x"+to_hex(cpu->Regs()[15])+" service="+current+" instructions_left="+std::to_string(budget)+" asset_bytes="+std::to_string(asset_read_bytes)+" guest_gl="+std::to_string(gl_calls)+" direct_rw_bytes="+std::to_string(direct_read_bytes+direct_write_bytes));
                     last_checkpoint=now;
                 }
             }
@@ -269,8 +301,8 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         static const std::array<const char*,15> float_imports={"acosf","asinf","atanf","atan2f","ceilf","cosf","expf","floorf","fmodf","logf","log10f","powf","sinf","sqrtf","tanf"};
         const bool floating=std::find(float_imports.begin(),float_imports.end(),name)!=float_imports.end();
         const std::string base=floating?name.substr(0,name.size()-1):name;
-        if(base=="memset"){bounded(c);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,b);result=a;}
-        else if(base=="memcpy"||base=="memmove"){bounded(c);std::vector<uint8_t> v(c);for(uint32_t i=0;i<c;++i)v[i]=MemoryRead8(b+i);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,v[i]);result=a;}
+        if(base=="memset"){bounded(c);fill_bytes(a,uint8_t(b),c);result=a;}
+        else if(base=="memcpy"||base=="memmove"){bounded(c);std::vector<uint8_t> v(c);MemoryReadBytes(b,v.data(),c);MemoryWriteBytes(a,v.data(),c);result=a;}
         else if(base=="memcmp"){bounded(c);int cmp=0;for(uint32_t i=0;i<c;++i){uint8_t x=MemoryRead8(a+i),y=MemoryRead8(b+i);if(x!=y){cmp=x>y?1:-1;break;}}result=cmp;}
         else if(base=="qsort") {
             if(b>1&&!image.executable(d&~1u,4))throw std::runtime_error("Invalid qsort comparator");
@@ -278,8 +310,8 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 [&](uint32_t x,uint32_t y){return int32_t(guest_call(d,{x,y},"qsort comparator",false));});
         }
         else if(base=="malloc")result=alloc(a);
-        else if(base=="calloc")result=guest_heap.zeroed(a,b,[&](uint32_t p,uint32_t n){for(uint32_t i=0;i<n;++i)MemoryWrite8(p+i,0);});
-        else if(base=="realloc")result=guest_heap.reallocate(a,b,[&](uint32_t dst,uint32_t src,uint32_t n){for(uint32_t i=0;i<n;++i)MemoryWrite8(dst+i,MemoryRead8(src+i));});
+        else if(base=="calloc")result=guest_heap.zeroed(a,b,[&](uint32_t p,uint32_t n){fill_bytes(p,0,n);});
+        else if(base=="realloc")result=guest_heap.reallocate(a,b,[&](uint32_t dst,uint32_t src,uint32_t n){std::vector<uint8_t> bytes(n);MemoryReadBytes(src,bytes.data(),n);MemoryWriteBytes(dst,bytes.data(),n);});
         else if(base=="free")guest_heap.release(a);
         else if(base=="strlen")result=uint32_t(guest_text(a).size());
         else if(base=="strcmp"||base=="strncmp"){std::string x=guest_text(a),y=guest_text(b);if(base=="strncmp"){x=x.substr(0,c);y=y.substr(0,c);}result=(x>y)-(x<y);}
@@ -462,7 +494,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             if(!fp){MemoryWrite32(errno_address,errno);result=stdio?0:UINT32_MAX;}
             else if(bytes) {
                 std::vector<uint8_t> data(static_cast<size_t>(bytes));
-                for(size_t i=0;i<data.size();++i)data[i]=MemoryRead8(src+uint32_t(i));
+                MemoryReadBytes(src,data.data(),data.size());
                 const size_t written=std::fwrite(data.data(),1,data.size(),fp);
                 if(stdio?save_streams.count(d):save_descriptors.count(a))save_written_bytes+=written;
                 result=stdio?uint32_t(written/b):uint32_t(written);
@@ -486,7 +518,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 std::vector<uint8_t> data(static_cast<size_t>(bytes));
                 const size_t got=std::fread(data.data(),1,data.size(),fp);
                 if(stdio?save_streams.count(d):save_descriptors.count(a))save_read_bytes+=got;
-                for(size_t i=0;i<got;++i)MemoryWrite8(dst+uint32_t(i),data[i]);
+                MemoryWriteBytes(dst,data.data(),got);
                 if(std::ferror(fp))MemoryWrite32(errno_address,errno);
                 result=stdio?uint32_t(got/b):uint32_t(got);
             }
@@ -598,9 +630,9 @@ public:
         if(!image.read(a,&v,1))fail("Unmapped guest read at "+std::to_string(a));
         return v;
     }
-    uint16_t MemoryRead16(uint32_t a) override {return MemoryRead8(a)|uint16_t(MemoryRead8(a+1))<<8;}
+    uint16_t MemoryRead16(uint32_t a) override {uint8_t b[2];if(read_span(a,b,2))return b[0]|uint16_t(b[1])<<8;return MemoryRead8(a)|uint16_t(MemoryRead8(a+1))<<8;}
     uint32_t MemoryRead32(uint32_t a) override {
-        const uint32_t v=MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;
+        uint8_t b[4];const uint32_t v=read_span(a,b,4)?uint32_t(b[0])|uint32_t(b[1])<<8|uint32_t(b[2])<<16|uint32_t(b[3])<<24:MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;
         if(a==0x10444100u&&trace.total()<6000)trace.push_back("  RD32 0x10444100="+to_hex(v)+" @"+to_hex(cpu->Regs()[15])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4]));
         if(cpu&&v==0x1031e5a4u&&trace.total()<6000)trace.push_back("  GOT 0x1031e5a4 read @"+to_hex(cpu->Regs()[15]));
         return v;
@@ -620,8 +652,8 @@ public:
         if(mapped(a)){pages[a>>12][a&4095]=v;return;}
         if(!image.write(a,&v,1))fail("Write outside writable guest mapping at "+std::to_string(a));
     }
-    void MemoryWrite16(uint32_t a,uint16_t v) override {MemoryWrite8(a,v);MemoryWrite8(a+1,v>>8);}
-    void MemoryWrite32(uint32_t a,uint32_t v) override {MemoryWrite16(a,v);MemoryWrite16(a+2,v>>16);}
+    void MemoryWrite16(uint32_t a,uint16_t v) override {const uint8_t b[2]={uint8_t(v),uint8_t(v>>8)};if(!write_span(a,b,2)){MemoryWrite8(a,v);MemoryWrite8(a+1,v>>8);}}
+    void MemoryWrite32(uint32_t a,uint32_t v) override {const uint8_t b[4]={uint8_t(v),uint8_t(v>>8),uint8_t(v>>16),uint8_t(v>>24)};if(!write_span(a,b,4)){MemoryWrite16(a,v);MemoryWrite16(a+2,v>>16);}}
     void MemoryWrite64(uint32_t a,uint64_t v) override {MemoryWrite32(a,v);MemoryWrite32(a+4,v>>32);}
     void InterpreterFallback(uint32_t,size_t) override {fail("Unavailable instruction interpreter");}
     void ExceptionRaised(uint32_t,Dynarmic::A32::Exception) override {fail("Guest CPU exception");}
@@ -657,12 +689,12 @@ public:
             [&](unsigned n){return arg(n);},[&](uint32_t n){return alloc(n);},
             [&](uint32_t p,void* out,size_t n){
                 if(uint64_t(p)+n>0x100000000ull)throw std::runtime_error("GL guest read wraps");
-                auto* bytes=static_cast<uint8_t*>(out);for(size_t i=0;i<n;++i)bytes[i]=MemoryRead8(p+uint32_t(i));
+                MemoryReadBytes(p,out,n);
                 if(!fault.empty())throw std::runtime_error(fault);
             },
             [&](uint32_t p,const void* input,size_t n){
                 if(uint64_t(p)+n>0x100000000ull)throw std::runtime_error("GL guest write wraps");
-                const auto* bytes=static_cast<const uint8_t*>(input);for(size_t i=0;i<n;++i)MemoryWrite8(p+uint32_t(i),bytes[i]);
+                MemoryWriteBytes(p,input,n);
                 if(!fault.empty())throw std::runtime_error(fault);
             }});
         errno_address=alloc(4);threads.thread().error=errno_address;
