@@ -17,9 +17,22 @@ elif ! git -C "$dynarmic_dir" apply --reverse --check "$patch_path" 2>/dev/null;
   exit 1
 fi
 cpu_build="${CPU_BUILD_DIR:-$project_root/switch/build/cpu}"
+mkdir -p "$cpu_build"
+cpu_build="$(cd "$cpu_build" && pwd)"
+# Never add /usr/include to the cross compiler's system search path. FindBoost
+# otherwise imports host stdint.h/glibc when BOOST_ROOT=/usr is used.
+boost_headers="$(cd "$BOOST_ROOT/include/boost" && pwd)"
+boost_prefix="$cpu_build/boost-headers"
+mkdir -p "$boost_prefix/include"
+if [[ -e "$boost_prefix/include/boost" && ! -L "$boost_prefix/include/boost" ]]; then
+  echo 'Boost staging path is not a symlink; refusing to overwrite it.' >&2
+  exit 1
+fi
+ln -sfn "$boost_headers" "$boost_prefix/include/boost"
 cmake -S "$project_root/switch/runtime" -B "$cpu_build" -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$project_root/switch/runtime/switch-toolchain.cmake" \
-  -DBoost_NO_BOOST_CMAKE=ON -DBOOST_ROOT="$BOOST_ROOT" \
+  -DBoost_NO_BOOST_CMAKE=ON -DBOOST_ROOT="$boost_prefix" \
+  -DBoost_INCLUDE_DIR="$boost_prefix/include" \
   -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build "$cpu_build" --parallel "${BUILD_JOBS:-2}"
 # A fresh main.o is needed when enabling the CPU probe compile definition.
