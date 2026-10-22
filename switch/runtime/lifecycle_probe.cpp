@@ -54,6 +54,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     ds::GuestJumps jumps;
     struct ThreadAttr {uint32_t stack_size=1024*1024,detached=0;};
     std::map<uint32_t,ThreadAttr> thread_attrs;
+    bool app_exit_requested=false;
     unsigned call_depth=0,thread_switches=0,threads_created=0;uint64_t quantum=0;
     uint32_t next_tls_key=1;
     bool rotate=false;
@@ -159,6 +160,11 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             if(std::find(stateless.begin(),stateless.end(),cls)!=stateless.end())return 0;
         }
         if(cls=="com/ea/blast/MainActivity"){
+            if(m.name=="finish"&&m.sig=="()V"){
+                app_exit_requested=true;
+                if(graphics.progress)graphics.progress("EXIT: MainActivity.finish requested; stopping at frame boundary");
+                return 0;
+            }
             if(m.name=="GetInstance"){const uint32_t r=singleton("com/ea/blast/MainActivity");trace.push_back("  GetInstance -> "+to_hex(r));return r;}
             if(m.name=="getAssets"){const uint32_t r=singleton("android/content/res/AssetManager");trace.push_back("  getAssets -> "+to_hex(r));return r;}
         }
@@ -215,7 +221,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     uint32_t guest_call(uint32_t address,const std::vector<uint32_t>& args,const std::string& label,bool top_level=false) {
         struct Depth {unsigned& d;Depth(unsigned& v):d(v){++d;}~Depth(){--d;}} depth(call_depth);
         struct Quantum {uint64_t& q;uint64_t old;Quantum(uint64_t& v):q(v),old(v){}~Quantum(){q=old;}} saved_quantum(quantum);
-        const bool diagnostic=top_level&&label!="constructor"&&label.rfind("NativeOnDrawFrame",0)!=0;
+        const bool diagnostic=top_level&&label!="constructor"&&label!="pointer input"&&label!="motion input"&&label.rfind("NativeOnDrawFrame",0)!=0;
         if(diagnostic&&graphics.progress)graphics.progress("BEGIN: "+label);
         const bool outer=call_depth==1;
         if(outer)jumps.clear_owner(threads.current());
@@ -804,16 +810,22 @@ public:
         for(unsigned i=0;!frames||i<frames;++i){
             guest_time();
             if(i<3&&graphics.progress)graphics.progress("FRAME BEGIN: "+std::to_string(i));
-            if(graphics.keep_running&&!graphics.keep_running())break;
+            if(app_exit_requested||(graphics.keep_running&&!graphics.keep_running()))break;
             if(i<3&&graphics.progress)graphics.progress("FRAME INPUT: "+std::to_string(i));
             if(graphics.input) {
                 const auto events=graphics.input(i);if(events.size()>64)throw std::runtime_error("Input event budget");
                 for(const auto& event:events) {
+                    if(app_exit_requested)break;
                     if(event.kind==ds::InputEvent::touch_down||event.kind==ds::InputEvent::touch_move||event.kind==ds::InputEvent::touch_up) {
                         const auto words=ds::pointer_arguments(event,graphics.width,graphics.height);
                         const auto entry=image.exports.find("Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent");
                         if(entry==image.exports.end())throw std::runtime_error("Guest pointer export missing");
                         guest_call(entry->second,{env_addr,0x42424242,words[0],words[1],words[2],words[3],words[4]},"pointer input",true);
+                    } else if(event.kind==ds::InputEvent::acceleration) {
+                        const auto words=ds::acceleration_arguments(event);
+                        const auto entry=image.exports.find("Java_com_ea_blast_AccelerometerAndroidDelegate_NativeOnAcceleration");
+                        if(entry==image.exports.end())throw std::runtime_error("Guest acceleration export missing");
+                        guest_call(entry->second,{env_addr,0x42424242,words[0],words[1],words[2]},"motion input",true);
                     } else {
                         if(event.kind!=ds::InputEvent::key_down&&event.kind!=ds::InputEvent::key_up)throw std::runtime_error("Invalid key event kind");
                         if(!event.code||event.code>255)throw std::runtime_error("Guest key code invalid");
@@ -827,7 +839,7 @@ public:
                 }
             }
 
-            if(graphics.keep_running&&!graphics.keep_running())break;
+            if(app_exit_requested||(graphics.keep_running&&!graphics.keep_running()))break;
             if(i<3&&graphics.progress)graphics.progress("FRAME DRAW: "+std::to_string(i));
             if(i==0&&graphics.progress)graphics.progress("BEGIN: first guest DrawFrame");
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
@@ -854,7 +866,8 @@ public:
     }
 
     std::string report() const {
-        std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
+        std::string out=app_exit_requested?"SESSION: requested-exit\n":"";
+        out+="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
         out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
         out+="Clock: "+std::string(graphics.monotonic_ns?"host monotonic floor":"instruction-only")+"; guest_ns="+std::to_string(threads.time())+"\n";
         out+="Threads: bounded instruction timeslices (1000000); created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";

@@ -1,26 +1,38 @@
 #pragma once
 #include "guest_input.hpp"
 #include "sdl_audio_output.hpp"
+#include "motion_gestures.hpp"
+#include "switch_hid_input.hpp"
 #ifdef __SWITCH__
 #include <switch.h>
 #endif
 namespace ds {
-// Basic touch and digital keys; analogue aim/movement and gestures remain.
+// Physical Nintendo controls are normalized by SwitchHidInput before routing.
 class SdlGameInput {
     unsigned width,height;
     SDL_GameController* controller=nullptr;
     bool initialized=false;
     bool quit=false;
 #ifdef __SWITCH__
+    SwitchHidInput native;
     bool panel_touch=false;
     float panel_x=0,panel_y=0;
 #endif
-    bool confirm_touch=false,trigger_left=false,trigger_right=false,shoulder_left=false,shoulder_right=false;
+    bool confirm_touch=false,trigger_left=false,trigger_right=false;
+    std::array<unsigned,256> held_keys{};
+    std::array<bool,SDL_CONTROLLER_BUTTON_MAX> buttons{};
+    std::array<uint32_t,SDL_CONTROLLER_BUTTON_MAX> button_codes{};
+    void key(std::vector<InputEvent>& out,uint32_t code,bool down){
+        auto& held=held_keys.at(code);
+        if(down){if(held++==0)out.push_back({InputEvent::key_down,0,code});}
+        else if(held&&--held==0)out.push_back({InputEvent::key_up,0,code});
+    }
     float cursor_x=0,cursor_y=0;
     bool menu=true,left_active=false,right_active=false;
     float lx=0,ly=0,rx=0,ry=0,right_x=0,right_y=0;
     int dx=0,dy=0;
     Uint32 last_poll=0;
+    MotionGesture gesture;
     static float axis(Sint16 raw,float maximum=1.0f){const float v=float(raw)/32767.0f;return std::fabs(v)<=0.15f?0.0f:std::copysign(std::min((std::fabs(v)-0.15f)/0.85f,maximum),v);}
     void sticks(std::vector<InputEvent>& out){
         const float bx=width*(192.0f/960),by=height*(75.0f/544);
@@ -58,6 +70,7 @@ public:
 #ifdef __SWITCH__
         // Read the panel directly: do not depend on SDL's platform-specific
         // choice between finger and emulated mouse events. HID is 1280x720.
+        native.poll();
         HidTouchScreenState panel{};
         hidGetTouchScreenStates(&panel,1);
         if(panel.count){
@@ -69,6 +82,7 @@ public:
 #endif
         while(SDL_PollEvent(&event)){
 #ifdef __SWITCH__
+            if(SwitchHidInput::duplicate(event))continue;
             if(event.type==SDL_FINGERDOWN||event.type==SDL_FINGERMOTION||event.type==SDL_FINGERUP||event.type==SDL_MOUSEBUTTONDOWN||event.type==SDL_MOUSEBUTTONUP||event.type==SDL_MOUSEMOTION)continue;
 #endif
             if(event.type==SDL_QUIT || (event.type==SDL_WINDOWEVENT&&event.window.event==SDL_WINDOWEVENT_CLOSE)){
@@ -99,19 +113,26 @@ public:
                         bool& held=event.caxis.axis==SDL_CONTROLLER_AXIS_TRIGGERLEFT?trigger_left:trigger_right;
                         const bool down=event.caxis.value>16000;
                         if(held!=down){
-                            const bool shoulder=event.caxis.axis==SDL_CONTROLLER_AXIS_TRIGGERLEFT?shoulder_left:shoulder_right;
-                            const bool before=held||shoulder;held=down;
-                            if(before!=(held||shoulder))events.push_back({down?InputEvent::key_down:InputEvent::key_up,0,event.caxis.axis==SDL_CONTROLLER_AXIS_TRIGGERLEFT?102u:103u,0,0});
+                            held=down;
+                            key(events,event.caxis.axis==SDL_CONTROLLER_AXIS_TRIGGERLEFT?102u:103u,down);
                         }
                         break;
                     }
                     default:break;
                 }
             }
-            else if(event.type==SDL_CONTROLLERBUTTONDOWN||event.type==SDL_CONTROLLERBUTTONUP){uint32_t code=0;
+            else if(event.type==SDL_CONTROLLERBUTTONDOWN||event.type==SDL_CONTROLLERBUTTONUP){
                 const bool pressed=event.type==SDL_CONTROLLERBUTTONDOWN;
                 const auto button=event.cbutton.button;
-                if(button==SDL_CONTROLLER_BUTTON_LEFTSTICK||button==SDL_CONTROLLER_BUTTON_RIGHTSTICK){if(pressed){menu=!menu;if(menu)lx=ly=rx=ry=0;}continue;}
+                if(button>=buttons.size()||buttons[button]==pressed)continue;
+                buttons[button]=pressed;
+                if(!pressed&&button_codes[button]){
+                    key(events,button_codes[button],false);button_codes[button]=0;
+                }
+                if(button==SDL_CONTROLLER_BUTTON_LEFTSTICK){if(pressed)gesture.start(false,SDL_GetTicks());continue;}
+                if(!menu&&button==SDL_CONTROLLER_BUTTON_DPAD_DOWN){if(pressed)gesture.start(true,SDL_GetTicks());continue;}
+                // User mapping: L3 rotates the weapon; R3 toggles the menu cursor.
+                if(button==SDL_CONTROLLER_BUTTON_RIGHTSTICK){if(pressed){menu=!menu;if(menu)lx=ly=rx=ry=0;}continue;}
                 if(button==SDL_CONTROLLER_BUTTON_START&&pressed){menu=true;lx=ly=rx=ry=0;}
                 if(menu&&button>=SDL_CONTROLLER_BUTTON_DPAD_UP&&button<=SDL_CONTROLLER_BUTTON_DPAD_RIGHT){
                     if(button==SDL_CONTROLLER_BUTTON_DPAD_LEFT)dx=pressed?-1:(dx<0?0:dx);
@@ -120,20 +141,29 @@ public:
                     if(button==SDL_CONTROLLER_BUTTON_DPAD_DOWN)dy=pressed?1:(dy>0?0:dy);
                     continue;
                 }
-                switch(event.cbutton.button){case SDL_CONTROLLER_BUTTON_B:code=23;break;case SDL_CONTROLLER_BUTTON_A:code=4;break;case SDL_CONTROLLER_BUTTON_X:code=99;break;case SDL_CONTROLLER_BUTTON_Y:code=100;break;case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:code=102;break;case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:code=103;break;case SDL_CONTROLLER_BUTTON_START:code=108;break;case SDL_CONTROLLER_BUTTON_BACK:code=109;break;case SDL_CONTROLLER_BUTTON_DPAD_UP:code=19;break;case SDL_CONTROLLER_BUTTON_DPAD_DOWN:code=20;break;case SDL_CONTROLLER_BUTTON_DPAD_LEFT:code=21;break;case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:code=22;break;default:break;}
-                // Xperia Play startup menus need pointer input as well as keys.
-                // Keep a press held until release so the guest sees separate frames.
-                if(menu&&event.cbutton.button==SDL_CONTROLLER_BUTTON_B){
-                    const bool down=event.type==SDL_CONTROLLERBUTTONDOWN;
-                    if(down!=confirm_touch){confirm_touch=down;events.push_back({down?InputEvent::touch_down:InputEvent::touch_up,3,0,cursor_x,cursor_y});}
+                uint32_t code=0;
+                // SDL names here use the existing positional convention:
+                // Nintendo A=B, B=A, X=Y, Y=X. Native HID guarantees it.
+                switch(button){
+                    case SDL_CONTROLLER_BUTTON_B:code=23;break; // A: interact
+                    case SDL_CONTROLLER_BUTTON_A:code=4;break;  // B: kinesis
+                    case SDL_CONTROLLER_BUTTON_Y:code=20;break; // X: saw (donor D-pad down)
+                    case SDL_CONTROLLER_BUTTON_X:code=100;break;// Y: quick turn
+                    case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:code=100;break;// L: aimed stasis
+                    case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:code=99;break;// R: reload
+                    case SDL_CONTROLLER_BUTTON_START:code=108;break;
+                    case SDL_CONTROLLER_BUTTON_BACK:code=109;break;
+                    case SDL_CONTROLLER_BUTTON_DPAD_UP:code=19;break;
+                    case SDL_CONTROLLER_BUTTON_DPAD_LEFT:code=21;break;
+                    case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:code=22;break;
+                    default:break;
                 }
-                if(code==102||code==103){
-                    bool& shoulder=code==102?shoulder_left:shoulder_right;
-                    const bool trigger=code==102?trigger_left:trigger_right;
-                    const bool before=shoulder||trigger;shoulder=pressed;
-                    if(before==(shoulder||trigger))code=0;
+                if(menu&&button==SDL_CONTROLLER_BUTTON_B&&pressed!=confirm_touch){
+                    confirm_touch=pressed;
+                    events.push_back({pressed?InputEvent::touch_down:InputEvent::touch_up,3,0,cursor_x,cursor_y});
                 }
-                if(code)events.push_back({event.type==SDL_CONTROLLERBUTTONDOWN?InputEvent::key_down:InputEvent::key_up,0,code,0,0});}
+                if(pressed&&code){button_codes[button]=code;key(events,code,true);}
+            }
         }
         const Uint32 now=SDL_GetTicks();
         const float elapsed=last_poll?std::min(now-last_poll,Uint32(50))/1000.0f:1.0f/60;
@@ -143,12 +173,19 @@ public:
             cursor_y=std::clamp(cursor_y+dy*height*0.5f*elapsed,0.0f,float(height-1));
 
         }
-        if(lx!=0||ly!=0||rx!=0||ry!=0){menu=false;dx=dy=0;}
+        if(std::fabs(lx)>0.5f||std::fabs(ly)>0.5f||std::fabs(rx)>0.5f||std::fabs(ry)>0.5f){menu=false;dx=dy=0;}
         if(menu&&(left_active||right_active)){lx=ly=rx=ry=0;sticks(events);}
         if(!menu){
             if(confirm_touch){events.push_back({InputEvent::touch_up,3,0,cursor_x,cursor_y});confirm_touch=false;}
             sticks(events);
         }
+        const bool synthetic_motion=gesture.active();
+        gesture.poll(now,events);
+#ifdef __SWITCH__
+        if(!synthetic_motion)native.motion(events);
+#else
+        (void)synthetic_motion;
+#endif
         return events;
     }
 };

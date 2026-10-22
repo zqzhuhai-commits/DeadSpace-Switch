@@ -13,6 +13,9 @@ with tempfile.TemporaryDirectory() as temp:
     english.parent.mkdir(parents=True)
     schema=b'SBIN\x02\0\0\0ENUM\0\0\0\0'
     english.write_bytes(schema+b'DATAenglish')
+    font=game/'assets/published/fonts/default.ttf'
+    font.parent.mkdir(parents=True)
+    font.write_bytes(b'original-font')
     apk=work/'test.apk'
     def archive(database):
         with zipfile.ZipFile(apk,'w') as z:
@@ -21,7 +24,10 @@ with tempfile.TemporaryDirectory() as temp:
             z.writestr('assets/game/libDeadSpace32.so',b'never import code')
     archive(schema+b'DATAchinese')
     report=cr.overlay(apk,game)
-    assert report['locale']=='zh_CN' and len(report['files'])==2
+    assert report['locale']=='zh_CN' and len(report['files'])==4
+    assert report['english_fallback_is_chinese']
+    assert english.read_bytes()==schema+b'DATAchinese'
+    assert font.read_bytes()==b'\0\1\0\0test-font'
     assert (game/'assets/published'/cr.FILES[0]).read_bytes()==schema+b'DATAchinese'
     assert not list(game.rglob('*.so'))
     archive(b'SBIN\x02\0\0\0DIFFERENTDATAinvalid')
