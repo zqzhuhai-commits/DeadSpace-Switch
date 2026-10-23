@@ -1,9 +1,9 @@
-# Switch 死亡空间 Xbox360版汉化补丁
+# 已知启动故障：请暂停使用旧版完整补丁
 
-Windows x64 EXE，作者 Xiao Fan。目标为本项目所提供的《死亡空间2》Xbox 360英文资源版本；名称按用户指定。
+用户已反馈旧版 `Switch_DeadSpace_Xbox360_Chinese_Patch.zip` 更新 VIV 后黑屏，无法启动。此前仅完成合成 VIV 上的写入回读检查，没有完成游戏启动验证。请恢复备份的原版 bigfile0.viv；目前尚未确定根因，也没有经过实机验证的修复版。
 
-解压ZIP后运行 `Switch 死亡空间 Xbox360版汉化补丁.exe`，选择本地 `bigfile0.viv`。程序校验语言流、字体流和TOC的SHA-256后，在原文件旁的“汉化输出”目录生成新副本，原文件保留。版本不匹配时停止。生成成功后再备份原文件并替换。
+提供 [VIV 只读诊断工具](Switch_DeadSpace_VIV_Diagnostic.zip)。这不是修复补丁。解压运行 VIV_Diagnostic.exe，分别选择原版和黑屏版 VIV，报告另存为 original_diagnostic.txt 和 patched_diagnostic.txt；发回两个报告，并注明主机或模拟器及黑屏阶段。无需上传整个 VIV。
 
-包含6894条语言索引资源、四套扩展文字字体和TOC更新。补丁核心通过模拟VIV的原生C测试、资源回读及损坏/版本不匹配拒绝测试。中文字形图集已解码检查。**尚未使用完整真实游戏VIV验证，Windows GUI和游戏内显示尚未运行验证，需要实机测试。** ZIP内有详细说明、校验报告、许可证和源代码。
+已发现的待验证风险：字体流由 524288 字节扩大到 22806528 字节；三个资源被移动到 VIV 尾部，按 2048 字节对齐。尚不能判断其中哪项导致黑屏。
 
-ZIP SHA-256: `c82f343149dd220c7db41c5ab797fb2b6cd671b76fca78aaec92c6d9be926660`
+诊断工具以只读模式打开 VIV，源码随包提供。读取逻辑通过 Linux 样本检查，Windows EXE 已交叉编译；Windows 图形界面和游戏启动尚未验证。
