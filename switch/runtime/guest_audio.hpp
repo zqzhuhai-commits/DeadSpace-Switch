@@ -25,6 +25,8 @@ class GuestAudio {
 public:
     uint64_t submitted_bytes=0,write_calls=0,nonzero_samples=0;
     uint32_t peak=0;
+    uint64_t empty_writes=0,backpressure=0;
+    uint32_t buffered_ms()const{return opened?uint32_t(uint64_t(backend.queued())*1000/(rate*channels*2)):0;}
     void set_backend(AudioBackend b){if(opened)throw std::runtime_error("Audio backend already open");backend=std::move(b);}
     void attach(uint32_t ref,unsigned hz,unsigned count){
         if(track||!ref||hz<8000||hz>192000||(count!=1&&count!=2))throw std::runtime_error("Unsupported PCM configuration");
@@ -46,9 +48,10 @@ public:
         if((unit!=1&&unit!=2)||pcm.size()>1024*1024||pcm.size()%(channels*2))throw std::runtime_error("PCM block size/alignment invalid");
         if(pcm.empty())return 0;
         if(!opened){play(ref);pause(ref);}
-        const uint32_t limit=std::max<uint32_t>(8192,rate*channels*2/10),used=backend.queued();
+        const uint32_t limit=std::max<uint32_t>(8192,rate*channels*2/4),used=backend.queued();
+        if(state==3&&submitted_bytes&&used==0)++empty_writes;
         uint32_t count=uint32_t(std::min<uint64_t>(pcm.size(),used>=limit?0:limit-used));count-=count%(channels*2);
-        if(!count){if(blocking)throw AudioBackpressure{};return 0;}
+        if(!count){++backpressure;if(blocking)throw AudioBackpressure{};return 0;}
         backend.queue(pcm.data(),count);++write_calls;submitted_bytes+=count;
         for(uint32_t i=0;i<count;i+=2){const int32_t s=int16_t(uint16_t(pcm[i])|uint16_t(pcm[i+1])<<8);if(s)++nonzero_samples;peak=std::max(peak,uint32_t(s<0?-s:s));}
         return count/unit;
