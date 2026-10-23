@@ -9,9 +9,10 @@ import shutil
 import tempfile
 from prepare_data import import_data
 import reanimated_hd
+import chinese_resources
 
 
-def prepare(source, output, hd_apk=None):
+def prepare(source, output, hd_apk=None, chinese_apk=None):
     source, output = Path(source).resolve(), Path(output).absolute()
     if output.exists() or output.is_symlink():
         raise ValueError("Output already exists")
@@ -21,6 +22,7 @@ def prepare(source, output, hd_apk=None):
     stage = Path(tempfile.mkdtemp(prefix=".deadspacemobile-romfs-", dir=output.parent))
     try:
         import_data(source, stage / "gamedata")
+        chinese_summary = chinese_resources.overlay(chinese_apk, stage / "gamedata") if chinese_apk else None
         hd_summary = None
         if hd_apk is not None:
             pack = reanimated_hd.extract(hd_apk, stage / "texture_hd")
@@ -55,6 +57,8 @@ def prepare(source, output, hd_apk=None):
         manifest = {"format": 1, "title": "Dead Space Mobile", "files": entries,
                     "file_count": len(entries), "total_bytes": sum(e["size"] for e in entries),
                     "campaign_verified": False}
+        if chinese_summary is not None:
+            manifest["chinese_resources"] = chinese_summary
         if hd_summary is not None:
             manifest["hd_textures"] = hd_summary
         (stage / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
@@ -70,6 +74,7 @@ if __name__ == "__main__":
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--hd-apk", type=Path, help="Pinned Reanimated v1.3 APK; embed HD-only files after matching the donor")
+    parser.add_argument("--chinese-apk", type=Path, help="Copy compatible Chinese strings and font; retain supported donor code")
     args = parser.parse_args()
-    report = prepare(args.source, args.output, args.hd_apk)
+    report = prepare(args.source, args.output, args.hd_apk, args.chinese_apk)
     print(f"Staged {report['file_count']} files, {report['total_bytes']} bytes. Not a playable build.")

@@ -46,6 +46,20 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     std::unordered_map<uint32_t,Page> pages;
     std::vector<std::string> functions;
     ds::GuestHeap guest_heap;
+    using FastPages=std::array<uint8_t*,Dynarmic::A32::UserConfig::NUM_PAGE_TABLE_ENTRIES>;
+    std::unique_ptr<FastPages> fast_pages=std::make_unique<FastPages>();
+    uint64_t fast_page_count=0;
+    // Only permanent, fully mapped heap/main-stack pages are eligible. Worker
+    // stacks, mmap/sbrk and image permissions continue through checked callbacks.
+    Page& sparse_page(uint32_t address) {
+        auto& page=pages[address>>12];
+        const uint64_t begin=uint64_t(address&~4095u),end=begin+4096;
+        if(((begin>=heap&&end<=guest_heap.high_water())||
+            (begin>=stack&&end<=uint64_t(stack)+0x200000))&&!(*fast_pages)[address>>12]) {
+            (*fast_pages)[address>>12]=page.data();++fast_page_count;
+        }
+        return page;
+    }
     struct Mutex {unsigned type=0,depth=0;uint32_t owner=0;};
     std::map<uint32_t,Mutex> mutexes;
     std::map<uint32_t,unsigned> attrs,semaphores;
@@ -80,6 +94,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     std::map<std::string,uint64_t> service_counts;
     ds::GraphicsBackend graphics;
     ds::GuestClockFloor clock_floor;
+    uint64_t perf_frames=0,input_ns=0,draw_ns=0,present_ns=0,max_frame_ns=0;
+    static uint64_t elapsed_ns(std::chrono::steady_clock::time_point start) {
+        return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-start).count());
+    }
     uint64_t guest_time() {
         const auto previous=threads.time();
         if(graphics.monotonic_ns)threads.tick(clock_floor.sample(graphics.monotonic_ns(),previous)-previous);
@@ -97,9 +115,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         if(uint64_t(address)+count>0x100000000ull)return false;
         const uint32_t last=address+uint32_t(count-1);
         if((address>>12)==(last>>12)&&mapped(address)&&mapped(last)) {
-            const auto it=pages.find(address>>12);
-            if(it==pages.end())std::memset(output,0,count);
-            else std::memcpy(output,it->second.data()+(address&4095),count);
+            std::memcpy(output,sparse_page(address).data()+(address&4095),count);
         } else if(!image.read(address,output,count))return false;
         direct_read_bytes+=count;return true;
     }
@@ -108,7 +124,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         if(uint64_t(address)+count>0x100000000ull)return false;
         const uint32_t last=address+uint32_t(count-1);
         if((address>>12)==(last>>12)&&mapped(address)&&mapped(last))
-            std::memcpy(pages[address>>12].data()+(address&4095),input,count);
+            std::memcpy(sparse_page(address).data()+(address&4095),input,count);
         else if(!image.write(address,input,count))return false;
         direct_write_bytes+=count;return true;
     }
@@ -180,10 +196,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
               {"GetLocationAvailable","true"},{"GetMicrophoneCount","1"},{"GetApiLevel","19"},
               {"GetPlatformRawName","Android"},{"GetPlatformStdName","Android"},{"GetPlatformVersion","4.4.4"},
               {"GetPhysicalKeyboardCount","1"},{"GetProcessorArchitecture","armeabi-v7a"},
-              {"GetLanguage","zh"},{"GetLocale","zh"},{"GetTotalRAM","-1"},{"GetTouchPadCount","1"},
+              {"GetLanguage","zh"},{"GetLocale","zh_CN"},{"GetTotalRAM","-1"},{"GetTouchPadCount","1"},
               {"GetTouchScreenCount","1"},{"GetTrackBallCount","0"},{"GetVibratorCount","0"},
               {"GetVirtualKeyboardCount","1"}};
-            const auto it=props.find(m.name);if(it!=props.end())return java_string(it->second);
+            const auto it=props.find(m.name);if(it!=props.end()){if((m.name=="GetLanguage"||m.name=="GetLocale")&&graphics.progress)graphics.progress("LOCALE: "+m.name+"="+it->second);return java_string(it->second);}
         }
         if(cls=="com/ea/blast/GetAppDataDirectoryDelegate"){
             if(m.name=="GetAppDataDirectory"||m.name=="GetExternalStorageDirectory")return java_string(storage.save_root.empty()?data_root:storage.save_root);
@@ -231,16 +247,19 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         unsigned calls=0;
         unsigned beats=0;
         auto last_checkpoint=std::chrono::steady_clock::now();
+        // Import calls end a JIT run, not a scheduling timeslice. Keep the
+        // remaining budget across them so import-heavy resource loaders can
+        // make progress between display frames, while bounding CPU-only loops.
+        quantum=std::min<uint64_t>(budget,1000000);
         while(!returned&&fault.empty()&&budget){
-            quantum=std::min<uint64_t>(budget,100000);
+            if(!quantum)quantum=std::min<uint64_t>(budget,1000000);
             cpu->Run();
             const auto& active=threads.thread();
             const auto sp=cpu->Regs()[13];
             if(fault.empty() && (sp<active.stack_begin || uint64_t(sp)>uint64_t(active.stack_begin)+active.stack_size)) {
                 throw std::runtime_error("Guest stack escaped thread mapping: sp="+to_hex(sp)+" pc="+to_hex(cpu->Regs()[15])+" lr="+to_hex(cpu->Regs()[14])+" last="+last_service);
             }
-            if((++beats&1023)==0)fprintf(stderr,"HB %s instr=%llu left=%llu reads=%u bytes=%llu pc=0x%x sp=0x%x\n",label.c_str(),(unsigned long long)(6000000000ull-budget),(unsigned long long)budget,asset_reads,(unsigned long long)asset_read_bytes,cpu->Regs()[15],cpu->Regs()[13]);
-            if((beats&1023)==0&&graphics.progress) {
+            if((++beats&1023)==0&&graphics.progress) {
                 const auto now=std::chrono::steady_clock::now();
                 if(now-last_checkpoint>=std::chrono::seconds(10)) {
                     const std::string current=pending&&pending<=functions.size()?functions[pending-1]:last_service;
@@ -264,15 +283,20 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 jumps.clear_owner(threads.current());
                 threads.exit(cpu->Regs()[0]);returned=false;rotate=true;
             }
-            if(auto* old=threads.find(threads.current())) {
+            // Ordinary imports resume the same CPU; snapshot registers only
+            // when the scheduler can actually choose another thread.
+            const bool scheduling=rotate||!quantum||threads.thread().state!=ds::GuestThreads::State::ready;
+            if(scheduling)if(auto* old=threads.find(threads.current())) {
                 old->cpu.save(*cpu);old->exception=jni_exception;old->error=errno_address;
             }
-            threads.reap_joins([&](uint32_t p,uint32_t v){MemoryWrite32(p,v);});
-            // Dispatch boundaries and instruction quanta are safe context-switch
-            // points. Nested Java-to-native calls retain their suspended context.
+            if(scheduling)threads.reap_joins([&](uint32_t p,uint32_t v){MemoryWrite32(p,v);});
+            // Yield only on an explicit request, a block, or slice exhaustion.
+            // Rotating on every libc/JNI import fragments background loading
+            // over thousands of display frames. Nested calls stay suspended.
             const auto previous=threads.current();
-            threads.select();
+            if(scheduling)threads.select();
             if(previous!=threads.current() || rotate) {
+                quantum=std::min<uint64_t>(budget,1000000);
                 ++thread_switches;cpu->ClearExclusiveState();threads.thread().cpu.load(*cpu);
                 jni_exception=threads.thread().exception;errno_address=threads.thread().error;
             }
@@ -616,6 +640,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     }
 
 public:
+    FastPages* page_table(){return fast_pages.get();}
     ds::GuestImage image;
     Dynarmic::A32::Jit* cpu=nullptr;
 
@@ -623,7 +648,7 @@ public:
         if(a==0&&++guard_log<=20)trace.push_back("  RD0 pc=0x"+to_hex(cpu->Regs()[15]-8)+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7]));
         if(a==0x1044bb6c&&++guard_log<=40)trace.push_back("  RD 0x1044bb6c pc=0x"+to_hex(cpu->Regs()[15]-8)+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6]));
         if((a==0x10450b68u||a==0x10450b69u||a==0x10450b6au||a==0x10450b6bu)&&++guard_log<=40)trace.push_back("  RD 0x10450b68 pc=0x"+to_hex(cpu->Regs()[15]-8)+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7]));
-        if(mapped(a)){const auto it=pages.find(a>>12);return it==pages.end()?0:it->second[a&4095];}
+        if(mapped(a))return sparse_page(a)[a&4095];
         if(a>=thunks && uint64_t(a)-thunks<functions.size()*4) return uint8_t((0xef000001u+((a-thunks)/4))>>(8*((a-thunks)%4)));
         if(a>=stop && a-stop<4)return uint8_t(0xef00ffffu>>(8*(a-stop)));
         uint8_t v=0;
@@ -649,7 +674,7 @@ public:
         if(a==0x1043f088u&&++svc_log<=20)trace.push_back("  WR088 v="+to_hex(v)+" mapped="+std::to_string(mapped(a))+" pcount="+std::to_string(pages.count(a>>12)));
         if((a>=0x1044bb58u&&a<0x1044bb90u||a>=0x10450b60u&&a<0x10450b90u)&&++guard_log<=500)trace.push_back("  WR 0x"+to_hex(a)+"=0x"+to_hex(v)+" svc="+last_service+" pc=0x"+to_hex(cpu->Regs()[15])+" sp=0x"+to_hex(cpu->Regs()[13])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7])+" r3=0x"+to_hex(cpu->Regs()[3])+" r2=0x"+to_hex(cpu->Regs()[2]));
         if(a==0x1043f100u&&++svc_log<=80)trace.push_back("  WRF100 0x"+to_hex(v)+" svc="+last_service+" pc=0x"+to_hex(cpu->Regs()[15]-8)+" r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6]));
-        if(mapped(a)){pages[a>>12][a&4095]=v;return;}
+        if(mapped(a)){sparse_page(a)[a&4095]=v;return;}
         if(!image.write(a,&v,1))fail("Write outside writable guest mapping at "+std::to_string(a));
     }
     void MemoryWrite16(uint32_t a,uint16_t v) override {const uint8_t b[2]={uint8_t(v),uint8_t(v>>8)};if(!write_span(a,b,2)){MemoryWrite8(a,v);MemoryWrite8(a+1,v>>8);}}
@@ -793,8 +818,10 @@ public:
         const auto frame=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
         if(!frames&&!graphics.keep_running)throw std::runtime_error("Interactive session requires a stop callback");
+        unsigned input_checkpoints=0;
         auto last_frame_checkpoint=std::chrono::steady_clock::now();
         for(unsigned i=0;!frames||i<frames;++i){
+            const auto frame_start=std::chrono::steady_clock::now();
             guest_time();
             if(i<3&&graphics.progress)graphics.progress("FRAME BEGIN: "+std::to_string(i));
             if(graphics.keep_running&&!graphics.keep_running())break;
@@ -814,21 +841,29 @@ public:
                         const auto entry=image.exports.find(name);if(entry==image.exports.end())throw std::runtime_error("Guest keyboard export missing");
                         guest_call(entry->second,{env_addr,0x42424242,600,event.code,1},"key input",true);
                     }
-                    trace.push_back("Input kind="+std::to_string(event.kind)+" frame="+std::to_string(i));
+                    const std::string input_log="Input kind="+std::to_string(event.kind)+" frame="+std::to_string(i)+" code="+std::to_string(event.code)+" x="+std::to_string(event.x)+" y="+std::to_string(event.y);
+                    trace.push_back(input_log);
+                    if(graphics.progress&&(input_checkpoints++<8||((event.kind==ds::InputEvent::key_down||event.kind==ds::InputEvent::key_up)&&i%120==0)))graphics.progress(input_log);
                 }
             }
 
             if(graphics.keep_running&&!graphics.keep_running())break;
             if(i<3&&graphics.progress)graphics.progress("FRAME DRAW: "+std::to_string(i));
             if(i==0&&graphics.progress)graphics.progress("BEGIN: first guest DrawFrame");
+            const auto draw_start=std::chrono::steady_clock::now();
+            input_ns+=elapsed_ns(frame_start);
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
             if(i==0&&graphics.progress)graphics.progress("END: first guest DrawFrame");
+            draw_ns+=elapsed_ns(draw_start);
             ++frames_done;
+            const auto present_start=std::chrono::steady_clock::now();
             if(graphics.present)graphics.present();
+            present_ns+=elapsed_ns(present_start);++perf_frames;max_frame_ns=std::max(max_frame_ns,elapsed_ns(frame_start));
             const auto frame_now=std::chrono::steady_clock::now();
             if(graphics.progress&&(i<3||frame_now-last_frame_checkpoint>=std::chrono::seconds(5))) {
                 graphics.progress("FRAME COMPLETE: "+std::to_string(frames_done)+" guest_ns="+std::to_string(guest_time())+" clock="+(graphics.monotonic_ns?"host-monotonic-floor":"instruction-only")+"\n"+graphics_report());
                 last_frame_checkpoint=frame_now;
+                perf_frames=input_ns=draw_ns=present_ns=max_frame_ns=0;
             }
             trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
         }
@@ -839,6 +874,7 @@ public:
     std::string graphics_report() const {
         if(!native_gl)return "Graphics backend: mock diagnostics.\n";
         std::string out=std::string("Graphics backend: ")+(graphics.desktop_compatibility?"desktop compatibility reference":"native GLES1 subset")+"; "+std::to_string(native_gl->calls)+" guest GL dispatches, "+std::to_string(native_gl->draws)+" draw submissions, "+std::to_string(native_gl->texture_uploads)+" texture uploads, "+std::to_string(native_gl->atc_uploads)+" ATC uploads.\n";
+        if(perf_frames)out+="Timing window: frames="+std::to_string(perf_frames)+" input_ms="+std::to_string(double(input_ns)/perf_frames/1e6)+" guest_ms="+std::to_string(double(draw_ns)/perf_frames/1e6)+" present_ms="+std::to_string(double(present_ns)/perf_frames/1e6)+" max_frame_ms="+std::to_string(double(max_frame_ns)/1e6)+" PCM_empty_writes="+std::to_string(audio.empty_writes)+" PCM_backpressure="+std::to_string(audio.backpressure)+" PCM_buffer_ms="+std::to_string(audio.buffered_ms())+" fast_pages="+std::to_string(fast_page_count)+"\n";
         if(graphics.hd_texture)out+="HD: "+std::to_string(native_gl->hd_matches)+" matches, "+std::to_string(native_gl->hd_mip_uploads)+" mip uploads, "+std::to_string(native_gl->hd_misses)+" missing, "+std::to_string(native_gl->hd_rejected)+" rejected, "+std::to_string(native_gl->hd_budget_skips)+" budget skips, "+std::to_string(native_gl->hd_dynamic_fallbacks)+" dynamic fallbacks.\n";
         if(!native_gl->last_hd_error.empty())out+="Last HD rejection: "+native_gl->last_hd_error+"\n";
         return out;
@@ -847,8 +883,9 @@ public:
     std::string report() const {
         std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
         out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
+        out+="Memory: "+std::to_string(fast_page_count)+" permanent pages on JIT fast path; other accesses checked.\n";
         out+="Clock: "+std::string(graphics.monotonic_ns?"host monotonic floor":"instruction-only")+"; guest_ns="+std::to_string(threads.time())+"\n";
-        out+="Threads: cooperative scheduler; created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
+        out+="Threads: bounded instruction timeslices (1000000); created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
         out+=graphics_report();
         out+="Storage: "+std::to_string(save_opens)+" save opens, "+std::to_string(save_read_bytes)+" bytes read, "+std::to_string(save_written_bytes)+" bytes written.\n";
         out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
@@ -883,7 +920,9 @@ std::string lifecycle_probe(const std::string& library,const std::string& data_r
         checkpoint("END: load guest ELF; BEGIN: runtime initialization");
         env.initialize(data_root,std::move(graphics),std::move(audio),save_root);
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
-        conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
+        conf.code_cache_size=32*1024*1024;conf.page_table=env.page_table();conf.fastmem_pointer=std::nullopt;
+        conf.detect_misaligned_access_via_page_table=16|32|64;
+        conf.only_detect_misalignment_via_page_table_on_page_boundary=true;
         checkpoint("END: runtime initialization; BEGIN: Dynarmic JIT construction");
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;
         checkpoint("END: Dynarmic JIT construction; BEGIN: guest constructors");

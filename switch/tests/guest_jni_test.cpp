@@ -182,6 +182,10 @@ int main() {
         check(blocked&&captured.size()==8,"Full queue lost or duplicated PCM");
         check(sound.call("CallIntMethod",{track,nonblock,bytes,0,8,1})==0,"Full nonblocking write must return zero");
         queued=0;check(sound.call("CallIntMethod",{track,write,samples,2,4})==4&&captured.size()==16,"PCM retry damaged data");
+        queued=44100-4;check(sound.call("CallIntMethod",{track,write,samples,2,4})==2,"250ms PCM cap must return a short partial write");
+        check(queued==44100&&sound.audio_stats().buffered_ms()==250,"PCM buffer duration accounting");
+        check(sound.call("CallIntMethod",{track,nonblock,bytes,0,8,1})==0,"250ms PCM cap must preserve backpressure");
+        check(sound.audio_stats().empty_writes>=1&&sound.audio_stats().backpressure>=3,"PCM starvation/backpressure telemetry");
         sound.call("CallVoidMethod",{track,stop});check(paused&&queued==0,"Audio stop did not clear queue");
         sound.call("CallVoidMethod",{track,sound.method(track,"release","()V")});
         check(uint32_t(sound.call("CallIntMethod",{track,write,samples,2,4}))==uint32_t(-3),"Released track accepted write");

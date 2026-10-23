@@ -5,26 +5,28 @@
 #include <dynarmic/interface/A32/config.h>
 #include <array>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 
 struct Runtime: Dynarmic::A32::UserCallbacks {
     ds::GuestThreads threads;
     Dynarmic::A32::Jit* cpu=nullptr;
     uint64_t ticks=0;uint32_t event=0;bool finished=false;
-    std::array<uint32_t,3> data{};
+    std::array<uint32_t,1024> data{};
+    unsigned data_reads=0,data_writes=0;
     const std::array<uint32_t,5> main_code={0xe3a00001,0xe5840000,0xef000002,0xe5940004,0xe12fff1e};
     const std::array<uint32_t,8> worker_code={0xe5941000,0xe3510001,0x0a000001,0xef000001,0xeafffffa,0xe3a0002a,0xe5840004,0xe12fff1e};
     uint32_t MemoryRead32(uint32_t p) override {
         if(p>=0x10000000&&p<0x10000000+main_code.size()*4)return main_code.at((p-0x10000000)/4);
         if(p>=0x10000100&&p<0x10000100+worker_code.size()*4)return worker_code.at((p-0x10000100)/4);
-        if(p>=0x30000000&&p<0x3000000c)return data.at((p-0x30000000)/4);
+        if(p>=0x30000000&&p<0x3000000c){++data_reads;return data.at((p-0x30000000)/4);}
         if(p==0x70000000)return 0xef00ffff;
         throw std::runtime_error("Unmapped synthetic ARM read");
     }
     uint8_t MemoryRead8(uint32_t p)override{return uint8_t(MemoryRead32(p&~3u)>>(8*(p&3)));}
     uint16_t MemoryRead16(uint32_t p)override{return MemoryRead8(p)|uint16_t(MemoryRead8(p+1))<<8;}
     uint64_t MemoryRead64(uint32_t p)override{return MemoryRead32(p)|uint64_t(MemoryRead32(p+4))<<32;}
-    void MemoryWrite32(uint32_t p,uint32_t v)override {if(p<0x30000000||p>=0x3000000c||(p&3))throw std::runtime_error("Unmapped synthetic ARM write");data.at((p-0x30000000)/4)=v;}
+    void MemoryWrite32(uint32_t p,uint32_t v)override {if(p<0x30000000||p>=0x3000000c||(p&3))throw std::runtime_error("Unmapped synthetic ARM write");++data_writes;data.at((p-0x30000000)/4)=v;}
     void MemoryWrite8(uint32_t,uint8_t)override{throw std::runtime_error("Unexpected byte write");}
     void MemoryWrite16(uint32_t,uint16_t)override{throw std::runtime_error("Unexpected halfword write");}
     void MemoryWrite64(uint32_t,uint64_t)override{throw std::runtime_error("Unexpected doubleword write");}
@@ -34,8 +36,12 @@ struct Runtime: Dynarmic::A32::UserCallbacks {
     void AddTicks(uint64_t n)override{ticks=n>ticks?0:ticks-n;threads.tick(n*10);}
     uint64_t GetTicksRemaining()override{return ticks;}
 };
-int main(){try {
+static void run(bool fast) {
     Runtime r;Dynarmic::A32::UserConfig config;config.callbacks=&r;config.arch_version=Dynarmic::A32::ArchVersion::v6K;config.code_cache_size=32*1024*1024;
+    auto pages=std::make_unique<std::array<uint8_t*,Dynarmic::A32::UserConfig::NUM_PAGE_TABLE_ENTRIES>>();
+    if(fast){(*pages)[0x30000]=reinterpret_cast<uint8_t*>(r.data.data());config.page_table=pages.get();}
+    config.detect_misaligned_access_via_page_table=16|32|64;
+    config.only_detect_misalignment_via_page_table_on_page_boundary=true;
     Dynarmic::A32::Jit cpu(config);r.cpu=&cpu;
     auto& main=r.threads.thread();main.cpu.regs[4]=0x30000000;main.cpu.regs[13]=0x201fff00;main.cpu.regs[14]=0x70000000;main.cpu.regs[15]=0x10000000;
     for(unsigned i=0;i<64;++i)main.cpu.ext[i]=0x3f800000+i;
@@ -55,5 +61,7 @@ int main(){try {
         cpu.ClearExclusiveState();r.threads.thread().cpu.load(cpu);
     }
     if(!r.finished||cpu.Regs()[0]!=42||r.data[0]!=1||r.data[1]!=42||r.data[2]!=42||!sleeps||switches<3||cpu.ExtRegs()[31]!=0x3f80001f||cpu.Regs()[13]!=0x201fff00)throw std::runtime_error("ARM cooperative completion invariant failed");
-    std::cout<<"PASS: actual ARM32 worker yielded, parent published flag, worker completed, join delivered 42; switches="<<switches<<" sleeps="<<sleeps<<"\n";
-}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
+    if(fast?(r.data_reads!=0||r.data_writes!=1):(r.data_reads==0||r.data_writes<3))throw std::runtime_error("JIT page-table path/callback coverage failed");
+    std::cout<<"PASS: fast_pages="<<fast<<" actual ARM32 worker yielded, parent published flag, worker completed, join delivered 42; switches="<<switches<<" sleeps="<<sleeps<<"\n";
+}
+int main(){try{run(false);run(true);}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

@@ -101,6 +101,8 @@ def build(args):
         stage = Path(temp)
         romfs = stage/'romfs'
         command = ['python3', str(ROOT/'switch/tools/prepare_romfs.py'), str(args.data.resolve()), str(romfs)]
+        if getattr(args, "chinese_apk", None):
+            command += ["--chinese-apk", str(args.chinese_apk.resolve())]
         if args.hd_apk:
             command += ['--hd-apk', str(args.hd_apk.resolve())]
         subprocess.run(command, check=True)
@@ -109,7 +111,7 @@ def build(args):
         if args.prebuilt_nso:
             shutil.copyfile(args.prebuilt_nso, exefs/'main')
             subprocess.run(['nacptool', '--create', 'Dead Space Mobile', 'Xiao Fan',
-                            '0.3.6', str(control/'control.nacp'), f'--titleid={title}'], check=True)
+                            '0.3.9', str(control/'control.nacp'), f'--titleid={title}'], check=True)
         else:
             subprocess.run(['make', '-C', str(ROOT/'switch'), '-j2', 'CPU_PROBE=1', 'STANDALONE=1',
                             f'CPU_BUILD_DIR={cpu_build}', f'ROMFS_ROOT={romfs}', f'TITLE_ID={title}',
@@ -142,6 +144,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data', type=Path, required=True, help='Supported original donor data directory/archive')
     parser.add_argument('--hd-apk', type=Path)
+    parser.add_argument('--chinese-apk', type=Path, help='Embed compatible Chinese strings/font in this same NSP')
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument('--cpu-build', type=Path)
     source.add_argument('--prebuilt-nso', type=Path, help='Standalone NSO built from the reviewed source revision')

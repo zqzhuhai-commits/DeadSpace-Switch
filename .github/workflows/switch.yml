@@ -29,6 +29,7 @@ jobs:
         run: python3 switch/tests/run_tests.py --native-gl
       - name: Resource tool regressions
         run: |
+          python3 switch/tests/chinese_resources_test.py
           python3 switch/tests/hd_romfs_test.py
           python3 switch/tests/reanimated_hd_test.py
           python3 switch/tests/package_nsp_test.py
