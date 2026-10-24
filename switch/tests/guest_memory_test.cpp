@@ -98,6 +98,10 @@ int main() {
         check(heap.allocate(64)==b,"Failed calloc leaked reserved block");
         ds::GuestHeap full;full.allocate(32*1024*1024);full.allocate(32*1024*1024);
         reject([&]{full.allocate(16);});
+        ds::GuestHeap crowded;std::vector<uint32_t> pointers;
+        for(unsigned i=0;i<100000;++i)pointers.push_back(crowded.allocate(16));
+        for(unsigned i=0;i<pointers.size();i+=2)crowded.release(pointers[i]);
+        for(unsigned i=0;i<pointers.size()/2;++i)check(crowded.allocation_size(crowded.allocate(16))==16,"Indexed free blocks lost allocations");
         std::cout<<"PASS: canonical image bounds, nested stack ABI and exception restoration, heap reuse/coalescing, bounded realloc and zeroed calloc\n";
     } catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

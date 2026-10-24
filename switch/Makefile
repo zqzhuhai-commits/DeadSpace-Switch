@@ -18,13 +18,22 @@ APP_VERSION := 0.3.2
 ifeq ($(CPU_PROBE),1)
 CPU_BUILD_DIR ?= build/cpu
 CPPFLAGS += -DDS_CPU_PROBE -Iruntime
-LIBS := -Wl,--start-group $(CPU_BUILD_DIR)/libds_cpu_probe.a $(CPU_BUILD_DIR)/dynarmic/src/dynarmic/libdynarmic.a $(CPU_BUILD_DIR)/dynarmic/externals/fmt/libfmt.a $(CPU_BUILD_DIR)/dynarmic/externals/mcl/src/libmcl.a -Wl,--end-group $(LIBS)
+CPU_LIBRARIES := $(CPU_BUILD_DIR)/libds_cpu_probe.a $(CPU_BUILD_DIR)/dynarmic/src/dynarmic/libdynarmic.a $(CPU_BUILD_DIR)/dynarmic/externals/fmt/libfmt.a $(CPU_BUILD_DIR)/dynarmic/externals/mcl/src/libmcl.a
+LIBS := -Wl,--start-group $(CPU_LIBRARIES) -Wl,--end-group $(LIBS)
 endif
 CPPFLAGS += -DDS_APP_VERSION='"$(APP_VERSION)"'
+MAIN_SOURCE := main
+ifeq ($(GAME_LAUNCHER),1)
+ifneq ($(CPU_PROBE),1)
+$(error GAME_LAUNCHER requires CPU_PROBE=1)
+endif
+MAIN_SOURCE := rebuild_main
+CPPFLAGS += -DDS_GAME_LAUNCHER
+endif
 ifneq ($(strip $(ROMFS_ROOT)),)
 ROMFS_OPTION := --romfsdir="$(ROMFS_ROOT)"
 endif
-OBJECTS := build/main.o build/preflight.o build/platform_probe.o build/fixed_function_probe.o build/game_graphics_probe.o build/PVRTDecompress.o
+OBJECTS := build/$(MAIN_SOURCE).o build/preflight.o build/platform_probe.o build/fixed_function_probe.o build/game_graphics_probe.o build/PVRTDecompress.o
 
 .PHONY: all clean host-test FORCE
 FORCE:
@@ -35,8 +44,8 @@ build/%.o: source/%.cpp | build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 build/PVRTDecompress.o: ../third_party/powervr/PVRTDecompress.cpp | build
 	$(CXX) $(CPPFLAGS) $(filter-out -Werror,$(CXXFLAGS)) -c $< -o $@
-build/deadspace-switch.elf: $(OBJECTS)
-	$(CXX) $(LDFLAGS) $^ $(LIBS) -o $@
+build/deadspace-switch.elf: $(OBJECTS) $(CPU_LIBRARIES)
+	$(CXX) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
 build/deadspace-switch.nacp: Makefile | build
 	nacptool --create "$(APP_TITLE)" "Switch Port Contributors" "$(APP_VERSION)" $@
 build/deadspace-switch.nro: build/deadspace-switch.elf build/deadspace-switch.nacp $(APP_ICON) FORCE

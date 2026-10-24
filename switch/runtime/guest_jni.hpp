@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <set>
 
 namespace ds {
 struct JavaObject {
@@ -40,6 +41,7 @@ protected:
     virtual uint32_t monitor_waiter(uint32_t) const {return 0;}
     virtual void wake_monitor(uint32_t) {throw std::runtime_error("JNI monitor scheduler unavailable");}
     uint64_t asset_opens=0, asset_lists=0, asset_read_bytes=0; unsigned open_log=0;
+    std::set<std::string> asset_paths;
     virtual uint32_t alloc(uint32_t)=0;
     virtual uint32_t arg(unsigned)=0;
     virtual uint8_t MemoryRead8(uint32_t)=0;
@@ -49,6 +51,8 @@ protected:
     virtual void MemoryWrite8(uint32_t,uint8_t)=0;
     virtual void MemoryWrite16(uint32_t,uint16_t)=0;
     virtual void MemoryWrite32(uint32_t,uint32_t)=0;
+    virtual void MemoryReadBlock(uint32_t p,void* output,size_t size){auto* bytes=static_cast<uint8_t*>(output);for(size_t i=0;i<size;++i)bytes[i]=MemoryRead8(p+uint32_t(i));}
+    virtual void MemoryWriteBlock(uint32_t p,const void* input,size_t size){const auto* bytes=static_cast<const uint8_t*>(input);for(size_t i=0;i<size;++i)MemoryWrite8(p+uint32_t(i),bytes[i]);}
     virtual uint64_t java_delegate(uint32_t,const MethodKey&,const std::vector<uint64_t>&)=0;
     virtual uint32_t guest_pc() const {return 0;}
     std::string last_asset_call;

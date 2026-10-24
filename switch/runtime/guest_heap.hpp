@@ -7,10 +7,15 @@
 
 namespace ds {
 class GuestHeap {
-    struct Block {uint32_t size,requested;bool available;};
+    using FreeIndex=std::multimap<uint32_t,uint32_t>;
+    struct Block {uint32_t size,requested;bool available;FreeIndex::iterator free_slot{};};
     std::map<uint32_t,Block> blocks;
+    FreeIndex available;
     uint32_t end=GuestLayout::heap_base;
 public:
+    GuestHeap()=default;
+    GuestHeap(const GuestHeap&)=delete;
+    GuestHeap& operator=(const GuestHeap&)=delete;
     uint32_t high_water() const {return end;}
     uint32_t allocation_size(uint32_t pointer) const {
         const auto it=blocks.find(pointer);
@@ -20,11 +25,11 @@ public:
     uint32_t allocate(uint32_t requested) {
         if(requested>32*1024*1024)throw std::runtime_error("Guest allocation size bound");
         const uint32_t size=std::max(16u,(requested+15)&~15u);
-        for(auto it=blocks.begin();it!=blocks.end();++it) {
-            auto& block=it->second;
-            if(!block.available || block.size<size)continue;
-            const auto pointer=it->first,remaining=block.size-size;
-            if(remaining)blocks.emplace(pointer+size,Block{remaining,0,true});
+        const auto slot=available.lower_bound(size);
+        if(slot!=available.end()) {
+            const auto pointer=slot->second;auto& block=blocks.at(pointer);
+            const auto remaining=block.size-size;available.erase(slot);
+            if(remaining){auto added=blocks.emplace(pointer+size,Block{remaining,0,true}).first;added->second.free_slot=available.emplace(remaining,pointer+size);}
             block={size,requested,false};return pointer;
         }
         if(size>GuestLayout::heap_base+GuestLayout::heap_size-end)throw std::runtime_error("Guest heap exhausted");
@@ -53,11 +58,12 @@ public:
         if(it==blocks.end() || it->second.available)throw std::runtime_error("Invalid guest free");
         it->second.available=true;it->second.requested=0;
         auto after=std::next(it);
-        if(after!=blocks.end() && after->second.available){it->second.size+=after->second.size;blocks.erase(after);}
+        if(after!=blocks.end() && after->second.available){available.erase(after->second.free_slot);it->second.size+=after->second.size;blocks.erase(after);}
         if(it!=blocks.begin()) {
             auto before=std::prev(it);
-            if(before->second.available){before->second.size+=it->second.size;blocks.erase(it);}
+            if(before->second.available){available.erase(before->second.free_slot);before->second.size+=it->second.size;blocks.erase(it);it=before;}
         }
+        it->second.free_slot=available.emplace(it->second.size,it->first);
     }
 };
 }

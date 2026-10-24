@@ -3,18 +3,28 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
+#include "guest_input.hpp"
 
 namespace ds {
 struct GraphicsBackend {
     std::function<void*(const char*)> resolve;
     std::function<void()> present;
     bool desktop_compatibility=false; // host reference only; Switch uses GLES1
+    bool realtime_clock=false;
+    uint32_t surface_width=640,surface_height=480;
     std::function<std::vector<uint8_t>(const std::string&)> hd_texture={};
     uint64_t hd_budget_bytes=128*1024*1024;
+    std::function<void(bool)> audio_playing;
+    // Samples are signed 16-bit interleaved stereo at 44100 Hz. No value
+    // means the real device queue is full: suspend this guest worker.
+    std::function<std::optional<uint32_t>(const std::vector<int16_t>&)> audio_write;
+    std::function<std::vector<GuestInput>()> poll_input;
+    std::function<void(const std::string&)> record;
 };
 struct GlGuestMemory {
     std::function<uint32_t(unsigned)> arg;

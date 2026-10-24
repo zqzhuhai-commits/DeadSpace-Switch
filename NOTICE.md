@@ -20,7 +20,7 @@ tool were created by **EapRules**.
 | `thunks/khronos/` | glad generator, Khronos headers | MIT / Apache-2.0 |
 | `third_party/powervr/PVRTDecompress.*` | [PowerVR SDK](https://github.com/powervr-graphics/Native_SDK) by Imagination Technologies | MIT |
 | `src/vfp_vector_patch.cpp` register decoding/scalar emission | adapted from VFPVector by **Bythos14** | MIT |
-| accelerometer gesture samples in `android/input_bridge.cpp` | adapted from [deadspace-vita](https://github.com/v-atamanenko/deadspace-vita) by **v-atamanenko** | MIT |
+| accelerometer gesture samples in `android/input_bridge.cpp` and `switch/runtime/accel_gestures.hpp` | adapted from [deadspace-vita](https://github.com/v-atamanenko/deadspace-vita) by **v-atamanenko** | MIT |
 | `tools/eapx.py` — transactional first-boot donor extractor | written by **EapRules** | GPL-3.0 |
 | `android/`, `jni/classes/xt_*`, `src/`, `harness/`, `ports/` | written for this port | GPL-3.0 |
 

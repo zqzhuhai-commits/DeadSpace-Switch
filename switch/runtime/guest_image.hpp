@@ -22,6 +22,7 @@ public:
     bool read(uint32_t address,void* out,size_t size) const;
     bool write(uint32_t address,const void* data,size_t size);
     bool executable(uint32_t address,size_t size) const;
+    bool writable(uint32_t address,size_t size) const;
 private:
     std::vector<GuestSegment> segments;
     struct Relocation { uint32_t target,addend,kind,value; std::string import; };

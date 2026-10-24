@@ -47,5 +47,13 @@ int main(){try{
  reject([&]{jumps.restore(cpu,4,2,2,1,[&](auto p){return mem[p];});});
  reject([&]{jumps.restore(cpu,4,2,1,2,[&](auto p){return mem[p];});});
  jumps.clear_owner(1);reject([&]{jumps.restore(cpu,4,2,1,1,[&](auto p){return mem[p];});});
- std::cout<<"PASS: guest context/VFP/TLS isolation, round-robin, blocking/wake, sleep deadlines, join results, detached exit, stack reuse, deadlock and opaque jump guards\n";
+ {T timed;const auto worker=timed.create(0x10000000,0,65536,false,0x70000000);
+  timed.sleep(100);require(timed.select()==worker,"Timed waiter worker not selected");
+  timed.block_until(T::State::semaphore,42,50);
+  require(timed.select()==worker&&timed.time()==50,"Timed semaphore did not expire before sleeper");
+  require(timed.thread().cpu.regs[0]==0xffffffff&&timed.thread().timeout_error==110,"Timed semaphore success fabricated");}
+ {T signaled;const auto worker=signaled.create(0x10000000,0,65536,false,0x70000000);
+  signaled.select();signaled.block_until(T::State::semaphore,42,50);signaled.select();signaled.wake(worker);signaled.tick(100);
+  signaled.select();require(signaled.thread().timeout_error==0&&!signaled.thread().timed_wait,"Canceled timeout fired after signal");}
+ std::cout<<"PASS: guest contexts, blocking/wake, timed semaphore expiry/cancellation, sleep, join, TLS and opaque jump guards\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
