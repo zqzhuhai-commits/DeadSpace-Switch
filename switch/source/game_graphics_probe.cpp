@@ -1,7 +1,6 @@
 #include "platform_probe.hpp"
 #ifdef DS_CPU_PROBE
 #include "lifecycle_probe.hpp"
-#include "hd_texture.hpp"
 #include "app_paths.hpp"
 #include "startup_log.hpp"
 #include <SDL2/SDL.h>
@@ -115,11 +114,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         }
         SDL_GL_SwapWindow(window);
     };
-    const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
-    int hd_enabled=1;
-    if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/hd.cfg","r")){int value=1;if(std::fscanf(config,"%d",&value)==1&&(value==0||value==1))hd_enabled=value;std::fclose(config);}
-    if(hd_enabled){graphics.hd_budget_bytes=192*1024*1024;graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};}
-    graphics.record(std::string("HD replacements: ")+(hd_enabled?"enabled, 192 MiB budget; missing textures use originals":"disabled by hd.cfg"));
+    graphics.record("HD replacements: disabled; original textures only");
     log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,frames,std::move(graphics));
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
     if(get_error){char text[80];std::snprintf(text,sizeof(text),"Native context GL error after probe: 0x%x\n",get_error());log+=text;}
