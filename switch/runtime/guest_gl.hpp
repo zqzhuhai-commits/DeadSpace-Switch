@@ -24,6 +24,7 @@ struct GraphicsBackend {
     // means the real device queue is full: suspend this guest worker.
     std::function<std::optional<uint32_t>(const std::vector<int16_t>&)> audio_write;
     std::function<std::vector<GuestInput>()> poll_input;
+    std::function<void(bool)> input_mode;
     std::function<void(const std::string&)> record;
 };
 struct GlGuestMemory {

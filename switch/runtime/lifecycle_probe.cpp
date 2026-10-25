@@ -860,7 +860,50 @@ public:
         }
     }
 
+    uint32_t input_hud=0,input_vector=0,input_app=0;
+    uint64_t native_input_actions=0,native_input_looks=0;
+    bool input_menu=true;
+    void verify_input_profile(){
+        const std::pair<uint32_t,uint32_t> marks[]={{0x71608,0xe92d4ff0},{0x7160c,0xed2d8b06},{0x72594,0x0352fb98},{0x1c5040,0xeaffffd2},{0x1d7d14,0xeafdd9cb},{0x74ef8,0xe3a03ffb},{0x74f00,0xe2833002}};
+        for(auto mark:marks)if(MemoryRead32(ds::GuestImage::base+mark.first)!=mark.second)throw std::runtime_error("Input engine profile mismatch");
+    }
+    uint32_t engine_player(){const auto world=input_hud?MemoryRead32(input_hud+4):0;return world?MemoryRead32(world+212):0;}
+    void update_input_context(){
+        input_hud=0;
+        if(frames_done>=30){
+            if(!input_app)input_app=guest_call(ds::GuestImage::base+0x1c5040,{},"input application",true);
+            const auto app=input_app;
+            const auto world=app?MemoryRead32(app+204):0;
+            const auto player=world?MemoryRead32(world+88):0;
+            if(player&&MemoryRead32(world+0x16a0)>=2)input_hud=guest_call(ds::GuestImage::base+0x1d7d14,{player},"input HUD",true);
+        }
+        const bool menu=!input_hud||MemoryRead32(input_hud+664)!=0||MemoryRead32(input_hud+676)==2;
+        if(menu!=input_menu&&graphics.record)graphics.record(menu?"INPUT: menu pointer":"INPUT: native game actions");
+        input_menu=menu;if(graphics.input_mode)graphics.input_mode(menu);
+    }
+    void engine_action(uint32_t action,bool down){
+        if(!input_hud)return;
+        if(action==uint32_t(ds::GameAction::aim)&&down){
+            const auto player=engine_player();if(!player)return;
+            const auto index=MemoryRead32(player+744);
+            if(index>4||!MemoryRead32(player+724+index*4))return;
+        }
+        guest_call(ds::GuestImage::base+0x71608,{input_hud,action,down?0u:0xffffffffu},"native game action",true);
+        if(++native_input_actions<=32&&graphics.record)graphics.record("INPUT ACTION: 0x"+to_hex(action)+(down?" press":" release"));
+    }
+    void engine_look(float x,float y){
+        const auto player=engine_player();if(!player)return;
+        const auto handler=MemoryRead32(MemoryRead32(player)+8);
+        if(!image.executable(handler&~1u,4))throw std::runtime_error("Invalid player input handler");
+        if(!input_vector)input_vector=alloc(24);
+        uint32_t xb,yb;std::memcpy(&xb,&x,4);std::memcpy(&yb,&y,4);
+        MemoryWrite32(input_vector,ds::GuestImage::base+0x426ed0);MemoryWrite32(input_vector+4,1006);
+        MemoryWrite32(input_vector+12,xb);MemoryWrite32(input_vector+16,yb);MemoryWrite32(input_vector+20,0);
+        for(uint32_t pad:{3u,5u}){MemoryWrite32(input_vector+8,pad);guest_call(handler,{player,input_vector},"native camera event",true);}
+        ++native_input_looks;
+    }
     void run_lifecycle(unsigned frames) {
+        if(graphics.poll_input)verify_input_profile();
         trace.push_back("Constructors returned: "+std::to_string(constructors_completed));
         if(graphics.record)graphics.record("Game constructors completed");
         trace.push_back("lit 0x23599c="+to_hex(MemoryRead32(0x1023599c))+" 0x2359a0="+to_hex(MemoryRead32(0x102359a0))+" 0x2359a8="+to_hex(MemoryRead32(0x102359a8))+" 0x2359a4="+to_hex(MemoryRead32(0x102359a4)));
@@ -897,8 +940,12 @@ public:
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
         for(unsigned i=0;i<frames;++i){
             bool quit=false;
+            if(graphics.poll_input)update_input_context();
             if(graphics.poll_input)for(const auto& event:graphics.poll_input()){
                 if(event.kind==ds::GuestInput::Kind::quit){quit=true;break;}
+                if(event.kind==ds::GuestInput::Kind::action){engine_action(event.code,event.down);continue;}
+                if(event.kind==ds::GuestInput::Kind::look){if(!input_menu)engine_look(event.x,event.y);continue;}
+                if(event.kind==ds::GuestInput::Kind::key&&event.code==4&&input_hud){if(event.down)engine_action(uint32_t(ds::GameAction::cancel),true);continue;}
                 const auto bits=[](float value){uint32_t result;std::memcpy(&result,&value,4);return result;};
                 std::string name;
                 std::vector<uint32_t> args={env_addr,0x42424242};
@@ -936,6 +983,7 @@ public:
         std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
         out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
         out+="Threads: cooperative scheduler; created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
+        out+="Native input: actions="+std::to_string(native_input_actions)+" camera events="+std::to_string(native_input_looks)+"\n";
         out+="Audio: "+std::to_string(audio_samples)+" PCM samples accepted by backend; listening verification is separate.\n";
         out+=graphics_report();
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_lists)+" directories listed; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";

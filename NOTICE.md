@@ -45,6 +45,12 @@ repository will relicense to match — open an issue and it will be corrected.
 
 ## What is *not* in here
 
+The Switch controller layout, menu/level separation, direct game action/camera
+approach and gravity-projected motion aiming follow **hazevauks/deadspace_nx**
+(MIT, Copyright (c) 2026 hazevauks). See `switch/licenses/deadspace_nx-MIT.txt`.
+Its Amazon 1.2.0 offsets are not used for the Xperia donor; the Xperia entry
+points and event vtable were independently checked in the supported library.
+
 No game code, assets, or data from Dead Space are distributed by this project.
 The supported binary is EA/IronMonkey's Xperia Play release; you supply your
 own copy. The port loads it at runtime and circumvents no protection.

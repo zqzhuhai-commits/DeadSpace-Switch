@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <switch.h>
 #include "controller_input.hpp"
+#include "gyro_input.hpp"
 #include <memory>
 
 std::string game_graphics_probe(const std::string& root,unsigned frames) {
@@ -21,7 +22,12 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 #ifdef DS_GAME_LAUNCHER
-    SDL_Window* window=SDL_CreateWindow("Dead Space Mobile",0,0,960,540,SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN);
+    int requested_width=1280,requested_height=720;
+    if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/display.cfg","r")){
+        int w=0,h=0;if(std::fscanf(config,"%d %d",&w,&h)==2&&((w==1280&&h==720)||(w==960&&h==540))){requested_width=w;requested_height=h;}std::fclose(config);
+    }else if(auto* created=std::fopen("sdmc:/switch/deadspacemobile/display.cfg","w")){std::fputs("1280 720\n",created);std::fclose(created);}
+    ds::startup_log("Requested surface: %dx%d",requested_width,requested_height);
+    SDL_Window* window=SDL_CreateWindow("Dead Space Mobile",0,0,requested_width,requested_height,SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN);
 #else
     SDL_Window* window=SDL_CreateWindow("Dead Space Mobile native GL diagnostics",0,0,1280,720,SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN);
 #endif
@@ -52,16 +58,37 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     graphics.resolve=[](const char* name){return SDL_GL_GetProcAddress(name);};
     PadState pad;padConfigureInput(1,HidNpadStyleSet_NpadStandard);padInitializeDefault(&pad);hidInitializeTouchScreen();
     ds::ControllerInput input;
+    graphics.input_mode=[&](bool menu){input.set_menu(menu);};
+    struct Sensors {
+        HidSixAxisSensorHandle handles[4]{};bool active[4]{};ds::GyroInput filter;
+        Sensors(){
+            const Result a=hidGetSixAxisSensorHandles(handles,1,HidNpadIdType_Handheld,HidNpadStyleTag_NpadHandheld);
+            const Result b=hidGetSixAxisSensorHandles(handles+1,1,HidNpadIdType_No1,HidNpadStyleTag_NpadFullKey);
+            const Result c=hidGetSixAxisSensorHandles(handles+2,2,HidNpadIdType_No1,HidNpadStyleTag_NpadJoyDual);
+            for(int i=0;i<4;++i)if(R_SUCCEEDED(i==0?a:i==1?b:c))active[i]=R_SUCCEEDED(hidStartSixAxisSensor(handles[i]));
+            ds::startup_log("Motion sensors: handheld=%u Pro=%u JoyConR=%u",unsigned(active[0]),unsigned(active[1]),unsigned(active[3]));
+        }
+        ~Sensors(){for(int i=0;i<4;++i)if(active[i])hidStopSixAxisSensor(handles[i]);}
+        std::pair<float,float> read(bool handheld,uint32_t style,float dt){
+            const int i=handheld?0:(style&HidNpadStyleTag_NpadJoyDual)?3:1;HidSixAxisSensorState state{};
+            if(!active[i]||hidGetSixAxisSensorStates(handles[i],&state,1)<1)return {0,0};
+            return filter.update(state.acceleration.x,state.acceleration.y,state.acceleration.z,state.angular_velocity.x,state.angular_velocity.y,state.angular_velocity.z,dt);
+        }
+    } sensors;
+    bool motion_was_enabled=false;
     uint32_t last_tick=SDL_GetTicks();bool touched=false;float touch_x=0,touch_y=0;
     graphics.poll_input=[&]{
         using C=ds::ControllerInput;
         std::vector<ds::GuestInput> events;
         SDL_Event event;bool quit=!appletMainLoop();while(SDL_PollEvent(&event))if(event.type==SDL_QUIT)quit=true;
         padUpdate(&pad);const auto buttons=padGetButtons(&pad);uint32_t held=0;
-        const std::pair<uint64_t,uint32_t> map[]={{HidNpadButton_A,C::A},{HidNpadButton_B,C::B},{HidNpadButton_X,C::X},{HidNpadButton_Y,C::Y},{HidNpadButton_L,C::L},{HidNpadButton_R,C::R},{HidNpadButton_ZL,C::ZL},{HidNpadButton_ZR,C::ZR},{HidNpadButton_Plus,C::Plus},{HidNpadButton_Minus,C::Minus},{HidNpadButton_Up,C::Up},{HidNpadButton_Down,C::Down},{HidNpadButton_Left,C::Left},{HidNpadButton_Right,C::Right},{HidNpadButton_StickR,C::RStick}};
+        const std::pair<uint64_t,uint32_t> map[]={{HidNpadButton_A,C::A},{HidNpadButton_B,C::B},{HidNpadButton_X,C::X},{HidNpadButton_Y,C::Y},{HidNpadButton_L,C::L},{HidNpadButton_R,C::R},{HidNpadButton_ZL,C::ZL},{HidNpadButton_ZR,C::ZR},{HidNpadButton_Plus,C::Plus},{HidNpadButton_Minus,C::Minus},{HidNpadButton_Up,C::Up},{HidNpadButton_Down,C::Down},{HidNpadButton_Left,C::Left},{HidNpadButton_Right,C::Right},{HidNpadButton_StickR,C::RStick},{HidNpadButton_StickL,C::LStick}};
         for(const auto& binding:map)if(buttons&binding.first)held|=binding.second;
         const auto left=padGetStickPos(&pad,0),right=padGetStickPos(&pad,1);const uint32_t now=SDL_GetTicks();
-        events=input.update({held,left.x/32767.0f,-left.y/32767.0f,right.x/32767.0f,-right.y/32767.0f,padIsConnected(&pad)},(now-last_tick)/1000.0f);last_tick=now;
+        const float dt=std::clamp((now-last_tick)/1000.0f,.001f,.05f);
+        events=input.update({held,left.x/32767.0f,-left.y/32767.0f,right.x/32767.0f,-right.y/32767.0f,padIsConnected(&pad)},dt);last_tick=now;
+        if(input.motion_enabled()!=motion_was_enabled){motion_was_enabled=input.motion_enabled();ds::startup_log("Motion aiming: %s",motion_was_enabled?"enabled (aim only)":"disabled");}
+        if(input.motion_enabled()&&!input.is_menu()&&(held&(C::L|C::ZL))){const auto delta=sensors.read(padIsHandheld(&pad),padGetStyleSet(&pad),dt);if(delta.first||delta.second){ds::GuestInput e;e.kind=ds::GuestInput::Kind::look;e.x=delta.first;e.y=delta.second;events.push_back(e);}}
         HidTouchScreenState touch{};hidGetTouchScreenStates(&touch,1);
         if(touch.count||touched){ds::GuestInput e;e.kind=ds::GuestInput::Kind::pointer;e.module=1000;e.id=0;e.code=touch.count?(touched?0x4000c:0x6000c):0x8000c;if(touch.count){touch_x=touch.touches[0].x/1280.0f*640;touch_y=touch.touches[0].y/720.0f*480;}e.x=touch_x;e.y=touch_y;events.push_back(e);touched=touch.count!=0;}
         if(quit){ds::GuestInput e;e.kind=ds::GuestInput::Kind::quit;events.push_back(e);}

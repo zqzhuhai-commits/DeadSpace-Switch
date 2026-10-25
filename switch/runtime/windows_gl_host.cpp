@@ -104,6 +104,7 @@ int main(int argc,char** argv){
         std::map<unsigned,std::vector<ds::GuestInput>> scheduled;
         std::map<unsigned,ds::ControllerInput::Snapshot> control_changes;
         ds::ControllerInput controller;ds::ControllerInput::Snapshot controls;
+        backend.input_mode=[&](bool menu){controller.set_menu(menu);};
         if(argc>5&&std::string(argv[5]).rfind("--events=",0)==0){
             std::ifstream file(std::string(argv[5]).substr(9));if(!file)throw std::runtime_error("Input event script unavailable");
             std::string line;
