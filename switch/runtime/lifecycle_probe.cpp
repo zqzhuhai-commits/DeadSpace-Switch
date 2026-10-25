@@ -234,7 +234,8 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         cpu->Regs()[14]=stop;cpu->Regs()[15]=address&~1u;cpu->SetCpsr((address&1)?0x30:0x10);cpu->SetFpscr(0);
         for(unsigned i=4;i<args.size();++i)MemoryWrite32(cpu->Regs()[13]+4*(i-4),args[i]);
         budget=200000000;returned=false;pending=0;
-        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(120);
+        auto last_progress=std::chrono::steady_clock::now();
+        const auto deadline=last_progress+std::chrono::seconds(120);
         unsigned calls=0;
         unsigned beats=0;
         bool background=false;std::chrono::steady_clock::time_point background_deadline;
@@ -245,8 +246,13 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             const uint64_t sp=cpu->Regs()[13];
             if(sp<active.stack_begin||sp>uint64_t(active.stack_begin)+active.stack_size)
                 throw std::runtime_error(label+": guest stack escaped its allocation; sp=0x"+to_hex(uint32_t(sp))+" pc=0x"+to_hex(cpu->Regs()[15]));
-            if((++beats&1023)==0&&std::chrono::steady_clock::now()>=deadline)
-                throw std::runtime_error(label+": diagnostic wall-clock budget exhausted");
+            if((++beats&1023)==0){
+                const auto now=std::chrono::steady_clock::now();
+                if(now>=deadline)throw std::runtime_error(label+": diagnostic wall-clock budget exhausted");
+                if(graphics.record&&now-last_progress>=std::chrono::seconds(5)){
+                    graphics.record("WORK: "+label+" thread="+std::to_string(threads.current())+" imports="+std::to_string(calls)+" GL="+std::to_string(gl_calls)+" assets="+std::to_string(asset_read_bytes));last_progress=now;
+                }
+            }
             quantum=std::min<uint64_t>(budget,100000);
             cpu->Run();
             if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>50000000)throw std::runtime_error("Import dispatch limit "+label);++service_calls;if(cpu->Regs()[15]>=0x10235800u&&cpu->Regs()[15]<0x10235960u&&++svc_log<=40)trace.push_back("  SVC "+functions[id-1]+" guest_pc=0x"+to_hex(cpu->Regs()[15]-8)+" a=0x"+to_hex(cpu->Regs()[0])+" b=0x"+to_hex(cpu->Regs()[1])+" c=0x"+to_hex(cpu->Regs()[2])+" d=0x"+to_hex(cpu->Regs()[3]));service(functions[id-1]);}
@@ -903,9 +909,11 @@ public:
                 guest_call(entry->second,args,"Input",true);
             }
             if(quit)break;
+            if(graphics.record&&(i<5||i%120==0))graphics.record("BEGIN: game frame "+std::to_string(i+1));
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
             ++frames_done;
             if(graphics.record&&(frames_done<=5||frames_done%120==0))graphics.record("Game frame returned: "+std::to_string(frames_done));
+            if(graphics.record&&(frames_done<=5||frames_done%120==0))graphics.record(graphics_report());
             if(graphics.present)graphics.present();
             if(i<5||i%3600==0)trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
         }

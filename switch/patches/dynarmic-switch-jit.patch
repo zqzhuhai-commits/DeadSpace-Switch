@@ -1,5 +1,4 @@
 diff --git a/externals/oaknut/include/oaknut/code_block.hpp b/externals/oaknut/include/oaknut/code_block.hpp
-index bfa87d9..96d786d 100644
 --- a/externals/oaknut/include/oaknut/code_block.hpp
 +++ b/externals/oaknut/include/oaknut/code_block.hpp
 @@ -7,8 +7,11 @@
@@ -15,7 +14,7 @@ index bfa87d9..96d786d 100644
  #    define NOMINMAX
  #    include <windows.h>
  #elif defined(__APPLE__)
-@@ -28,7 +31,10 @@ public:
+@@ -28,7 +31,10 @@
      explicit CodeBlock(std::size_t size)
          : m_size(size)
      {
@@ -27,7 +26,7 @@ index bfa87d9..96d786d 100644
          m_memory = (std::uint32_t*)VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
  #elif defined(__APPLE__)
  #    if TARGET_OS_IPHONE
-@@ -53,7 +59,9 @@ public:
+@@ -53,7 +59,9 @@
          if (m_memory == nullptr)
              return;
  
@@ -38,7 +37,7 @@ index bfa87d9..96d786d 100644
          VirtualFree((void*)m_memory, 0, MEM_RELEASE);
  #else
          munmap(m_memory, m_size);
-@@ -70,9 +78,20 @@ public:
+@@ -70,9 +78,25 @@
          return m_memory;
      }
  
@@ -55,12 +54,17 @@ index bfa87d9..96d786d 100644
      {
 -#if defined(__APPLE__) && !TARGET_OS_IPHONE
 +#if defined(__SWITCH__)
-+        if (R_FAILED(jitTransitionToExecutable(&m_jit))) throw std::runtime_error("Switch JIT executable transition failed");
++        if (m_jit.type == JitType_CodeMemory) {
++            // RW/RX aliases already exist. invalidate synchronizes changed ranges.
++            m_jit.is_executable = true;
++        } else if (R_FAILED(jitTransitionToExecutable(&m_jit))) {
++            throw std::runtime_error("Switch JIT executable transition failed");
++        }
 +#elif defined(__APPLE__) && !TARGET_OS_IPHONE
          pthread_jit_write_protect_np(1);
  #elif defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
          mprotect(m_memory, m_size, PROT_READ | PROT_EXEC);
-@@ -81,7 +100,9 @@ public:
+@@ -81,7 +105,9 @@
  
      void unprotect()
      {
@@ -71,19 +75,26 @@ index bfa87d9..96d786d 100644
          pthread_jit_write_protect_np(0);
  #elif defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
          mprotect(m_memory, m_size, PROT_READ | PROT_WRITE);
-@@ -90,7 +111,10 @@ public:
+@@ -90,7 +116,17 @@
  
      void invalidate(std::uint32_t* mem, std::size_t size)
      {
 -#if defined(__APPLE__)
 +#if defined(__SWITCH__)
-+        // jitTransitionToExecutable performs the cache synchronization.
-+        (void)mem; (void)size;
++        const auto address = reinterpret_cast<std::uintptr_t>(mem);
++        const auto base = reinterpret_cast<std::uintptr_t>(m_memory);
++        if (address < base || address - base > m_size || size > m_size - (address - base))
++            throw std::runtime_error("Switch JIT cache range outside buffer");
++        if (size && m_jit.type == JitType_CodeMemory) {
++            armDCacheFlush(static_cast<std::uint8_t*>(jitGetRwAddr(&m_jit)) + (address - base), size);
++            armICacheInvalidate(mem, size);
++        }
++        // The legacy permission-based path synchronizes when remapped.
 +#elif defined(__APPLE__)
          sys_icache_invalidate(mem, size);
  #elif defined(_WIN32)
          FlushInstructionCache(GetCurrentProcess(), mem, size);
-@@ -136,6 +160,9 @@ public:
+@@ -136,6 +172,9 @@
      }
  
  protected:
@@ -94,10 +105,9 @@ index bfa87d9..96d786d 100644
      std::size_t m_size = 0;
  };
 diff --git a/src/dynarmic/backend/arm64/address_space.cpp b/src/dynarmic/backend/arm64/address_space.cpp
-index 2c7ae77..029799c 100644
 --- a/src/dynarmic/backend/arm64/address_space.cpp
 +++ b/src/dynarmic/backend/arm64/address_space.cpp
-@@ -23,7 +23,7 @@ namespace Dynarmic::Backend::Arm64 {
+@@ -23,7 +23,7 @@
  AddressSpace::AddressSpace(size_t code_cache_size)
          : code_cache_size(code_cache_size)
          , mem(code_cache_size)
@@ -106,7 +116,7 @@ index 2c7ae77..029799c 100644
          , fastmem_manager(exception_handler) {
      ASSERT_MSG(code_cache_size <= 128 * 1024 * 1024, "code_cache_size > 128 MiB not currently supported");
  
-@@ -136,7 +136,7 @@ void AddressSpace::Link(EmittedBlockInfo& block_info) {
+@@ -136,7 +136,7 @@
      using namespace oaknut::util;
  
      for (auto [ptr_offset, target] : block_info.relocations) {
@@ -115,7 +125,7 @@ index 2c7ae77..029799c 100644
          c.set_xptr(reinterpret_cast<u32*>(block_info.entry_point + ptr_offset));
  
          switch (target) {
-@@ -276,7 +276,7 @@ void AddressSpace::LinkBlockLinks(const CodePtr entry_point, const CodePtr targe
+@@ -276,7 +276,7 @@
      using namespace oaknut::util;
  
      for (auto [ptr_offset, type] : block_relocations_list) {
