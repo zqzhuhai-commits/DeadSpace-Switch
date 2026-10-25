@@ -4,6 +4,7 @@
 #include "lifecycle_probe.hpp"
 #include "guest_image.hpp"
 #include "guest_call_scope.hpp"
+#include "guest_math.hpp"
 #include "loading_budget.hpp"
 #include "guest_heap.hpp"
 #include "guest_threads.hpp"
@@ -638,6 +639,13 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             else if(op=="DetachCurrentThread")result=0;
             else throw std::runtime_error("Unsupported VM: "+op);
         }
+        else if(name=="modf"||name=="ldexp"){
+            // ARM32 soft-float ABI: double r0:r1; output pointer / int exponent r2.
+            errno=0;
+            const auto bits=name=="modf"?ds::guest_modf(a,b,c,[&](uint32_t p,uint32_t v){MemoryWrite32(p,v);}):ds::guest_ldexp(a,b,c);
+            if(errno==ERANGE)MemoryWrite32(errno_address,34);
+            cpu->Regs()[0]=uint32_t(bits);cpu->Regs()[1]=uint32_t(bits>>32);goto done;
+        }
         else if(base=="acos"||base=="asin"||base=="atan"||base=="atan2"||base=="ceil"||base=="cos"||base=="exp"||base=="floor"||base=="fmod"||base=="log"||base=="log10"||base=="pow"||base=="sin"||base=="sqrt"||base=="tan"){
             const bool single=name==base+"f";
             if(single){
@@ -939,6 +947,17 @@ public:
         }
     }
     void run_lifecycle(unsigned frames) {
+#ifndef __SWITCH__
+        if(std::getenv("DS_VERIFY_MATH")){
+            const auto thunk=[&](const std::string& name){auto it=std::find(functions.begin(),functions.end(),name);if(it==functions.end())throw std::runtime_error("Math regression import missing: "+name);return thunks+uint32_t(it-functions.begin())*4;};
+            const auto output=alloc(8);
+            const auto lo=guest_call(thunk("modf"),{0x60000000,0x40300a30,output},"actual ARM32 modf regression",true);
+            if((uint64_t(lo)|(uint64_t(cpu->Regs()[1])<<32))!=0x3fa460c000000000ull||MemoryRead32(output)!=0||MemoryRead32(output+4)!=0x40300000)throw std::runtime_error("Actual ARM32 modf ABI mismatch");
+            const auto scaled=guest_call(thunk("ldexp"),{0,0x3ff80000,uint32_t(-3)},"actual ARM32 ldexp regression",true);
+            if((uint64_t(scaled)|(uint64_t(cpu->Regs()[1])<<32))!=0x3fc8000000000000ull)throw std::runtime_error("Actual ARM32 ldexp ABI mismatch");
+            if(graphics.record)graphics.record("PASS: actual ARM32 modf/ldexp imports; logged elevator arguments and double writeback verified");
+        }
+#endif
         if(graphics.poll_input)verify_input_profile();
         trace.push_back("Constructors returned: "+std::to_string(constructors_completed));
         if(graphics.record)graphics.record("Game constructors completed");

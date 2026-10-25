@@ -100,7 +100,7 @@ int main(int argc,char** argv){
         if(argc>6&&std::string(argv[6]).rfind("--hd=",0)==0){const auto hd=std::string(argv[6]).substr(5);backend.hd_budget_bytes=192*1024*1024;backend.hd_texture=[hd](const std::string& key){return ds::read_hd_texture(hd,key);};}
         uint64_t loading_callbacks=0;bool startup_done=false;
         backend.loading=[&](const std::string&,uint64_t,uint64_t){++loading_callbacks;};
-        backend.startup_complete=[&]{if(!startup_done){startup_done=true;std::cerr<<"Native player HUD available: startup overlay may close\n";}};
+        backend.startup_complete=[&]{if(!startup_done){startup_done=true;std::cerr<<"Native player HUD available\n";}};
         backend.resolve=[&](const char* name){return context.proc(name);};
         backend.audio_playing=[&](bool enabled){audio.playing(enabled);};
         backend.audio_write=[&](const std::vector<int16_t>& pcm){return audio.write(pcm);};

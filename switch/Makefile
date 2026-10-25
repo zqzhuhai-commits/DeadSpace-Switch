@@ -40,6 +40,11 @@ FORCE:
 all: build/deadspace-switch.nro
 build:
 	mkdir -p build
+build/build-config: FORCE | build
+	@printf '%s\n' '$(APP_VERSION)|$(CPU_PROBE)|$(GAME_LAUNCHER)|$(CPU_BUILD_DIR)' > $@.tmp
+	@if ! cmp -s $@.tmp $@; then cp $@.tmp $@; fi
+	@rm -f $@.tmp
+$(OBJECTS) build/deadspace-switch.nacp: build/build-config
 build/%.o: source/%.cpp | build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 build/PVRTDecompress.o: ../third_party/powervr/PVRTDecompress.cpp | build
