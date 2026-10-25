@@ -20,6 +20,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,24);
 #ifdef DS_GAME_LAUNCHER
     int requested_width=1280,requested_height=720;
     if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/display.cfg","r")){
@@ -33,6 +34,10 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     SDL_GLContext context=window?SDL_GL_CreateContext(window):nullptr;
     if(!context){log+="Native GLES1 context unavailable: "+std::string(SDL_GetError())+"\n";ds::startup_log("FAIL: GLES1 context: %s",SDL_GetError());if(window)SDL_DestroyWindow(window);SDL_Quit();return log;}
     ds::startup_log("END: GLES1 context");
+    if(auto query=reinterpret_cast<void(*)(unsigned,int*)>(SDL_GL_GetProcAddress("glGetIntegerv"))){
+        int depth=0,stencil=0;query(0x0d56,&depth);query(0x0d57,&stencil);
+        ds::startup_log("Framebuffer precision: depth=%d stencil=%d (requested depth=24)",depth,stencil);
+    }
     auto get_string=reinterpret_cast<const unsigned char*(*)(unsigned)>(SDL_GL_GetProcAddress("glGetString"));
     if(get_string){const auto* renderer=get_string(0x1f01);log+="Renderer: "+std::string(renderer?reinterpret_cast<const char*>(renderer):"unknown")+"\n";}
     ds::GraphicsBackend graphics;
@@ -46,6 +51,11 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     const uint32_t startup_started=SDL_GetTicks();bool startup_recorded=false;
     graphics.startup_complete=[&,record=graphics.record]{if(!startup_recorded){startup_recorded=true;record("Native player HUD ready; elapsed_ms="+std::to_string(uint32_t(SDL_GetTicks()-startup_started)));}};
     graphics.record("Custom loading overlay: disabled");
+    graphics.lighting_strength=0.25f;
+    if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/lighting.cfg","r")){
+        float strength=0;char extra=0;if(std::fscanf(config,"%f %c",&strength,&extra)==1&&strength>=0&&strength<=1)graphics.lighting_strength=strength;std::fclose(config);
+    }else if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/lighting.cfg","w")){std::fputs("0.25\n",config);std::fclose(config);}
+    graphics.record("Lighting compatibility strength="+std::to_string(graphics.lighting_strength)+" (1=original exposure)");
     SDL_AudioSpec desired{};desired.freq=44100;desired.format=AUDIO_S16LSB;desired.channels=2;desired.samples=1024;
     ds::startup_log("BEGIN: SDL audio device");
     SDL_AudioSpec actual{};const auto audio=SDL_OpenAudioDevice(nullptr,0,&desired,&actual,0);

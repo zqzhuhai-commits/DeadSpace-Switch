@@ -157,6 +157,23 @@ void GuestGl::maybe_replace(U target,U level,U w,U h,U format,const std::vector<
         if(shadow){fn<void(*)(U,I)>("glPixelStorei")(0x0cf5,I(unpack));fn<void(*)(U,U)>("glBindTexture")(0x0de1,original);fn<void(*)(I,const U*)>("glDeleteTextures")(1,&shadow);}
     }
 }
+bool GuestGl::limit_exposure(std::array<F,4>& original) {
+    const F strength=backend.lighting_strength;
+    if(!(strength>=0&&strength<1))return false;
+    const auto colors=arrays.find(color);
+    if(colors!=arrays.end()&&colors->second.enabled)return false;
+    // Track guest state at its setters; avoid driver queries on every opaque
+    // draw. The launcher cursor only touches scissor/clear/color-write state.
+    if(!blend_enabled||depth_enabled||!textured_units.empty()||blend_source!=0x0306||blend_destination!=0x0303)return false;
+    fn<void(*)(U,F*)>("glGetFloatv")(0x0b00,original.data());
+    if(original[0]!=1||original[1]!=1||original[2]!=1||!(original[3]>=0&&original[3]<1))return false;
+    // These white, untextured exposure quads multiply the destination by
+    // 2-alpha. Scale only the increase above 1. Other blend modes, textured
+    // surfaces and depth-tested lighting retain their original behavior.
+    const F alpha=1-strength*(1-original[3]);
+    fn<void(*)(F,F,F,F)>("glColor4f")(1,1,1,alpha);
+    ++lighting_limited_draws;return true;
+}
 void GuestGl::draw_textured(const std::function<void()>& draw) {
     std::vector<std::pair<U,U>> changed;
     const auto restore=[&]{for(const auto& binding:changed){fn<void(*)(U)>("glActiveTexture")(0x84c0+binding.first);fn<void(*)(U,U)>("glBindTexture")(0x0de1,binding.second);}fn<void(*)(U)>("glActiveTexture")(0x84c0+active_unit);};
@@ -170,7 +187,10 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
             changed.push_back(binding);fn<void(*)(U,U)>("glBindTexture")(0x0de1,it->second.shadow);
             if(dirty){for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I)>("glTexParameteri")(0x0de1,names[i],values[i]);hd_parameters_dirty.erase(binding.second);}
         }
-        draw();restore();
+        std::array<F,4> original{};const bool limited=limit_exposure(original);
+        const auto restore_color=[&]{if(limited)fn<void(*)(F,F,F,F)>("glColor4f")(original[0],original[1],original[2],original[3]);};
+        try{draw();}catch(...){restore_color();throw;}
+        restore_color();restore();
     } catch(...){restore();throw;}
 }
 GuestGl::U GuestGl::call(const std::string& name) {
@@ -376,8 +396,16 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(one_of(name,{"glTexParameterf","glTexEnvf"})){fn<void(*)(U,U,F)>(name)(a,b,number(2));return 0;}
     if(name=="glBindTexture") {if(a!=0x0de1)throw std::runtime_error("Unsupported GL texture target");fn<void(*)(U,U)>(name)(a,b);texture_bindings[active_unit]=b;return 0;}
     if(name=="glActiveTexture") {I units=0;fn<void(*)(U,I*)>("glGetIntegerv")(0x84e2,&units);if(a<0x84c0||a>=0x84c0+std::min(4u,U(std::max(0,units))))throw std::runtime_error("GL active texture unit bound");fn<void(*)(U)>(name)(a);active_unit=a-0x84c0;return 0;}
-    if(one_of(name,{"glBlendFunc","glHint","glBindFramebufferOES","glBindRenderbufferOES","glBlendEquationSeparateOES"})){fn<void(*)(U,U)>(name)(a,b);return 0;}
-    if(one_of(name,{"glMatrixMode","glClear","glEnable","glDisable","glDepthFunc","glCullFace","glFrontFace","glShadeModel","glStencilMask","glLogicOp","glGenerateMipmapOES","glBlendEquationOES"})){fn<void(*)(U)>(name)(a);return 0;}
+    if(name=="glEnable"||name=="glDisable"){
+        const bool enable=name=="glEnable";
+        if(a==0x0be2)blend_enabled=enable;
+        if(a==0x0b71)depth_enabled=enable;
+        if(a==0x0de1){if(enable)textured_units.insert(active_unit);else textured_units.erase(active_unit);}
+        fn<void(*)(U)>(name)(a);return 0;
+    }
+    if(name=="glBlendFunc"){blend_source=a;blend_destination=b;fn<void(*)(U,U)>(name)(a,b);return 0;}
+    if(one_of(name,{"glHint","glBindFramebufferOES","glBindRenderbufferOES","glBlendEquationSeparateOES"})){fn<void(*)(U,U)>(name)(a,b);return 0;}
+    if(one_of(name,{"glMatrixMode","glClear","glDepthFunc","glCullFace","glFrontFace","glShadeModel","glStencilMask","glLogicOp","glGenerateMipmapOES","glBlendEquationOES"})){fn<void(*)(U)>(name)(a);return 0;}
     if(name=="glClearStencil"){fn<void(*)(I)>(name)(I(a));return 0;}
     if(name=="glStencilFunc"){fn<void(*)(U,I,U)>(name)(a,I(b),c);return 0;}
     if(name=="glStencilOp"){fn<void(*)(U,U,U)>(name)(a,b,c);return 0;}

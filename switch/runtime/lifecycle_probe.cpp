@@ -1030,6 +1030,7 @@ public:
     std::string graphics_report() const {
         if(!native_gl)return "Graphics backend: mock diagnostics.\n";
         std::string out=std::string("Graphics backend: ")+(graphics.desktop_compatibility?"desktop compatibility reference":"native GLES1 subset")+"; "+std::to_string(native_gl->calls)+" guest GL dispatches, "+std::to_string(native_gl->draws)+" draw submissions, "+std::to_string(native_gl->texture_uploads)+" texture uploads, "+std::to_string(native_gl->atc_uploads)+" ATC uploads.\n";
+        if(graphics.lighting_strength<1)out+="Lighting compatibility: strength="+std::to_string(graphics.lighting_strength)+" limited draws="+std::to_string(native_gl->lighting_limited_draws)+"\n";
         if(graphics.hd_texture)out+="HD: "+std::to_string(native_gl->hd_matches)+" matches, "+std::to_string(native_gl->hd_mip_uploads)+" mip uploads, "+std::to_string(native_gl->hd_misses)+" missing, "+std::to_string(native_gl->hd_rejected)+" rejected, "+std::to_string(native_gl->hd_budget_skips)+" budget skips, "+std::to_string(native_gl->hd_dynamic_fallbacks)+" dynamic fallbacks.\n";
         if(!native_gl->last_hd_error.empty())out+="Last HD rejection: "+native_gl->last_hd_error+"\n";
         return out;

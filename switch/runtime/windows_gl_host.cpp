@@ -18,6 +18,7 @@
 #include <map>
 #include <array>
 #include <cstring>
+#include <cstdlib>
 
 struct Audio {
     HWAVEOUT device=nullptr;
@@ -69,8 +70,8 @@ struct Context {
     }
 };
 static void check_fixed_bridge(Context& context){
-    std::array<uint32_t,8> args{};std::vector<uint8_t> memory(4096);
-    ds::GraphicsBackend backend;backend.desktop_compatibility=true;backend.resolve=[&](const char* name){return context.proc(name);};
+    std::array<uint32_t,12> args{};std::vector<uint8_t> memory(4096);
+    ds::GraphicsBackend backend;backend.desktop_compatibility=true;backend.resolve=[&](const char* name){return context.proc(name);};backend.lighting_strength=.25f;
     ds::GuestGl bridge(backend,{
         [&](unsigned n){return args.at(n);},[&](uint32_t){return 2048u;},
         [&](uint32_t p,void* out,size_t n){if(uint64_t(p)+n>memory.size())throw std::runtime_error("Test read bound");std::memcpy(out,memory.data()+p,n);},
@@ -88,6 +89,30 @@ static void check_fixed_bridge(Context& context){
     GLint filter=0;glGetTexParameteriv(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,&filter);if(filter!=GL_LINEAR)throw std::runtime_error("Texture enum was scaled as fixed point");glDeleteTextures(1,&texture);
     if(glGetError()!=GL_NO_ERROR)throw std::runtime_error("Fixed bridge GL error");glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);
     std::cout<<"PASS: real GL fixed color pixel, signed matrix, light vector and unchanged texture enum\n";
+    const float vertices[]={-1,-1,0,3,-1,0,-1,3,0};std::memcpy(memory.data()+256,vertices,sizeof(vertices));
+    glMatrixMode(GL_PROJECTION);glLoadIdentity();glMatrixMode(GL_MODELVIEW);glLoadIdentity();
+    call("glEnableClientState",{GL_VERTEX_ARRAY});call("glVertexPointer",{3,GL_FLOAT,0,256});
+    call("glActiveTexture",{0x84c1});call("glDisable",{GL_TEXTURE_2D});
+    call("glDisable",{GL_DEPTH_TEST});call("glEnable",{GL_BLEND});call("glBlendFunc",{GL_DST_COLOR,GL_ONE_MINUS_SRC_ALPHA});
+    call("glColor4f",{0x3f800000,0x3f800000,0x3f800000,0});
+    const auto clear_sample=[&]{glClearColor(.2f,.1f,.05f,1);glClear(GL_COLOR_BUFFER_BIT);};
+    const auto sample=[&](int red){glReadPixels(320,240,1,1,GL_RGBA,GL_UNSIGNED_BYTE,pixel);if(std::abs(int(pixel[0])-red)>2)throw std::runtime_error("Lighting framebuffer pixel mismatch");};
+    clear_sample();call("glDrawArrays",{GL_TRIANGLES,0,3});sample(64);
+    GLfloat rgba[4]{};GLint active=0;glGetFloatv(GL_CURRENT_COLOR,rgba);glGetIntegerv(0x84e0,&active);
+    if(rgba[0]!=1||rgba[1]!=1||rgba[2]!=1||rgba[3]!=0||active!=0x84c1||bridge.lighting_limited_draws!=1)throw std::runtime_error("Lighting compatibility leaked GL state");
+    call("glBlendFunc",{GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA});clear_sample();call("glDrawArrays",{GL_TRIANGLES,0,3});sample(51);
+    if(bridge.lighting_limited_draws!=1)throw std::runtime_error("Lighting compatibility changed an alpha fade");
+    call("glBlendFunc",{GL_DST_COLOR,GL_ONE_MINUS_SRC_ALPHA});glGenTextures(1,&texture);call("glBindTexture",{GL_TEXTURE_2D,texture});
+    const uint8_t white[]={255,255,255,255};glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,1,1,0,GL_RGBA,GL_UNSIGNED_BYTE,white);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+    call("glEnable",{GL_TEXTURE_2D});clear_sample();call("glDrawArrays",{GL_TRIANGLES,0,3});sample(102);
+    if(bridge.lighting_limited_draws!=1)throw std::runtime_error("Lighting compatibility changed a textured draw");
+    call("glDisable",{GL_TEXTURE_2D});glDeleteTextures(1,&texture);call("glEnable",{GL_DEPTH_TEST});call("glDepthFunc",{GL_ALWAYS});
+    clear_sample();call("glDrawArrays",{GL_TRIANGLES,0,3});sample(102);
+    if(bridge.lighting_limited_draws!=1)throw std::runtime_error("Lighting compatibility changed a depth-tested draw");
+    call("glActiveTexture",{0x84c0});call("glDisable",{GL_BLEND});call("glDisable",{GL_DEPTH_TEST});call("glDisableClientState",{GL_VERTEX_ARRAY});call("glColor4f",{0x3f800000,0x3f800000,0x3f800000,0x3f800000});call("glDepthFunc",{GL_LESS});call("glBlendFunc",{GL_ONE,GL_ZERO});
+    if(glGetError()!=GL_NO_ERROR)throw std::runtime_error("Lighting compatibility GL error");glClearColor(0,0,0,1);glClear(GL_COLOR_BUFFER_BIT);
+    std::cout<<"PASS: real GL lighting gain pixel, color/active-unit restoration, alpha-fade/textured/depth-tested bypass\n";
+
 }
 int main(int argc,char** argv){
     try {
@@ -95,6 +120,8 @@ int main(int argc,char** argv){
         Context context;check_fixed_bridge(context);Audio audio;
         std::cout<<"Host-only WGL renderer: "<<glGetString(GL_RENDERER)<<"\n";
         ds::GraphicsBackend backend;backend.desktop_compatibility=true;backend.realtime_clock=true;
+        if(const auto* strength=std::getenv("DS_LIGHTING_STRENGTH")){char* end=nullptr;const float v=std::strtof(strength,&end);if(end==strength||*end||!(v>=0&&v<=1))throw std::runtime_error("Invalid lighting strength");backend.lighting_strength=v;}
+        std::cout<<"Host lighting strength="<<backend.lighting_strength<<"\n";
         const auto host_started=std::chrono::steady_clock::now();
         backend.record=[&](const std::string& text){if(text.rfind("Game frame returned: ",0)==0||text.rfind("INPUT:",0)==0)std::cerr<<"HOST elapsed ms="<<std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-host_started).count()<<'\n';std::cerr<<text<<'\n';};
         if(argc>6&&std::string(argv[6]).rfind("--hd=",0)==0){const auto hd=std::string(argv[6]).substr(5);backend.hd_budget_bytes=192*1024*1024;backend.hd_texture=[hd](const std::string& key){return ds::read_hd_texture(hd,key);};}

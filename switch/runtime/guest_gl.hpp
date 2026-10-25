@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -20,6 +21,7 @@ struct GraphicsBackend {
     std::function<void()> startup_complete;
     bool desktop_compatibility=false; // host reference only; Switch uses GLES1
     bool realtime_clock=false;
+    float lighting_strength=1.0f; // 1 preserves original untextured exposure passes
     uint32_t surface_width=640,surface_height=480;
     std::function<std::vector<uint8_t>(const std::string&)> hd_texture={};
     uint64_t hd_budget_bytes=128*1024*1024;
@@ -49,6 +51,9 @@ class GuestGl {
     std::map<U,bool> index_contents_known;
     std::map<U,U> strings;
     U active_unit=0;
+    bool blend_enabled=false,depth_enabled=false;
+    U blend_source=1,blend_destination=0;
+    std::set<U> textured_units;
     std::map<U,U> texture_bindings;
     struct Replacement {U shadow,width,height;uint64_t bytes;std::string key;};
     std::map<U,Replacement> replacements;
@@ -71,6 +76,7 @@ class GuestGl {
     void pointer(const std::string&,U size,U type,U stride,const void* data);
     void invalidate_hd(U texture,bool dynamic=false);
     void maybe_replace(U target,U level,U width,U height,U format,const std::vector<uint8_t>& pixels);
+    bool limit_exposure(std::array<F,4>& original);
     void draw_textured(const std::function<void()>& draw);
     static U storage_format(U original_format);
     void upload_rgba(U target,U level,U width,U height,U format,const std::vector<uint8_t>& rgba);
@@ -78,7 +84,7 @@ public:
     GuestGl(GraphicsBackend b,GlGuestMemory m):backend(std::move(b)),memory(std::move(m)){}
     ~GuestGl();
     U call(const std::string& name);
-    uint64_t calls=0,draws=0,texture_uploads=0,atc_uploads=0;
+    uint64_t calls=0,draws=0,texture_uploads=0,atc_uploads=0,lighting_limited_draws=0;
     uint64_t hd_matches=0,hd_rejected=0,hd_misses=0,hd_budget_skips=0,hd_dynamic_fallbacks=0,hd_mip_uploads=0;
     std::string last_hd_error;
 };
