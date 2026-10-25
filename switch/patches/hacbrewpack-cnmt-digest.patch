@@ -1,0 +1,28 @@
+--- a/cnmt.c
++++ b/cnmt.c
+@@ -5,6 +5,7 @@
+ #include "cnmt.h"
+ #include "filepath.h"
+ #include "utils.h"
++#include "sha.h"
+ 
+ void cnmt_create(cnmt_ctx_t *cnmt_ctx, filepath_t *cnmt_filepath, hbp_settings_t *settings)
+ {
+@@ -51,6 +52,17 @@
+         fwrite(&cnmt_ctx->cnmt_content_records[3], sizeof(cnmt_content_record_t), 1, cnmt_file);
+     if (settings->legalinfo_romfs_dir.valid == VALIDITY_VALID)
+         fwrite(&cnmt_ctx->cnmt_content_records[4], sizeof(cnmt_content_record_t), 1, cnmt_file);    
++    sha_ctx_t *digest_ctx = new_sha_ctx(HASH_TYPE_SHA256, 0);
++    sha_update(digest_ctx, &cnmt_ctx->cnmt_header, sizeof(cnmt_header_t));
++    sha_update(digest_ctx, &cnmt_ext_header, sizeof(cnmt_extended_application_header_t));
++    sha_update(digest_ctx, &cnmt_ctx->cnmt_content_records[0], sizeof(cnmt_content_record_t));
++    sha_update(digest_ctx, &cnmt_ctx->cnmt_content_records[1], sizeof(cnmt_content_record_t));
++    if (settings->htmldoc_romfs_dir.valid == VALIDITY_VALID)
++        sha_update(digest_ctx, &cnmt_ctx->cnmt_content_records[3], sizeof(cnmt_content_record_t));
++    if (settings->legalinfo_romfs_dir.valid == VALIDITY_VALID)
++        sha_update(digest_ctx, &cnmt_ctx->cnmt_content_records[4], sizeof(cnmt_content_record_t));
++    sha_get_hash(digest_ctx, digest);
++    free_sha_ctx(digest_ctx);
+     fwrite(digest, 1, 0x20, cnmt_file);
+ 
+     fclose(cnmt_file);
