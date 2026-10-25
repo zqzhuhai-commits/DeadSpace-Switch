@@ -95,6 +95,9 @@ int main(int argc,char** argv){
         std::cout<<"Host-only WGL renderer: "<<glGetString(GL_RENDERER)<<"\n";
         ds::GraphicsBackend backend;backend.desktop_compatibility=true;backend.realtime_clock=true;
         backend.record=[](const std::string& text){std::cerr<<text<<'\n';};
+        uint64_t loading_callbacks=0;bool startup_done=false;
+        backend.loading=[&](const std::string&,uint64_t,uint64_t){++loading_callbacks;};
+        backend.startup_complete=[&]{if(!startup_done){startup_done=true;std::cerr<<"Native player HUD available: startup overlay may close\n";}};
         backend.resolve=[&](const char* name){return context.proc(name);};
         backend.audio_playing=[&](bool enabled){audio.playing(enabled);};
         backend.audio_write=[&](const std::vector<int16_t>& pcm){return audio.write(pcm);};
@@ -148,6 +151,7 @@ int main(int argc,char** argv){
         };
         const auto report=lifecycle_probe(argv[1],argv[2],frames,std::move(backend));
         std::cout<<report<<"Presented frames: "<<presents<<"\n";
+        std::cout<<"Loading callbacks: "<<loading_callbacks<<"; startup complete: "<<startup_done<<"\n";
         std::cout<<"PCM output: samples="<<audio.samples<<" nonzero="<<audio.nonzero<<" peak="<<audio.peak<<" (device queue accepted; listening not verified)\n";
         std::cout<<"Host reference only; gameplay, audible audio and Switch hardware remain unverified.\n";
         return report.rfind("PASS:",0)==0?0:2;

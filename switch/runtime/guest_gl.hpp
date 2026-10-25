@@ -14,6 +14,10 @@ namespace ds {
 struct GraphicsBackend {
     std::function<void*(const char*)> resolve;
     std::function<void()> present;
+    // Called on the emulation thread, between CPU runs. No invented percentage:
+    // byte/frame counters describe work observed, not an assumed total.
+    std::function<void(const std::string&,uint64_t,uint64_t)> loading;
+    std::function<void()> startup_complete;
     bool desktop_compatibility=false; // host reference only; Switch uses GLES1
     bool realtime_clock=false;
     uint32_t surface_width=640,surface_height=480;

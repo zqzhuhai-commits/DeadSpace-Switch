@@ -248,6 +248,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 throw std::runtime_error(label+": guest stack escaped its allocation; sp=0x"+to_hex(uint32_t(sp))+" pc=0x"+to_hex(cpu->Regs()[15]));
             if((++beats&1023)==0){
                 const auto now=std::chrono::steady_clock::now();
+                if(graphics.loading)graphics.loading(label,asset_read_bytes,frames_done);
                 if(now>=deadline)throw std::runtime_error(label+": diagnostic wall-clock budget exhausted");
                 if(graphics.record&&now-last_progress>=std::chrono::seconds(5)){
                     graphics.record("WORK: "+label+" thread="+std::to_string(threads.current())+" imports="+std::to_string(calls)+" GL="+std::to_string(gl_calls)+" assets="+std::to_string(asset_read_bytes));last_progress=now;
@@ -582,7 +583,11 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             if(std::find(modes.begin(),modes.end(),mode)==modes.end()){MemoryWrite32(errno_address,22);result=0;}
             else {
                 const bool writing=mode[0]!='r'||mode.find('+')!=std::string::npos;
-                result=files.open_stream(resolve_path(guest_text(a),writing).c_str(),mode.c_str());
+                const auto guest_path=guest_text(a);
+                const bool save=guest_path.rfind("/data/var/",0)==0&&guest_path.size()<160;
+                if(save&&graphics.record)graphics.record("SAVE OPEN: "+mode+" "+guest_path);
+                result=files.open_stream(resolve_path(guest_path,writing).c_str(),mode.c_str());
+                if(save&&graphics.record)graphics.record("SAVE OPEN result="+std::to_string(result?1:0)+" errno="+std::to_string(files.error()));
                 if(files.error())MemoryWrite32(errno_address,files.error());
             }
         }
@@ -776,12 +781,21 @@ public:
 
     void initialize(const std::string& data,ds::GraphicsBackend backend) {
         data_root=data;
+        graphics=std::move(backend);
+        if(graphics.record)graphics.record("BEGIN: writable save storage; existing files preserved");
 #ifdef __SWITCH__
         storage=std::make_unique<ds::GuestStorage>(data_root,"sdmc:/switch/deadspacemobile/savedata");
 #else
         storage=std::make_unique<ds::GuestStorage>(data_root,data_root+"/savedata");
 #endif
-        graphics=std::move(backend);
+        if(graphics.record){
+            for(const char* name:{"settings.sb","00_LevelSave.sb","00_CheckpointSave.sb"}){
+                struct stat st{};const auto path=storage->resolve(std::string("/data/var/")+name);
+                const int rc=::stat(path.c_str(),&st);const int error=rc?errno:0;
+                graphics.record(std::string("SAVE STATE: ")+name+(rc?" unavailable errno="+std::to_string(error):" bytes="+std::to_string(st.st_size)));
+            }
+            graphics.record("END: writable save storage");
+        }
         if(graphics.resolve)native_gl=std::make_unique<ds::GuestGl>(graphics,ds::GlGuestMemory{
             [&](unsigned n){return arg(n);},[&](uint32_t n){return alloc(n);},
             [&](uint32_t p,void* out,size_t n){
@@ -861,10 +875,10 @@ public:
     }
 
     uint32_t input_hud=0,input_vector=0,input_app=0;
-    uint64_t native_input_actions=0,native_input_looks=0;
-    bool input_menu=true;
+    uint64_t native_input_actions=0,native_input_looks=0,native_input_moves=0;
+    bool input_menu=true,vector_handler_logged=false;
     void verify_input_profile(){
-        const std::pair<uint32_t,uint32_t> marks[]={{0x71608,0xe92d4ff0},{0x7160c,0xed2d8b06},{0x72594,0x0352fb98},{0x1c5040,0xeaffffd2},{0x1d7d14,0xeafdd9cb},{0x74ef8,0xe3a03ffb},{0x74f00,0xe2833002}};
+        const std::pair<uint32_t,uint32_t> marks[]={{0x71608,0xe92d4ff0},{0x7160c,0xed2d8b06},{0x72594,0x0352fb98},{0x1c5040,0xeaffffd2},{0x1d7d14,0xeafdd9cb},{0x74ef8,0xe3a03ffb},{0x74f00,0xe2833002},{0x167d04,0xe92d40f0},{0x167f28,0xed967a04},{0x167f3c,0xed847a71},{0x167f40,0xedc46a6f}};
         for(auto mark:marks)if(MemoryRead32(ds::GuestImage::base+mark.first)!=mark.second)throw std::runtime_error("Input engine profile mismatch");
     }
     uint32_t engine_player(){const auto world=input_hud?MemoryRead32(input_hud+4):0;return world?MemoryRead32(world+212):0;}
@@ -880,6 +894,8 @@ public:
         const bool menu=!input_hud||MemoryRead32(input_hud+664)!=0||MemoryRead32(input_hud+676)==2;
         if(menu!=input_menu&&graphics.record)graphics.record(menu?"INPUT: menu pointer":"INPUT: native game actions");
         input_menu=menu;if(graphics.input_mode)graphics.input_mode(menu);
+        if(input_hud&&!vector_handler_logged&&graphics.record){const auto player=engine_player();if(player){graphics.record("Player vector handler: 0x"+to_hex(MemoryRead32(MemoryRead32(player)+8)));vector_handler_logged=true;}}
+        if(input_hud&&graphics.startup_complete)graphics.startup_complete();
     }
     void engine_action(uint32_t action,bool down){
         if(!input_hud)return;
@@ -891,7 +907,7 @@ public:
         guest_call(ds::GuestImage::base+0x71608,{input_hud,action,down?0u:0xffffffffu},"native game action",true);
         if(++native_input_actions<=32&&graphics.record)graphics.record("INPUT ACTION: 0x"+to_hex(action)+(down?" press":" release"));
     }
-    void engine_look(float x,float y){
+    void engine_vector(float x,float y,bool movement){
         const auto player=engine_player();if(!player)return;
         const auto handler=MemoryRead32(MemoryRead32(player)+8);
         if(!image.executable(handler&~1u,4))throw std::runtime_error("Invalid player input handler");
@@ -899,8 +915,15 @@ public:
         uint32_t xb,yb;std::memcpy(&xb,&x,4);std::memcpy(&yb,&y,4);
         MemoryWrite32(input_vector,ds::GuestImage::base+0x426ed0);MemoryWrite32(input_vector+4,1006);
         MemoryWrite32(input_vector+12,xb);MemoryWrite32(input_vector+16,yb);MemoryWrite32(input_vector+20,0);
-        for(uint32_t pad:{3u,5u}){MemoryWrite32(input_vector+8,pad);guest_call(handler,{player,input_vector},"native camera event",true);}
-        ++native_input_looks;
+        if(movement){
+            // Xperia Play onEvent, case Vector2Event pad 1, consumes the full
+            // float pair and records -x/-y at player+444/+452. No touch D-pad.
+            MemoryWrite32(input_vector+8,1);guest_call(handler,{player,input_vector},"native analog movement",true);
+            if(++native_input_moves<=8&&graphics.record){float sx,sy;auto bx=MemoryRead32(player+444),by=MemoryRead32(player+452);std::memcpy(&sx,&bx,4);std::memcpy(&sy,&by,4);graphics.record("INPUT MOVE: "+std::to_string(x)+","+std::to_string(y)+" engine="+std::to_string(sx)+","+std::to_string(sy));}
+        }else{
+            for(uint32_t pad:{3u,5u}){MemoryWrite32(input_vector+8,pad);guest_call(handler,{player,input_vector},"native camera event",true);}
+            ++native_input_looks;
+        }
     }
     void run_lifecycle(unsigned frames) {
         if(graphics.poll_input)verify_input_profile();
@@ -944,7 +967,8 @@ public:
             if(graphics.poll_input)for(const auto& event:graphics.poll_input()){
                 if(event.kind==ds::GuestInput::Kind::quit){quit=true;break;}
                 if(event.kind==ds::GuestInput::Kind::action){engine_action(event.code,event.down);continue;}
-                if(event.kind==ds::GuestInput::Kind::look){if(!input_menu)engine_look(event.x,event.y);continue;}
+                if(event.kind==ds::GuestInput::Kind::look){if(!input_menu)engine_vector(event.x,event.y,false);continue;}
+                if(event.kind==ds::GuestInput::Kind::move){if(!input_menu||(event.x==0&&event.y==0))engine_vector(event.x,event.y,true);continue;}
                 if(event.kind==ds::GuestInput::Kind::key&&event.code==4&&input_hud){if(event.down)engine_action(uint32_t(ds::GameAction::cancel),true);continue;}
                 const auto bits=[](float value){uint32_t result;std::memcpy(&result,&value,4);return result;};
                 std::string name;

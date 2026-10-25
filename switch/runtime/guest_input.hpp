@@ -2,7 +2,7 @@
 #include <cstdint>
 namespace ds {
 struct GuestInput {
-    enum class Kind {key,pointer,acceleration,action,look,quit};
+    enum class Kind {key,pointer,acceleration,action,look,move,quit};
     Kind kind=Kind::key;
     uint32_t code=0,module=600,id=0;
     float x=0,y=0,z=0;

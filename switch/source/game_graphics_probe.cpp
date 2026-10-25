@@ -10,6 +10,7 @@
 #include <switch.h>
 #include "controller_input.hpp"
 #include "gyro_input.hpp"
+#include "loading_overlay.hpp"
 #include <memory>
 
 std::string game_graphics_probe(const std::string& root,unsigned frames) {
@@ -44,6 +45,40 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     std::unique_ptr<std::FILE,int(*)(std::FILE*)> progress(std::fopen(ds::paths::log_file,"a"),std::fclose);
     graphics.record=[&](const std::string& text){ds::startup_log("%s",text.c_str());if(progress){std::fprintf(progress.get(),"%s\n",text.c_str());std::fflush(progress.get());}};
     graphics.record("Native surface: "+std::to_string(drawable_width)+"x"+std::to_string(drawable_height));
+    bool starting=true;
+    uint64_t loading_bytes=0,loading_frames=0;
+    const uint32_t loading_started=SDL_GetTicks();uint32_t last_loading_draw=0;
+    auto draw_loading=[&]{
+        if(!starting)return;
+        auto gi=reinterpret_cast<void(*)(unsigned,int*)>(SDL_GL_GetProcAddress("glGetIntegerv"));
+        auto gf=reinterpret_cast<void(*)(unsigned,float*)>(SDL_GL_GetProcAddress("glGetFloatv"));
+        auto gb=reinterpret_cast<void(*)(unsigned,unsigned char*)>(SDL_GL_GetProcAddress("glGetBooleanv"));
+        auto enabled=reinterpret_cast<unsigned char(*)(unsigned)>(SDL_GL_GetProcAddress("glIsEnabled"));
+        auto en=reinterpret_cast<void(*)(unsigned)>(SDL_GL_GetProcAddress("glEnable"));auto dis=reinterpret_cast<void(*)(unsigned)>(SDL_GL_GetProcAddress("glDisable"));
+        auto sc=reinterpret_cast<void(*)(int,int,int,int)>(SDL_GL_GetProcAddress("glScissor"));
+        auto cc=reinterpret_cast<void(*)(float,float,float,float)>(SDL_GL_GetProcAddress("glClearColor"));
+        auto cm=reinterpret_cast<void(*)(unsigned char,unsigned char,unsigned char,unsigned char)>(SDL_GL_GetProcAddress("glColorMask"));auto cl=reinterpret_cast<void(*)(unsigned)>(SDL_GL_GetProcAddress("glClear"));
+        if(!gi||!gf||!gb||!enabled||!en||!dis||!sc||!cc||!cm||!cl)throw std::runtime_error("Loading overlay GL entry missing");
+        int box[4];float saved[4];unsigned char mask[4];gi(0x0c10,box);gf(0x0c22,saved);gb(0x0c23,mask);const auto was_enabled=enabled(0x0c11);
+        en(0x0c11);cm(1,1,1,1);
+        ds::draw_loading(uint32_t(SDL_GetTicks()-loading_started),loading_bytes,loading_frames,[&](int x,int y,int w,int h,float r,float g,float b){
+            const int x0=x*drawable_width/640,x1=(x+w)*drawable_width/640;
+            const int y0=(480-y-h)*drawable_height/480,y1=(480-y)*drawable_height/480;
+            sc(x0,y0,x1-x0,y1-y0);cc(r,g,b,1);cl(0x4000);
+        });
+        cc(saved[0],saved[1],saved[2],saved[3]);cm(mask[0],mask[1],mask[2],mask[3]);sc(box[0],box[1],box[2],box[3]);if(!was_enabled)dis(0x0c11);
+        last_loading_draw=SDL_GetTicks();
+    };
+    graphics.startup_complete=[&,record=graphics.record]{if(starting){starting=false;record("Loading overlay dismissed: native player HUD available");}};
+    graphics.loading=[&](const std::string&,uint64_t bytes,uint64_t frames){
+        loading_bytes=bytes;loading_frames=frames;
+        if(starting&&uint32_t(SDL_GetTicks()-last_loading_draw)>=250){draw_loading();SDL_GL_SwapWindow(window);}
+    };
+    auto initial_color=reinterpret_cast<void(*)(float,float,float,float)>(SDL_GL_GetProcAddress("glClearColor"));
+    auto initial_clear=reinterpret_cast<void(*)(unsigned)>(SDL_GL_GetProcAddress("glClear"));
+    if(!initial_color||!initial_clear)throw std::runtime_error("Initial loading GL entry missing");
+    initial_color(0.015f,0.025f,0.04f,1);initial_clear(0x4000);
+    draw_loading();SDL_GL_SwapWindow(window);
     SDL_AudioSpec desired{};desired.freq=44100;desired.format=AUDIO_S16LSB;desired.channels=2;desired.samples=1024;
     ds::startup_log("BEGIN: SDL audio device");
     SDL_AudioSpec actual{};const auto audio=SDL_OpenAudioDevice(nullptr,0,&desired,&actual,0);
@@ -96,6 +131,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         return events;
     };
     graphics.present=[&]{
+        if(starting){++loading_frames;draw_loading();}
         if(input.cursor_visible()){
             const auto resolve=[](const char* name){auto* p=SDL_GL_GetProcAddress(name);if(!p)throw std::runtime_error(std::string("Cursor GL unavailable: ")+name);return p;};
             auto get_int=reinterpret_cast<void(*)(unsigned,int*)>(resolve("glGetIntegerv"));
