@@ -6,6 +6,7 @@
 #include <mmsystem.h>
 #include "lifecycle_probe.hpp"
 #include "controller_input.hpp"
+#include "hd_texture.hpp"
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -94,7 +95,9 @@ int main(int argc,char** argv){
         Context context;check_fixed_bridge(context);Audio audio;
         std::cout<<"Host-only WGL renderer: "<<glGetString(GL_RENDERER)<<"\n";
         ds::GraphicsBackend backend;backend.desktop_compatibility=true;backend.realtime_clock=true;
-        backend.record=[](const std::string& text){std::cerr<<text<<'\n';};
+        const auto host_started=std::chrono::steady_clock::now();
+        backend.record=[&](const std::string& text){if(text.rfind("Game frame returned: ",0)==0||text.rfind("INPUT:",0)==0)std::cerr<<"HOST elapsed ms="<<std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-host_started).count()<<'\n';std::cerr<<text<<'\n';};
+        if(argc>6&&std::string(argv[6]).rfind("--hd=",0)==0){const auto hd=std::string(argv[6]).substr(5);backend.hd_budget_bytes=192*1024*1024;backend.hd_texture=[hd](const std::string& key){return ds::read_hd_texture(hd,key);};}
         uint64_t loading_callbacks=0;bool startup_done=false;
         backend.loading=[&](const std::string&,uint64_t,uint64_t){++loading_callbacks;};
         backend.startup_complete=[&]{if(!startup_done){startup_done=true;std::cerr<<"Native player HUD available: startup overlay may close\n";}};

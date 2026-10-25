@@ -52,6 +52,7 @@ class GuestGl {
     std::map<U,U> texture_bindings;
     struct Replacement {U shadow,width,height;uint64_t bytes;std::string key;};
     std::map<U,Replacement> replacements;
+    std::set<U> hd_parameters_dirty;
     std::set<U> dynamic_textures;
     std::set<std::string> missing_hd_keys;
     uint64_t hd_live_bytes=0;

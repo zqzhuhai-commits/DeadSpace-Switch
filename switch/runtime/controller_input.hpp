@@ -27,7 +27,7 @@ public:
         seconds=std::clamp(seconds,.001f,.05f);
         auto action=[&](GameAction code,bool down=true){GuestInput e;e.kind=GuestInput::Kind::action;e.code=uint32_t(code);e.down=down;out.push_back(e);};
         auto pointer=[&](uint32_t code,uint32_t id,float x,float y){GuestInput e;e.kind=GuestInput::Kind::pointer;e.module=1000;e.code=code;e.id=id;e.x=x;e.y=y;out.push_back(e);};
-        auto move=[&](float x,float y){GuestInput e;e.kind=GuestInput::Kind::move;e.x=x;e.y=y;out.push_back(e);};
+        auto move=[&](float x,float y,bool run=false){GuestInput e;e.kind=GuestInput::Kind::move;e.x=x;e.y=y;e.down=run;out.push_back(e);};
         auto release=[&]{if(left_down)move(0,0);if(click_down)pointer(0x8000c,2,cursor_x,cursor_y);if(back_down){GuestInput e;e.code=4;e.down=false;out.push_back(e);}if(aim_down)action(GameAction::aim,false);left_down=click_down=back_down=aim_down=false;};
         if(menu!=was_menu||!state.connected){release();previous=state.buttons;was_menu=menu;}
         if(!state.connected){previous=0;return out;}
@@ -52,10 +52,10 @@ public:
             if((released&A)&&click_down){pointer(0x8000c,2,cursor_x,cursor_y);click_down=false;}
             const bool back=state.buttons&B;if(back!=back_down){GuestInput e;e.code=4;e.down=back;out.push_back(e);back_down=back;}
         }else{
-            const bool aiming=state.buttons&(L|ZL);if(aiming!=aim_down){action(GameAction::aim,aiming);aim_down=aiming;}
+            const bool aiming=state.buttons&ZL;if(aiming!=aim_down){action(GameAction::aim,aiming);aim_down=aiming;}
             const std::pair<uint32_t,GameAction> map[]={{ZR,GameAction::fire},{R,GameAction::alt_fire},{B,GameAction::accept},{A,GameAction::kinesis},{Y,GameAction::reload},{X,GameAction::turn_stasis},{RStick,GameAction::locator},{Left,GameAction::previous_weapon},{Right,GameAction::next_weapon},{Up,GameAction::melee},{Down,GameAction::jump}};
             for(const auto& binding:map)if(pressed&binding.first)action(binding.second);
-            if(lx||ly){move(lx,ly);left_down=true;}
+            if(lx||ly){move(lx,ly,(state.buttons&L)!=0);left_down=true;}
             else if(left_down){move(0,0);left_down=false;}
             if(rx||ry){GuestInput e;e.kind=GuestInput::Kind::look;e.x=rx*540*seconds;e.y=ry*360*seconds;out.push_back(e);}
         }

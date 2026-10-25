@@ -4,6 +4,7 @@
 #include "lifecycle_probe.hpp"
 #include "guest_image.hpp"
 #include "guest_call_scope.hpp"
+#include "loading_budget.hpp"
 #include "guest_heap.hpp"
 #include "guest_threads.hpp"
 #include "guest_jump.hpp"
@@ -233,13 +234,20 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         cpu->Regs()[13]=call_sp;
         cpu->Regs()[14]=stop;cpu->Regs()[15]=address&~1u;cpu->SetCpsr((address&1)?0x30:0x10);cpu->SetFpscr(0);
         for(unsigned i=4;i<args.size();++i)MemoryWrite32(cpu->Regs()[13]+4*(i-4),args[i]);
-        budget=200000000;returned=false;pending=0;
+        const bool resource_loading_call=label.rfind("NativeOnDrawFrame[",0)==0||label=="mount original"||label=="mount published";
+        ds::LoadingBudget loading_budget(resource_loading_call,asset_read_bytes);
+        budget=ds::LoadingBudget::initial;returned=false;pending=0;
         auto last_progress=std::chrono::steady_clock::now();
         const auto deadline=last_progress+std::chrono::seconds(120);
         unsigned calls=0;
         unsigned beats=0;
         bool background=false;std::chrono::steady_clock::time_point background_deadline;
-        while(!returned&&fault.empty()&&budget){
+        while(!returned&&fault.empty()){
+            if(!budget){
+                budget=loading_budget.extend(asset_read_bytes);
+                if(!budget)break;
+                if(graphics.record)graphics.record("LOAD BUDGET: "+label+" total="+std::to_string(loading_budget.total())+" assets="+std::to_string(asset_read_bytes));
+            }
             if(background&&std::chrono::steady_clock::now()>=background_deadline)break;
             update_clock();
             const auto& active=threads.thread();
@@ -254,7 +262,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                     graphics.record("WORK: "+label+" thread="+std::to_string(threads.current())+" imports="+std::to_string(calls)+" GL="+std::to_string(gl_calls)+" assets="+std::to_string(asset_read_bytes));last_progress=now;
                 }
             }
-            quantum=std::min<uint64_t>(budget,100000);
+            if(!quantum)quantum=std::min<uint64_t>(budget,100000);
             cpu->Run();
             if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>50000000)throw std::runtime_error("Import dispatch limit "+label);++service_calls;if(cpu->Regs()[15]>=0x10235800u&&cpu->Regs()[15]<0x10235960u&&++svc_log<=40)trace.push_back("  SVC "+functions[id-1]+" guest_pc=0x"+to_hex(cpu->Regs()[15]-8)+" a=0x"+to_hex(cpu->Regs()[0])+" b=0x"+to_hex(cpu->Regs()[1])+" c=0x"+to_hex(cpu->Regs()[2])+" d=0x"+to_hex(cpu->Regs()[3]));service(functions[id-1]);}
             if(!outer)continue;
@@ -279,6 +287,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 threads.exit(cpu->Regs()[0]);returned=false;rotate=true;
                 }
             }
+            // An ordinary imported function is not a thread yield. Retain the
+            // remaining quantum so a loader can finish its work rather than
+            // waking busy-waiting peers after every memcpy/JNI call.
+            if(!rotate&&quantum&&threads.thread().state==ds::GuestThreads::State::ready)continue;
             if(auto* old=threads.find(threads.current())) {
                 old->cpu.save(*cpu);old->exception=jni_exception;old->error=errno_address;
             }
@@ -305,6 +317,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             }
             if(threads.thread().timeout_error){MemoryWrite32(errno_address,threads.thread().timeout_error);threads.thread().timeout_error=0;}
             rotate=false;
+            quantum=0;
         }
         if(background){
             if(auto* worker=threads.find(threads.current())){worker->cpu.save(*cpu);worker->exception=jni_exception;worker->error=errno_address;}
@@ -907,14 +920,14 @@ public:
         guest_call(ds::GuestImage::base+0x71608,{input_hud,action,down?0u:0xffffffffu},"native game action",true);
         if(++native_input_actions<=32&&graphics.record)graphics.record("INPUT ACTION: 0x"+to_hex(action)+(down?" press":" release"));
     }
-    void engine_vector(float x,float y,bool movement){
+    void engine_vector(float x,float y,bool movement,bool run=false){
         const auto player=engine_player();if(!player)return;
         const auto handler=MemoryRead32(MemoryRead32(player)+8);
         if(!image.executable(handler&~1u,4))throw std::runtime_error("Invalid player input handler");
         if(!input_vector)input_vector=alloc(24);
         uint32_t xb,yb;std::memcpy(&xb,&x,4);std::memcpy(&yb,&y,4);
         MemoryWrite32(input_vector,ds::GuestImage::base+0x426ed0);MemoryWrite32(input_vector+4,1006);
-        MemoryWrite32(input_vector+12,xb);MemoryWrite32(input_vector+16,yb);MemoryWrite32(input_vector+20,0);
+        MemoryWrite32(input_vector+12,xb);MemoryWrite32(input_vector+16,yb);MemoryWrite32(input_vector+20,movement&&run?1:0);
         if(movement){
             // Xperia Play onEvent, case Vector2Event pad 1, consumes the full
             // float pair and records -x/-y at player+444/+452. No touch D-pad.
@@ -968,7 +981,7 @@ public:
                 if(event.kind==ds::GuestInput::Kind::quit){quit=true;break;}
                 if(event.kind==ds::GuestInput::Kind::action){engine_action(event.code,event.down);continue;}
                 if(event.kind==ds::GuestInput::Kind::look){if(!input_menu)engine_vector(event.x,event.y,false);continue;}
-                if(event.kind==ds::GuestInput::Kind::move){if(!input_menu||(event.x==0&&event.y==0))engine_vector(event.x,event.y,true);continue;}
+                if(event.kind==ds::GuestInput::Kind::move){if(!input_menu||(event.x==0&&event.y==0))engine_vector(event.x,event.y,true,event.down);continue;}
                 if(event.kind==ds::GuestInput::Kind::key&&event.code==4&&input_hud){if(event.down)engine_action(uint32_t(ds::GameAction::cancel),true);continue;}
                 const auto bits=[](float value){uint32_t result;std::memcpy(&result,&value,4);return result;};
                 std::string name;

@@ -69,7 +69,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         cc(saved[0],saved[1],saved[2],saved[3]);cm(mask[0],mask[1],mask[2],mask[3]);sc(box[0],box[1],box[2],box[3]);if(!was_enabled)dis(0x0c11);
         last_loading_draw=SDL_GetTicks();
     };
-    graphics.startup_complete=[&,record=graphics.record]{if(starting){starting=false;record("Loading overlay dismissed: native player HUD available");}};
+    graphics.startup_complete=[&,record=graphics.record]{if(starting){starting=false;record("Loading overlay dismissed: native player HUD available; elapsed_ms="+std::to_string(uint32_t(SDL_GetTicks()-loading_started)));}};
     graphics.loading=[&](const std::string&,uint64_t bytes,uint64_t frames){
         loading_bytes=bytes;loading_frames=frames;
         if(starting&&uint32_t(SDL_GetTicks()-last_loading_draw)>=250){draw_loading();SDL_GL_SwapWindow(window);}
@@ -123,7 +123,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         const float dt=std::clamp((now-last_tick)/1000.0f,.001f,.05f);
         events=input.update({held,left.x/32767.0f,-left.y/32767.0f,right.x/32767.0f,-right.y/32767.0f,padIsConnected(&pad)},dt);last_tick=now;
         if(input.motion_enabled()!=motion_was_enabled){motion_was_enabled=input.motion_enabled();ds::startup_log("Motion aiming: %s",motion_was_enabled?"enabled (aim only)":"disabled");}
-        if(input.motion_enabled()&&!input.is_menu()&&(held&(C::L|C::ZL))){const auto delta=sensors.read(padIsHandheld(&pad),padGetStyleSet(&pad),dt);if(delta.first||delta.second){ds::GuestInput e;e.kind=ds::GuestInput::Kind::look;e.x=delta.first;e.y=delta.second;events.push_back(e);}}
+        if(input.motion_enabled()&&!input.is_menu()&&(held&C::ZL)){const auto delta=sensors.read(padIsHandheld(&pad),padGetStyleSet(&pad),dt);if(delta.first||delta.second){ds::GuestInput e;e.kind=ds::GuestInput::Kind::look;e.x=delta.first;e.y=delta.second;events.push_back(e);}}
         HidTouchScreenState touch{};hidGetTouchScreenStates(&touch,1);
         if(touch.count||touched){ds::GuestInput e;e.kind=ds::GuestInput::Kind::pointer;e.module=1000;e.id=0;e.code=touch.count?(touched?0x4000c:0x6000c):0x8000c;if(touch.count){touch_x=touch.touches[0].x/1280.0f*640;touch_y=touch.touches[0].y/720.0f*480;}e.x=touch_x;e.y=touch_y;events.push_back(e);touched=touch.count!=0;}
         if(quit){ds::GuestInput e;e.kind=ds::GuestInput::Kind::quit;events.push_back(e);}
@@ -148,11 +148,11 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         }
         SDL_GL_SwapWindow(window);
     };
-#ifndef DS_GAME_LAUNCHER
     const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
-    graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};
-    log+="Optional HD root: "+hd_root+" (missing files use original textures)\n";
-#endif
+    int hd_enabled=1;
+    if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/hd.cfg","r")){int value=1;if(std::fscanf(config,"%d",&value)==1&&(value==0||value==1))hd_enabled=value;std::fclose(config);}
+    if(hd_enabled){graphics.hd_budget_bytes=192*1024*1024;graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};}
+    graphics.record(std::string("HD replacements: ")+(hd_enabled?"enabled, 192 MiB budget; missing textures use originals":"disabled by hd.cfg"));
     log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,frames,std::move(graphics));
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
     if(get_error){char text[80];std::snprintf(text,sizeof(text),"Native context GL error after probe: 0x%x\n",get_error());log+=text;}

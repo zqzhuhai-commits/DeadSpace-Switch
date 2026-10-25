@@ -11,7 +11,7 @@ int main(){try{
  c.set_menu(false);auto changed=c.update({C::A,0,0,0,0,true},.016f);check(changed.size()==1&&changed[0].code==0x8000c,"Held A crossed into kinesis");c.update({},.016f);
  const std::pair<uint32_t,A> cases[]={{C::A,A::kinesis},{C::B,A::accept},{C::X,A::turn_stasis},{C::Y,A::reload},{C::R,A::alt_fire},{C::ZR,A::fire},{C::RStick,A::locator},{C::Left,A::previous_weapon},{C::Right,A::next_weapon},{C::Up,A::melee},{C::Down,A::jump}};
  for(auto test:cases){auto e=c.update({test.first,0,0,0,0,true},.016f);check(e.size()==1&&e[0].kind==E::Kind::action&&e[0].code==uint32_t(test.second)&&e[0].down,"NX game action");check(c.update({test.first,0,0,0,0,true},.016f).empty(),"Held action repeats");c.update({},.016f);}
- auto aim=c.update({C::L|C::ZL,0,0,0,0,true},.016f);check(aim.size()==1&&aim[0].code==uint32_t(A::aim)&&aim[0].down,"Combined aim");check(c.update({C::L,0,0,0,0,true},.016f).empty(),"One aim release cleared both");
+ auto aim=c.update({C::ZL,0,0,0,0,true},.016f);check(aim.size()==1&&aim[0].code==uint32_t(A::aim)&&aim[0].down,"ZL aim");check(c.update({C::L|C::ZL,0,0,0,0,true},.016f).empty(),"L changes ZL aim");
  auto disconnected=c.update({0,0,0,0,0,false},.016f);check(disconnected.size()==1&&!disconnected[0].down,"Disconnect leaves aim held");
  auto move=c.update({0,1,0,1,0,true},.016f);unsigned movement=0,look=0;for(auto e:move){movement+=e.kind==E::Kind::move;look+=e.kind==E::Kind::look;if(e.kind==E::Kind::look)check(std::fabs(e.x-8.64f)<.001f,"Reduced camera speed");}check(movement==1&&look==1,"Analog move/camera");
  auto held=c.update({0,1,0,1,0,true},.016f);movement=look=0;for(auto e:held){movement+=e.kind==E::Kind::move;look+=e.kind==E::Kind::look;check(e.kind!=E::Kind::pointer,"Analog uses touch D-pad");}check(movement==1&&look==1,"Held analog/camera");
@@ -21,6 +21,7 @@ int main(){try{
  check(c.update({C::Plus,0,0,0,0,true},.016f).empty(),"Pause fired on press");auto pause=c.update({},.016f);check(pause.size()==1&&pause[0].code==uint32_t(A::pause),"Pause on release");
  c.update({C::Plus|C::Minus,0,0,0,0,true},.016f);check(c.update({},.016f).empty(),"Chord exits or pauses");
  c.update({C::LStick,0,0,0,0,true},.016f);check(c.motion_enabled(),"Motion toggle missing");
+ c.update({},.016f);auto running=c.update({C::L,.5f,-.5f,0,0,true},.016f);check(running.size()==1&&running[0].kind==E::Kind::move&&running[0].down,"L does not request native running");auto walking=c.update({0,.5f,-.5f,0,0,true},.016f);check(walking.size()==1&&!walking[0].down&&walking[0].x==running[0].x&&walking[0].y==running[0].y,"L release changes angle or leaves running");c.update({},.016f);
  ds::GyroInput gyro;auto still=gyro.update(0,0,-1,.001f,0,0,.016f);check(still.first==0&&still.second==0,"Motion tremor not filtered");auto motion=gyro.update(0,0,-1,.1f,0,.2f,.01f);check(std::fabs(motion.first+8.64f)<.001f&&std::fabs(motion.second+4.32f)<.001f,"Motion units or axes");
  std::cout<<"PASS: NX actions, mode boundaries, radial drift, aim pairing, held camera, disconnect, chord isolation and motion conversion\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

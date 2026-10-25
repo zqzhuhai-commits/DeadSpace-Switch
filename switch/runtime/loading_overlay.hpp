@@ -16,14 +16,14 @@ inline uint16_t loading_glyph(char c){
 }
 // rect uses a 640x480, top-left coordinate space and an RGB color.
 template<class Rect> void draw_loading(uint64_t elapsed_ms,uint64_t bytes,uint64_t frames,Rect rect){
-    rect(0,412,640,68,0.015f,0.025f,0.04f);
+    rect(0,0,640,68,0.015f,0.025f,0.04f);
     auto text=[&](int x,int y,const std::string& s){for(char c:s){const auto bits=loading_glyph(c);for(int row=0;row<5;++row)for(int col=0;col<3;++col)if(bits&(1u<<(14-row*3-col)))rect(x+col*2,y+row*2,2,2,.75f,.9f,.95f);x+=8;}};
-    text(24,422,"STARTING GAME");
+    text(24,10,"STARTING GAME");
     char line[90];std::snprintf(line,sizeof(line),"READ %llu MB  FRAMES %llu  TIME %llu S",(unsigned long long)std::min<uint64_t>(999999,bytes/(1024*1024)),(unsigned long long)std::min<uint64_t>(99999999,frames),(unsigned long long)std::min<uint64_t>(999999,elapsed_ms/1000));
-    text(24,438,line);
-    rect(24,458,592,5,.09f,.18f,.24f);
+    text(24,26,line);
+    rect(24,46,592,5,.09f,.18f,.24f);
     // A travelling segment is activity, never a fictitious completion percent.
     const int step=int((elapsed_ms/12)%1088);const int x=step<=544?step:1088-step;
-    rect(24+x,458,48,5,.15f,.85f,.95f);
+    rect(24+x,46,48,5,.15f,.85f,.95f);
 }
 }

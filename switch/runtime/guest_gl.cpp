@@ -90,6 +90,7 @@ void GuestGl::prepare_arrays(U last) {
 }
 GuestGl::~GuestGl(){try{while(!replacements.empty())invalidate_hd(replacements.begin()->first);}catch(...){};}
 void GuestGl::invalidate_hd(U texture,bool dynamic) {
+    hd_parameters_dirty.erase(texture);
     const auto it=replacements.find(texture);
     if(it!=replacements.end()) {
         fn<void(*)(I,const U*)>("glDeleteTextures")(1,&it->second.shadow);
@@ -149,7 +150,7 @@ void GuestGl::maybe_replace(U target,U level,U w,U h,U format,const std::vector<
         }
         fn<void(*)(U,I)>("glPixelStorei")(0x0cf5,I(unpack));
         fn<void(*)(U,U)>("glBindTexture")(0x0de1,original);
-        replacements.emplace(original,Replacement{shadow,w,h,bytes,key});hd_live_bytes+=bytes;++hd_matches;
+        replacements.emplace(original,Replacement{shadow,w,h,bytes,key});hd_parameters_dirty.insert(original);hd_live_bytes+=bytes;++hd_matches;
     } catch(const std::exception& e) {
         ++hd_rejected;last_hd_error=std::string(e.what()).substr(0,512);
         if(missing_hd_keys.size()<4096)missing_hd_keys.insert(key);
@@ -163,15 +164,17 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
         for(const auto& binding:texture_bindings) {
             const auto it=replacements.find(binding.second);if(it==replacements.end())continue;
             fn<void(*)(U)>("glActiveTexture")(0x84c0+binding.first);
+            const bool dirty=hd_parameters_dirty.count(binding.second)!=0;
             I values[4]{};const U names[]={0x2800,0x2801,0x2802,0x2803};
-            for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I*)>("glGetTexParameteriv")(0x0de1,names[i],&values[i]);
+            if(dirty)for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I*)>("glGetTexParameteriv")(0x0de1,names[i],&values[i]);
             changed.push_back(binding);fn<void(*)(U,U)>("glBindTexture")(0x0de1,it->second.shadow);
-            for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I)>("glTexParameteri")(0x0de1,names[i],values[i]);
+            if(dirty){for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I)>("glTexParameteri")(0x0de1,names[i],values[i]);hd_parameters_dirty.erase(binding.second);}
         }
         draw();restore();
     } catch(...){restore();throw;}
 }
 GuestGl::U GuestGl::call(const std::string& name) {
+    if(backend.hd_texture&&name.rfind("glTexParameter",0)==0)hd_parameters_dirty.insert(texture_bindings[active_unit]);
     ++calls;const U a=arg(0),b=arg(1),c=arg(2),d=arg(3);
     const auto fixed=[&](unsigned n){return F(I(arg(n)))/65536.0f;};
     if(one_of(name,{"glClearColorx","glColor4x","glRotatex"})){
