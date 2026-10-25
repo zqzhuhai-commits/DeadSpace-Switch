@@ -3,6 +3,7 @@
 #include "lifecycle_probe.hpp"
 #include "app_paths.hpp"
 #include "startup_log.hpp"
+#include "render_test.hpp"
 #include <SDL2/SDL.h>
 #include <cstdio>
 #include <stdexcept>
@@ -43,6 +44,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     ds::GraphicsBackend graphics;
     graphics.realtime_clock=true;
     graphics.gpu_client_arrays=true;
+    graphics.render_test_mode=ds::read_render_test_mode();
     SDL_GL_SetSwapInterval(1);
     int drawable_width=1280,drawable_height=720;SDL_GL_GetDrawableSize(window,&drawable_width,&drawable_height);
     graphics.surface_width=uint32_t(drawable_width);graphics.surface_height=uint32_t(drawable_height);
@@ -51,6 +53,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     graphics.record("Native surface: "+std::to_string(drawable_width)+"x"+std::to_string(drawable_height));
     const uint32_t startup_started=SDL_GetTicks();bool startup_recorded=false;
     graphics.startup_complete=[&,record=graphics.record]{if(!startup_recorded){startup_recorded=true;record("Native player HUD ready; elapsed_ms="+std::to_string(uint32_t(SDL_GetTicks()-startup_started)));}};
+    graphics.record(std::string("Render isolation build room-test-1; mode=")+std::to_string(graphics.render_test_mode)+"; "+ds::render_test_name(graphics.render_test_mode));
     graphics.record("Custom loading overlay: disabled");
     graphics.record("GPU client buffers: enabled; driver-owned vertex/index uploads");
     graphics.lighting_strength=0.25f;

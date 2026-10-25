@@ -33,6 +33,7 @@ struct GraphicsBackend {
     std::function<std::vector<GuestInput>()> poll_input;
     std::function<void(bool)> input_mode;
     std::function<void(const std::string&)> record;
+    unsigned render_test_mode=0; // 0 baseline, 1 omit blended draws, 2 synchronize draws
 };
 struct GlGuestMemory {
     std::function<uint32_t(unsigned)> arg;
@@ -85,6 +86,7 @@ public:
     GuestGl(GraphicsBackend b,GlGuestMemory m):backend(std::move(b)),memory(std::move(m)){}
     ~GuestGl();
     U call(const std::string& name);
+    uint64_t diagnostic_skipped_draws=0,diagnostic_sync_draws=0;
     uint64_t calls=0,draws=0,texture_uploads=0,atc_uploads=0,lighting_limited_draws=0,client_array_uploads=0,client_index_uploads=0;
     uint64_t hd_matches=0,hd_rejected=0,hd_misses=0,hd_budget_skips=0,hd_dynamic_fallbacks=0,hd_mip_uploads=0;
     std::string last_hd_error;

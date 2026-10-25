@@ -3,6 +3,7 @@
 #include "preflight.hpp"
 #include "platform_probe.hpp"
 #include "startup_log.hpp"
+#include "render_test.hpp"
 #include <cstdio>
 #include <string>
 #include <sys/stat.h>
@@ -30,6 +31,17 @@ int main(){
     ds::startup_log("END: preflight ready=%u",unsigned(check.ready()));
     bool ran=false;
     if(check.ready()){
+        const unsigned render_mode=ds::read_render_test_mode();
+        std::printf("\nROOM-TEST-1 | build %s\n%s\n",DS_APP_VERSION,ds::render_test_name(render_mode));
+        float lighting=.25f;
+        if(auto* cfg=std::fopen("sdmc:/switch/deadspacemobile/lighting.cfg","r")){
+            char extra=0;float value=0;
+            if(std::fscanf(cfg,"%f %c",&value,&extra)==1&&value>=0&&value<=1)lighting=value;
+            std::fclose(cfg);
+        }
+        std::printf("Lighting strength: %.2f | GPU buffers: ON\n",double(lighting));
+        record(std::string("ROOM-TEST-1 mode=")+std::to_string(render_mode)+" lighting="+std::to_string(lighting));
+        consoleUpdate(nullptr);svcSleepThread(3000000000LL);
         consoleExit(nullptr);ds::startup_log("BEGIN: game_graphics_probe");
         try{const auto result=game_graphics_probe(root,std::numeric_limits<unsigned>::max());record(result);}
         catch(const std::exception& error){record(std::string("STARTUP EXCEPTION: ")+error.what());}

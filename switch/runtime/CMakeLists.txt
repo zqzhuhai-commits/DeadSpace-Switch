@@ -16,6 +16,8 @@ add_library(ds_cpu_probe STATIC hd_texture.cpp ../../third_party/powervr/PVRTDec
 target_include_directories(ds_cpu_probe PUBLIC . ../include)
 target_link_libraries(ds_cpu_probe PUBLIC dynarmic)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
+  add_executable(ds-render-isolation-test ../tests/render_isolation_test.cpp)
+  target_link_libraries(ds-render-isolation-test PRIVATE ds_cpu_probe)
   add_executable(ds-jit-cache-test ../tests/switch_jit_cache_test.cpp)
   target_compile_definitions(ds-jit-cache-test PRIVATE __SWITCH__)
   target_include_directories(ds-jit-cache-test PRIVATE ../tests/switch-stubs "${DYNARMIC_SOURCE_DIR}/externals/oaknut/include")

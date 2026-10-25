@@ -190,6 +190,12 @@ bool GuestGl::limit_exposure(std::array<F,4>& original) {
     ++lighting_limited_draws;return true;
 }
 void GuestGl::draw_textured(const std::function<void()>& draw) {
+    // Broad isolation only: transparent objects and UI can disappear in mode 1.
+    // This is not a lighting fix or a filter specific to the player character.
+    if(backend.render_test_mode==1&&blend_enabled){
+        if(!diagnostic_skipped_draws&&backend.record)backend.record("Render isolation: first blended draw omitted");
+        ++diagnostic_skipped_draws;return;
+    }
     std::vector<std::pair<U,U>> changed;
     const auto restore=[&]{for(const auto& binding:changed){fn<void(*)(U)>("glActiveTexture")(0x84c0+binding.first);fn<void(*)(U,U)>("glBindTexture")(0x0de1,binding.second);}fn<void(*)(U)>("glActiveTexture")(0x84c0+active_unit);};
     try {
@@ -204,7 +210,14 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
         }
         std::array<F,4> original{};const bool limited=limit_exposure(original);
         const auto restore_color=[&]{if(limited)fn<void(*)(F,F,F,F)>("glColor4f")(original[0],original[1],original[2],original[3]);};
-        try{draw();}catch(...){restore_color();throw;}
+        try{
+            draw();
+            if(backend.render_test_mode==2){
+                fn<void(*)()>("glFinish")();
+                if(!diagnostic_sync_draws&&backend.record)backend.record("Render isolation: first draw synchronized");
+                ++diagnostic_sync_draws;
+            }
+        }catch(...){restore_color();throw;}
         restore_color();restore();
     } catch(...){restore();throw;}
 }
@@ -225,7 +238,8 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(name=="glDepthRangex"){if(backend.desktop_compatibility)fn<void(*)(double,double)>("glDepthRange")(fixed(0),fixed(1));else fn<void(*)(F,F)>("glDepthRangef")(fixed(0),fixed(1));return 0;}
     if(name=="glOrthox"||name=="glFrustumx"){
         if(backend.desktop_compatibility)fn<void(*)(double,double,double,double,double,double)>(name=="glOrthox"?"glOrtho":"glFrustum")(fixed(0),fixed(1),fixed(2),fixed(3),fixed(4),fixed(5));
-        else fn<void(*)(F,F,F,F,F,F)>(name=="glOrthox"?"glOrthof":"glFrustumf")(fixed(0),fixed(1),fixed(2),fixed(3),fixed(4),fixed(5));return 0;
+        else fn<void(*)(F,F,F,F,F,F)>(name=="glOrthox"?"glOrthof":"glFrustumf")(fixed(0),fixed(1),fixed(2),fixed(3),fixed(4),fixed(5));
+        return 0;
     }
     if(name=="glLoadMatrixx"||name=="glMultMatrixx"){
         I source[16];F matrix[16];memory.read(a,source,sizeof(source));for(unsigned i=0;i<16;++i)matrix[i]=F(source[i])/65536.0f;
