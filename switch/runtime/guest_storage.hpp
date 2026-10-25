@@ -3,12 +3,44 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <cstdio>
+#include <array>
+#include <sys/stat.h>
 
 namespace ds {
 // A small virtual namespace: appbundle:/assets are immutable; /data is a
 // separate writable save tree. Guest absolute paths never name host files.
 class GuestStorage {
     std::filesystem::path assets, saves;
+    static void seed_settings(const std::filesystem::path& source,const std::string& destination){
+        struct stat st{};
+        if(::stat(destination.c_str(),&st)==0){
+            if(!S_ISREG(st.st_mode))throw std::runtime_error("Settings destination is not a regular file");
+            if(st.st_size>0)return; // Never replace existing player preferences.
+        }else if(errno!=ENOENT)throw std::runtime_error("Cannot inspect initial settings destination");
+        const auto input_name=source.string();
+        auto* input=std::fopen(input_name.c_str(),"rb");
+        if(!input)throw std::runtime_error("Cannot open initial settings resource");
+        const auto temporary=destination+".initializing";
+        auto* output=std::fopen(temporary.c_str(),"wb");
+        if(!output){std::fclose(input);throw std::runtime_error("Cannot create initial settings temporary file");}
+        std::array<unsigned char,4096> buffer{};size_t total=0;bool ok=true;
+        for(;;){
+            const auto count=std::fread(buffer.data(),1,buffer.size(),input);
+            if(count){total+=count;if(total>1024*1024||std::fwrite(buffer.data(),1,count,output)!=count){ok=false;break;}}
+            if(count<buffer.size()){if(std::ferror(input))ok=false;break;}
+        }
+        if(std::fclose(input)!=0)ok=false;
+        if(std::fclose(output)!=0)ok=false;
+        if(!ok||!total){std::remove(temporary.c_str());throw std::runtime_error("Initial settings stream copy failed");}
+        // A previous failed filesystem::copy_file can leave a zero-byte file.
+        // Remove only that incomplete placeholder, after the new copy is closed.
+        if(::stat(destination.c_str(),&st)==0){
+            if(!S_ISREG(st.st_mode)||st.st_size>0){std::remove(temporary.c_str());return;}
+            if(std::remove(destination.c_str())!=0){std::remove(temporary.c_str());throw std::runtime_error("Cannot replace empty initial settings");}
+        }else if(errno!=ENOENT){std::remove(temporary.c_str());throw std::runtime_error("Cannot recheck initial settings destination");}
+        if(std::rename(temporary.c_str(),destination.c_str())!=0){std::remove(temporary.c_str());throw std::runtime_error("Cannot publish initial settings");}
+    }
     static bool beneath(const std::filesystem::path& path,const std::filesystem::path& root) {
         auto p=path.begin();for(auto r=root.begin();r!=root.end();++r,++p)if(p==path.end()||*p!=*r)return false;
         return true;
@@ -21,9 +53,9 @@ public:
 #endif
         const auto seed=std::filesystem::path(donor)/"preferences/settings.sb";
         const auto destination=resolve("/data/var/settings.sb",true);
-        if(std::filesystem::is_regular_file(seed)&&!std::filesystem::exists(destination)){
+        if(std::filesystem::is_regular_file(seed)){
             std::filesystem::create_directories(resolve("/data/var",true));
-            std::filesystem::copy_file(seed,destination,std::filesystem::copy_options::none);
+            seed_settings(seed,destination);
         }
     }
     std::string resolve(std::string raw,bool writing=false) const {

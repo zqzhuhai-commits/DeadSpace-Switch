@@ -13,6 +13,11 @@ int main(int argc,char** argv){
         std::ofstream(root/"donor/assets/original")<<"original";
         ds::GuestStorage fs((root/"donor").string(),(root/"saves").string());
         check(std::filesystem::is_regular_file(root/"saves/var/settings.sb"),"Initial preferences not seeded");
+        {std::ifstream seeded(root/"saves/var/settings.sb");std::string text;std::getline(seeded,text);check(text=="seeded locale fixture","Initial preferences bytes differ");}
+        std::ofstream(root/"saves/var/settings.sb",std::ios::trunc).close();
+        ds::GuestStorage repaired((root/"donor").string(),(root/"saves").string());
+        check(std::filesystem::file_size(root/"saves/var/settings.sb")==21,"Zero-byte interrupted settings not repaired");
+        check(!std::filesystem::exists(root/"saves/var/settings.sb.initializing"),"Temporary settings leaked");
         std::ofstream(root/"saves/var/settings.sb",std::ios::trunc)<<"player settings";
         ds::GuestStorage restarted((root/"donor").string(),(root/"saves").string());
         check(std::filesystem::file_size(root/"saves/var/settings.sb")==15,"Restart overwrote player preferences");
