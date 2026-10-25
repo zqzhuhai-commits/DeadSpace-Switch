@@ -947,21 +947,28 @@ public:
 }
 
 std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics) {
+    const auto record=graphics.record;
+    if(record)record("BEGIN: guest runtime allocation");
     LifecycleRuntime env;
     try {
+        if(record)record("END: guest runtime allocation; BEGIN: load original ELF");
         std::string error;if(!env.image.load(library,error))throw std::runtime_error(error);
         //env.trace.push_back("image memory bytes="+std::to_string(env.image.memory.size()));
+        if(record)record("END: load original ELF; BEGIN: runtime initialization");
         env.initialize(data_root,std::move(graphics));
+        if(record)record("END: runtime initialization; BEGIN: JIT construction");
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
         conf.code_cache_size=32*1024*1024;conf.page_table=env.fast_page_table();conf.fastmem_pointer=std::nullopt;
         conf.detect_misaligned_access_via_page_table=8|16|32|64;
         conf.only_detect_misalignment_via_page_table_on_page_boundary=true;
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;
+        if(record)record("END: JIT construction; BEGIN: guest constructors");
         env.install_stack_chk_guard();
         env.run_constructors();
         env.run_lifecycle(frames);
         return env.report();
     } catch(const std::exception& e) {
+        if(record)record(std::string("RUNTIME ERROR: ")+e.what());
         std::string out="BLOCKED after "+std::to_string(env.done())+" constructors: "+e.what()+"\n";
         out+=env.trace_report();
         return out;

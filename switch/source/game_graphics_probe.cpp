@@ -3,6 +3,7 @@
 #include "lifecycle_probe.hpp"
 #include "hd_texture.hpp"
 #include "app_paths.hpp"
+#include "startup_log.hpp"
 #include <SDL2/SDL.h>
 #include <cstdio>
 #include <stdexcept>
@@ -12,7 +13,9 @@
 
 std::string game_graphics_probe(const std::string& root,unsigned frames) {
     std::string log="Original-library lifecycle with native GLES1 subset (not verified gameplay)\n";
-    if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)<0){log+=SDL_GetError();SDL_Quit();return log;}
+    ds::startup_log("BEGIN: SDL video/audio init");
+    if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)<0){log+=SDL_GetError();ds::startup_log("FAIL: SDL init: %s",SDL_GetError());SDL_Quit();return log;}
+    ds::startup_log("END: SDL init; BEGIN: GLES1 window/context");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);
@@ -23,7 +26,8 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     SDL_Window* window=SDL_CreateWindow("Dead Space Mobile native GL diagnostics",0,0,1280,720,SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN);
 #endif
     SDL_GLContext context=window?SDL_GL_CreateContext(window):nullptr;
-    if(!context){log+="Native GLES1 context unavailable: "+std::string(SDL_GetError())+"\n";if(window)SDL_DestroyWindow(window);SDL_Quit();return log;}
+    if(!context){log+="Native GLES1 context unavailable: "+std::string(SDL_GetError())+"\n";ds::startup_log("FAIL: GLES1 context: %s",SDL_GetError());if(window)SDL_DestroyWindow(window);SDL_Quit();return log;}
+    ds::startup_log("END: GLES1 context");
     auto get_string=reinterpret_cast<const unsigned char*(*)(unsigned)>(SDL_GL_GetProcAddress("glGetString"));
     if(get_string){const auto* renderer=get_string(0x1f01);log+="Renderer: "+std::string(renderer?reinterpret_cast<const char*>(renderer):"unknown")+"\n";}
     ds::GraphicsBackend graphics;
@@ -32,11 +36,13 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     int drawable_width=1280,drawable_height=720;SDL_GL_GetDrawableSize(window,&drawable_width,&drawable_height);
     graphics.surface_width=uint32_t(drawable_width);graphics.surface_height=uint32_t(drawable_height);
     std::unique_ptr<std::FILE,int(*)(std::FILE*)> progress(std::fopen(ds::paths::log_file,"a"),std::fclose);
-    graphics.record=[&](const std::string& text){if(progress){std::fprintf(progress.get(),"%s\n",text.c_str());std::fflush(progress.get());}};
+    graphics.record=[&](const std::string& text){ds::startup_log("%s",text.c_str());if(progress){std::fprintf(progress.get(),"%s\n",text.c_str());std::fflush(progress.get());}};
     graphics.record("Native surface: "+std::to_string(drawable_width)+"x"+std::to_string(drawable_height));
     SDL_AudioSpec desired{};desired.freq=44100;desired.format=AUDIO_S16LSB;desired.channels=2;desired.samples=1024;
+    ds::startup_log("BEGIN: SDL audio device");
     SDL_AudioSpec actual{};const auto audio=SDL_OpenAudioDevice(nullptr,0,&desired,&actual,0);
-    if(!audio){log+="Audio device unavailable: "+std::string(SDL_GetError())+"\n";SDL_GL_DeleteContext(context);SDL_DestroyWindow(window);SDL_Quit();return log;}
+    if(!audio){log+="Audio device unavailable: "+std::string(SDL_GetError())+"\n";ds::startup_log("FAIL: audio device: %s",SDL_GetError());SDL_GL_DeleteContext(context);SDL_DestroyWindow(window);SDL_Quit();return log;}
+    ds::startup_log("END: SDL audio device");
     graphics.audio_playing=[audio](bool enabled){if(!enabled)SDL_ClearQueuedAudio(audio);SDL_PauseAudioDevice(audio,enabled?0:1);};
     graphics.audio_write=[audio](const std::vector<int16_t>& pcm)->std::optional<uint32_t>{
         if(SDL_GetQueuedAudioSize(audio)>44100*4/4)return std::nullopt;

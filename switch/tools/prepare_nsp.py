@@ -39,5 +39,5 @@ def prepare(elf,devkitpro,output,icon,version='0.4.0-rebuild'):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('elf');p.add_argument('devkitpro');p.add_argument('output');p.add_argument('--icon',required=True)
-    args=p.parse_args();print(json.dumps(prepare(args.elf,args.devkitpro,args.output,args.icon),indent=2))
+    p.add_argument('elf');p.add_argument('devkitpro');p.add_argument('output');p.add_argument('--icon',required=True);p.add_argument('--version',default='0.4.0-rebuild')
+    args=p.parse_args();print(json.dumps(prepare(args.elf,args.devkitpro,args.output,args.icon,args.version),indent=2))
