@@ -41,7 +41,8 @@ def romfs_files(b):
     directory(0,'');return found
 def decrypt(key,mode,b):
     d=Cipher(algorithms.AES(key),mode).decryptor();return d.update(b)+d.finalize()
-def verify(package,keyfile,stage):
+def verify(package,keyfile,stage,boot_check=False):
+    expected_id=int(json.loads((Path(stage)/'preparation.json').read_text(encoding='utf-8'))['title_id'],16)
     keys={}
     for line in Path(keyfile).read_text(encoding='utf-8-sig').splitlines():
         if '=' in line:
@@ -55,7 +56,7 @@ def verify(package,keyfile,stage):
         head=b''.join(decrypt(keys['header_key'],modes.XTS(i.to_bytes(16,'big')),cut(b,i*512,512)) for i in range(6))
         if head[0x200:0x204]!=b'NCA3':raise ValueError('NCA header decrypt failed')
         size,tid=struct.unpack_from('<QQ',head,0x208)
-        if size!=len(b) or tid!=int('0100d5ace0040000',16):raise ValueError('NCA size/ID')
+        if size!=len(b) or tid!=expected_id:raise ValueError('NCA size/ID')
         if head[0x230:0x240]!=bytes(16):raise ValueError('Unexpected rights-managed content')
         content_type=head[0x205]
         if max(head[0x206],head[0x220])>1:raise ValueError('Unexpected key generation')
@@ -101,9 +102,9 @@ def verify(package,keyfile,stage):
             else:raise ValueError('Unsupported hash type')
         decoded[digest[:16]]=b
         records.append({'file':name,'bytes':len(b),'sha256':digest.hex(),'content_type':content_type,'sections':sections})
-    if len(records)!=3 or not exe or not control or program_romfs is None or cnmt is None:raise ValueError('Missing application content')
+    if len(records)!=3 or not exe or not control or (program_romfs is None and not boot_check) or cnmt is None:raise ValueError('Missing application content')
     extended,count=struct.unpack_from('<HH',cnmt,14)
-    if count!=2 or struct.unpack_from('<Q',cnmt)[0]!=int('0100d5ace0040000',16):raise ValueError('CNMT application metadata')
+    if count!=2 or struct.unpack_from('<Q',cnmt)[0]!=expected_id:raise ValueError('CNMT application metadata')
     for i in range(count):
         record=cnmt[32+extended+i*56:32+extended+(i+1)*56];b=decoded[record[32:48]]
         if sha(b)!=record[:32] or len(b)!=int.from_bytes(record[48:54],'little'):raise ValueError('CNMT content record')
@@ -113,12 +114,14 @@ def verify(package,keyfile,stage):
     for name,b in control.items():
         if b!=(Path(stage)/'control'/name).read_bytes():raise ValueError('Control differs from application metadata')
     if set(exe)!=set(('main','main.npdm')) or exe['main'][:4]!=b'NSO0':raise ValueError('Not standalone application')
-    with tempfile.TemporaryDirectory(prefix='nsp-verify-') as tmp:
-        rom=Path(tmp)/'romfs.bin';rom.write_bytes(program_romfs);resources=verify_romfs(rom)
+    resources={'omitted_for_boot_check':True}
+    if program_romfs is not None:
+        with tempfile.TemporaryDirectory(prefix='nsp-verify-') as tmp:
+            rom=Path(tmp)/'romfs.bin';rom.write_bytes(program_romfs);resources=verify_romfs(rom)
     return {'package':Path(package).name,'bytes':Path(package).stat().st_size,'sha256':sha(Path(package).read_bytes()).hex(),
-        'title_id':'0100d5ace0040000','ncas':records,'resource_verification':resources,'standalone_application':True,
+        'title_id':'%016x'%expected_id,'ncas':records,'resource_verification':resources,'standalone_application':True,
         'encryption_readback_verified':True,'content_hashes_verified':True,'forwarder':False,'keys_included':False,
         'switch_install_tested':False,'switch_hardware_tested':False}
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('package');p.add_argument('--keys',required=True);p.add_argument('--stage',required=True);p.add_argument('--report',required=True)
-    a=p.parse_args();r=verify(a.package,a.keys,a.stage);Path(a.report).write_text(json.dumps(r,indent=2),encoding='utf-8');print(json.dumps(r,indent=2))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('package');p.add_argument('--keys',required=True);p.add_argument('--stage',required=True);p.add_argument('--report',required=True);p.add_argument('--boot-check',action='store_true')
+    a=p.parse_args();r=verify(a.package,a.keys,a.stage,a.boot_check);Path(a.report).write_text(json.dumps(r,indent=2),encoding='utf-8');print(json.dumps(r,indent=2))
