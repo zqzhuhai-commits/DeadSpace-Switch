@@ -21,6 +21,7 @@ struct GraphicsBackend {
     std::function<void()> startup_complete;
     bool desktop_compatibility=false; // host reference only; Switch uses GLES1
     bool realtime_clock=false;
+    bool gpu_client_arrays=false; // Upload client arrays into driver-owned buffer stores
     float lighting_strength=1.0f; // 1 preserves original untextured exposure passes
     uint32_t surface_width=640,surface_height=480;
     std::function<std::vector<uint8_t>(const std::string&)> hd_texture={};
@@ -44,8 +45,8 @@ class GuestGl {
     using U=uint32_t;using I=int32_t;using F=float;using B=uint8_t;
     GraphicsBackend backend;
     GlGuestMemory memory;
-    U array_buffer=0,element_buffer=0,client_unit=0,unpack=4,pack=4;
-    struct Array {U size=0,type=0,stride=0,pointer=0,buffer=0;bool enabled=false;std::vector<uint8_t> staging;};
+    U array_buffer=0,element_buffer=0,client_unit=0,unpack=4,pack=4,client_indices=0;
+    struct Array {U size=0,type=0,stride=0,pointer=0,buffer=0,upload_buffer=0;bool enabled=false;std::vector<uint8_t> staging;};
     std::map<U,Array> arrays;
     std::map<U,std::vector<uint8_t>> buffers;
     std::map<U,bool> index_contents_known;
@@ -84,7 +85,7 @@ public:
     GuestGl(GraphicsBackend b,GlGuestMemory m):backend(std::move(b)),memory(std::move(m)){}
     ~GuestGl();
     U call(const std::string& name);
-    uint64_t calls=0,draws=0,texture_uploads=0,atc_uploads=0,lighting_limited_draws=0;
+    uint64_t calls=0,draws=0,texture_uploads=0,atc_uploads=0,lighting_limited_draws=0,client_array_uploads=0,client_index_uploads=0;
     uint64_t hd_matches=0,hd_rejected=0,hd_misses=0,hd_budget_skips=0,hd_dynamic_fallbacks=0,hd_mip_uploads=0;
     std::string last_hd_error;
 };

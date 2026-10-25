@@ -79,8 +79,19 @@ void GuestGl::prepare_arrays(U last) {
             const auto it=buffers.find(a.buffer);
             if(it==buffers.end() || uint64_t(a.pointer)+length>it->second.size())throw std::runtime_error("GL vertex buffer range exceeded");
             data=reinterpret_cast<const void*>(uintptr_t(a.pointer)); // native GL buffer OFFSET, never host address
-        } else {a.staging=copy(a.pointer,length);data=a.staging.data();}
-        fn<void(*)(U,U)>("glBindBuffer")(0x8892,a.buffer);
+        } else {
+            a.staging=copy(a.pointer,length);data=a.staging.data();
+            if(backend.gpu_client_arrays){
+                if(!a.upload_buffer)fn<void(*)(I,U*)>("glGenBuffers")(1,&a.upload_buffer);
+                if(!a.upload_buffer)throw std::runtime_error("Client vertex buffer allocation failed");
+                fn<void(*)(U,U)>("glBindBuffer")(0x8892,a.upload_buffer);
+                // Replace the store so queued draws retain driver-owned
+                // storage instead of depending on a reused host vector.
+                fn<void(*)(U,intptr_t,const void*,U)>("glBufferData")(0x8892,intptr_t(length),data,0x88e8);
+                data=nullptr;++client_array_uploads;
+            }
+        }
+        fn<void(*)(U,U)>("glBindBuffer")(0x8892,a.buffer?a.buffer:(backend.gpu_client_arrays?a.upload_buffer:0));
         if(slot==texcoord)fn<void(*)(U)>("glClientActiveTexture")(0x84c0+unit);
         pointer(slot==vertex?"glVertexPointer":slot==normal?"glNormalPointer":slot==color?"glColorPointer":"glTexCoordPointer",a.size,a.type,a.stride,data);
         if(fn<U(*)()>("glGetError")()!=0)throw std::runtime_error("Native GL rejected vertex-array setup");
@@ -88,7 +99,11 @@ void GuestGl::prepare_arrays(U last) {
     fn<void(*)(U,U)>("glBindBuffer")(0x8892,array_buffer);
     fn<void(*)(U)>("glClientActiveTexture")(0x84c0+client_unit);
 }
-GuestGl::~GuestGl(){try{while(!replacements.empty())invalidate_hd(replacements.begin()->first);}catch(...){};}
+GuestGl::~GuestGl(){try{
+    while(!replacements.empty())invalidate_hd(replacements.begin()->first);
+    for(const auto& entry:arrays)if(entry.second.upload_buffer)fn<void(*)(I,const U*)>("glDeleteBuffers")(1,&entry.second.upload_buffer);
+    if(client_indices)fn<void(*)(I,const U*)>("glDeleteBuffers")(1,&client_indices);
+}catch(...){};}
 void GuestGl::invalidate_hd(U texture,bool dynamic) {
     hd_parameters_dirty.erase(texture);
     const auto it=replacements.find(texture);
@@ -311,7 +326,20 @@ GuestGl::U GuestGl::call(const std::string& name) {
         else {indices=copy(d,n);data=indices.data();}
         U last=0;for(U i=0;i<b;++i){const U value=c==0x1401?indices[i]:U(indices[2*i])|U(indices[2*i+1])<<8;last=std::max(last,value);}
         if(b)prepare_arrays(last);
-        draw_textured([&]{fn<void(*)(U,I,U,const void*)>(name)(a,I(b),c,data);});++draws;return 0;
+        const bool upload=backend.gpu_client_arrays&&!element_buffer&&b;
+        const auto restore_indices=[&]{if(upload)fn<void(*)(U,U)>("glBindBuffer")(0x8893,element_buffer);};
+        try {
+            if(upload){
+                if(!client_indices)fn<void(*)(I,U*)>("glGenBuffers")(1,&client_indices);
+                if(!client_indices)throw std::runtime_error("Client index buffer allocation failed");
+                fn<void(*)(U,U)>("glBindBuffer")(0x8893,client_indices);
+                fn<void(*)(U,intptr_t,const void*,U)>("glBufferData")(0x8893,intptr_t(n),indices.data(),0x88e8);
+                if(fn<U(*)()>("glGetError")()!=0)throw std::runtime_error("Native GL rejected client index upload");
+                data=nullptr;++client_index_uploads;
+            }
+            draw_textured([&]{fn<void(*)(U,I,U,const void*)>(name)(a,I(b),c,data);});
+        }catch(...){restore_indices();throw;}
+        restore_indices();++draws;return 0;
     }
     if(name=="glPixelStorei") {if((a!=0x0cf5&&a!=0x0d05)||(b!=1&&b!=2&&b!=4&&b!=8))throw std::runtime_error("Unsupported GL pixel-store state");fn<void(*)(U,I)>(name)(a,I(b));(a==0x0cf5?unpack:pack)=b;return 0;}
     if(name=="glTexImage2D"||name=="glTexSubImage2D") {

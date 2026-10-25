@@ -42,6 +42,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     if(get_string){const auto* renderer=get_string(0x1f01);log+="Renderer: "+std::string(renderer?reinterpret_cast<const char*>(renderer):"unknown")+"\n";}
     ds::GraphicsBackend graphics;
     graphics.realtime_clock=true;
+    graphics.gpu_client_arrays=true;
     SDL_GL_SetSwapInterval(1);
     int drawable_width=1280,drawable_height=720;SDL_GL_GetDrawableSize(window,&drawable_width,&drawable_height);
     graphics.surface_width=uint32_t(drawable_width);graphics.surface_height=uint32_t(drawable_height);
@@ -51,6 +52,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     const uint32_t startup_started=SDL_GetTicks();bool startup_recorded=false;
     graphics.startup_complete=[&,record=graphics.record]{if(!startup_recorded){startup_recorded=true;record("Native player HUD ready; elapsed_ms="+std::to_string(uint32_t(SDL_GetTicks()-startup_started)));}};
     graphics.record("Custom loading overlay: disabled");
+    graphics.record("GPU client buffers: enabled; driver-owned vertex/index uploads");
     graphics.lighting_strength=0.25f;
     if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/lighting.cfg","r")){
         float strength=0;char extra=0;if(std::fscanf(config,"%f %c",&strength,&extra)==1&&strength>=0&&strength<=1)graphics.lighting_strength=strength;std::fclose(config);
