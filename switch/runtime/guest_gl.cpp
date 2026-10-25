@@ -196,6 +196,15 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
         if(!diagnostic_skipped_draws&&backend.record)backend.record("Render isolation: first blended draw omitted");
         ++diagnostic_skipped_draws;return;
     }
+    std::vector<std::pair<U,U>> mip_filters;
+    const auto restore_mips=[&]{
+        if(mip_filters.empty())return;
+        for(const auto& entry:mip_filters){
+            fn<void(*)(U)>("glActiveTexture")(0x84c0+entry.first);
+            fn<void(*)(U,U,I)>("glTexParameteri")(0x0de1,0x2801,I(entry.second));
+        }
+        fn<void(*)(U)>("glActiveTexture")(0x84c0+active_unit);
+    };
     std::vector<std::pair<U,U>> changed;
     const auto restore=[&]{for(const auto& binding:changed){fn<void(*)(U)>("glActiveTexture")(0x84c0+binding.first);fn<void(*)(U,U)>("glBindTexture")(0x0de1,binding.second);}fn<void(*)(U)>("glActiveTexture")(0x84c0+active_unit);};
     try {
@@ -208,6 +217,20 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
             changed.push_back(binding);fn<void(*)(U,U)>("glBindTexture")(0x0de1,it->second.shadow);
             if(dirty){for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I)>("glTexParameteri")(0x0de1,names[i],values[i]);hd_parameters_dirty.erase(binding.second);}
         }
+        if(backend.render_test_mode==3){
+            for(U unit:textured_units){
+                const auto binding=texture_bindings.find(unit);
+                if(binding==texture_bindings.end()||!binding->second)continue;
+                fn<void(*)(U)>("glActiveTexture")(0x84c0+unit);
+                I filter=0;fn<void(*)(U,U,I*)>("glGetTexParameteriv")(0x0de1,0x2801,&filter);
+                // Only override mipmapped filters; preserve nearest/linear filters.
+                if(filter>=0x2700&&filter<=0x2703){
+                    mip_filters.emplace_back(unit,U(filter));
+                    fn<void(*)(U,U,I)>("glTexParameteri")(0x0de1,0x2801,0x2601);
+                }
+            }
+            fn<void(*)(U)>("glActiveTexture")(0x84c0+active_unit);
+        }
         std::array<F,4> original{};const bool limited=limit_exposure(original);
         const auto restore_color=[&]{if(limited)fn<void(*)(F,F,F,F)>("glColor4f")(original[0],original[1],original[2],original[3]);};
         try{
@@ -218,8 +241,8 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
                 ++diagnostic_sync_draws;
             }
         }catch(...){restore_color();throw;}
-        restore_color();restore();
-    } catch(...){restore();throw;}
+        restore_color();restore_mips();restore();
+    } catch(...){restore_mips();restore();throw;}
 }
 GuestGl::U GuestGl::call(const std::string& name) {
     if(backend.hd_texture&&name.rfind("glTexParameter",0)==0)hd_parameters_dirty.insert(texture_bindings[active_unit]);

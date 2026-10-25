@@ -36,7 +36,7 @@ struct Fixture {
     std::array<uint32_t,16> args{};
     uint32_t next=1024;
     ds::GuestGl bridge;
-    Fixture(Egl& egl,std::function<std::vector<uint8_t>(const std::string&)> hd={},uint64_t budget=128*1024*1024):bridge({[&](const char* n){return egl.resolve(n);},{},true,std::move(hd),budget},
+    Fixture(Egl& egl,std::function<std::vector<uint8_t>(const std::string&)> hd={},uint64_t budget=128*1024*1024):bridge([&]{ds::GraphicsBackend b;b.resolve=[&](const char* n){return egl.resolve(n);};b.desktop_compatibility=true;b.hd_texture=std::move(hd);b.hd_budget_bytes=budget;return b;}(),
         {[&](unsigned n){return args.at(n);},[&](uint32_t n){return allocate(n);},
          [&](uint32_t p,void* out,size_t n){read(p,out,n);},[&](uint32_t p,const void* data,size_t n){write(p,data,n);}}){}
     uint32_t allocate(uint32_t n){if(uint64_t(next)+n+16>memory.size())throw std::runtime_error("Fixture memory exhausted");auto p=next;next+=(n+15)&~15u;return p;}

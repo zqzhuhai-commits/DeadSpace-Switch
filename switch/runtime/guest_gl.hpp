@@ -33,7 +33,7 @@ struct GraphicsBackend {
     std::function<std::vector<GuestInput>()> poll_input;
     std::function<void(bool)> input_mode;
     std::function<void(const std::string&)> record;
-    unsigned render_test_mode=0; // 0 baseline, 1 omit blended draws, 2 synchronize draws
+    unsigned render_test_mode=0; // 0 baseline, 1 omit blended draws, 2 synchronize draws, 3 base mip only
 };
 struct GlGuestMemory {
     std::function<uint32_t(unsigned)> arg;
