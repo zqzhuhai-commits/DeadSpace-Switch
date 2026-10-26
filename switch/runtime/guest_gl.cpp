@@ -309,6 +309,43 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(name=="glColorMask"){fn<void(*)(B,B,B,B)>(name)(B(a),B(b),B(c),B(d));return 0;}
     if(name=="glDepthMask"){fn<void(*)(B)>(name)(B(a));return 0;}
     if(one_of(name,{"glViewport","glScissor"})){fn<void(*)(I,I,I,I)>(name)(I(a),I(b),I(c),I(d));return 0;}
+    if(one_of(name,{"glClearColorx","glColor4x","glRotatex"})) {
+        const std::string target=name=="glClearColorx"?"glClearColor":name=="glColor4x"?"glColor4f":"glRotatef";
+        fn<void(*)(F,F,F,F)>(target)(F(I(a))/65536,F(I(b))/65536,F(I(c))/65536,F(I(d))/65536);return 0;
+    }
+    if(one_of(name,{"glTranslatex","glScalex","glNormal3x"})) {
+        const std::string target=name=="glTranslatex"?"glTranslatef":name=="glScalex"?"glScalef":"glNormal3f";
+        fn<void(*)(F,F,F)>(target)(F(I(a))/65536,F(I(b))/65536,F(I(c))/65536);return 0;
+    }
+    if(name=="glLoadMatrixx"||name=="glMultMatrixx") {
+        const auto bytes=copy(a,64);std::array<F,16> matrix{};
+        for(unsigned i=0;i<16;++i){I fixed;std::memcpy(&fixed,bytes.data()+i*4,4);matrix[i]=F(fixed)/65536;}
+        fn<void(*)(const F*)>(name=="glLoadMatrixx"?"glLoadMatrixf":"glMultMatrixf")(matrix.data());return 0;
+    }
+    if(name=="glOrthox"||name=="glFrustumx") {
+        std::array<F,6> v{};for(unsigned i=0;i<6;++i)v[i]=F(I(arg(i)))/65536;
+        if(backend.desktop_compatibility)fn<void(*)(double,double,double,double,double,double)>(name=="glOrthox"?"glOrtho":"glFrustum")(v[0],v[1],v[2],v[3],v[4],v[5]);
+        else fn<void(*)(F,F,F,F,F,F)>(name=="glOrthox"?"glOrthof":"glFrustumf")(v[0],v[1],v[2],v[3],v[4],v[5]);
+        return 0;
+    }
+    if(name=="glClearDepthx"){if(backend.desktop_compatibility)fn<void(*)(double)>("glClearDepth")(double(I(a))/65536);else fn<void(*)(F)>("glClearDepthf")(F(I(a))/65536);return 0;}
+    if(name=="glDepthRangex"){if(backend.desktop_compatibility)fn<void(*)(double,double)>("glDepthRange")(double(I(a))/65536,double(I(b))/65536);else fn<void(*)(F,F)>("glDepthRangef")(F(I(a))/65536,F(I(b))/65536);return 0;}
+    if(name=="glLineWidthx"||name=="glPointSizex"){fn<void(*)(F)>(name=="glLineWidthx"?"glLineWidth":"glPointSize")(F(I(a))/65536);return 0;}
+    if(name=="glFogx"){fn<void(*)(U,F)>("glFogf")(a,a==0x0b65?F(I(b)):F(I(b))/65536);return 0;}
+    if(name=="glLightModelx"){if(a!=0x0b52)throw std::runtime_error("Unsupported scalar fixed light model");fn<void(*)(U,F)>("glLightModelf")(a,F(I(b)));return 0;}
+    if(name=="glLightx"||name=="glMaterialx"){fn<void(*)(U,U,F)>(name=="glLightx"?"glLightf":"glMaterialf")(a,b,F(I(c))/65536);return 0;}
+    if(name=="glAlphaFuncx"){fn<void(*)(U,F)>("glAlphaFunc")(a,F(I(b))/65536);return 0;}
+    if(name=="glTexParameterx") {
+        if(b==0x2800||b==0x2801||b==0x2802||b==0x2803||b==0x8191)fn<void(*)(U,U,I)>("glTexParameteri")(a,b,I(c));
+        else throw std::runtime_error("Unsupported fixed texture parameter");
+        return 0;
+    }
+    if(name=="glTexEnvx") {
+        if(b==0x8573||b==0x0d1c)fn<void(*)(U,U,F)>("glTexEnvf")(a,b,F(I(c))/65536);
+        else if(b==0x2200||b==0x8571||b==0x8572||(b>=0x8580&&b<=0x8582)||(b>=0x8588&&b<=0x858a)||(b>=0x8590&&b<=0x8592)||(b>=0x8598&&b<=0x859a)||b==0x8862)fn<void(*)(U,U,I)>("glTexEnvi")(a,b,I(c));
+        else throw std::runtime_error("Unsupported fixed texture environment");
+        return 0;
+    }
     if(one_of(name,{"glTexParameteri","glTexEnvi"})){fn<void(*)(U,U,I)>(name)(a,b,I(c));return 0;}
     if(one_of(name,{"glTexParameterf","glTexEnvf"})){fn<void(*)(U,U,F)>(name)(a,b,number(2));return 0;}
     if(name=="glBindTexture") {if(a!=0x0de1)throw std::runtime_error("Unsupported GL texture target");fn<void(*)(U,U)>(name)(a,b);texture_bindings[active_unit]=b;return 0;}

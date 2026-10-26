@@ -5,6 +5,14 @@
 #include "guest_image.hpp"
 #include "guest_call_scope.hpp"
 #include "guest_heap.hpp"
+#include "guest_arena.hpp"
+#include "guest_sort.hpp"
+#include "guest_numeric.hpp"
+#include "guest_files.hpp"
+#include "guest_trace.hpp"
+#include "guest_clock.hpp"
+#include "guest_paths.hpp"
+#include "guest_stat.hpp"
 #include "guest_threads.hpp"
 #include "guest_jump.hpp"
 #include "guest_jni.hpp"
@@ -21,6 +29,7 @@
 #include <ctime>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -54,25 +63,65 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     uint32_t monitor_waiter(uint32_t ref) const override {return threads.waiter(ds::GuestThreads::State::monitor,ref);}
     void wake_monitor(uint32_t id) override {threads.wake(id);}
     std::vector<uint32_t> destructors;
-    struct File {std::FILE* fp=nullptr;};
-    std::map<uint32_t,File> files;
-    std::vector<std::string> trace;
+    ds::GuestFiles files;
+    std::set<uint32_t> save_descriptors,save_streams;
+    uint64_t save_read_bytes=0,save_written_bytes=0,save_opens=0;
+    ds::GuestTrace trace;
     std::string data_root;
-    uint32_t brk=arena,mmap_top=arena_end;
+    ds::GuestStoragePaths storage;
+    ds::GuestArena arena_memory{arena,arena_end};
     uint32_t pending=0,errno_address=0,env_addr=0,vm_addr=0,jni_table=0,vm_table=0;
     uint32_t ext_string=0;
     bool returned=false;
     uint64_t budget=0;
+    const uint64_t epoch_ns=uint64_t(std::time(nullptr))*1000000000ull;
     std::string fault;
     unsigned constructors_completed=0,service_calls=0,jni_calls=0,gl_calls=0,frames_done=0,strstr_log=0,asset_reads=0,guard_log=0,svc_log=0,call277efc=0,call28778=0;std::string last_service;
     std::map<std::string,uint64_t> service_counts;
     ds::GraphicsBackend graphics;
+    ds::GuestClockFloor clock_floor;
+    uint64_t guest_time() {
+        const auto previous=threads.time();
+        if(graphics.monotonic_ns)threads.tick(clock_floor.sample(graphics.monotonic_ns(),previous)-previous);
+        return threads.time();
+    }
     std::unique_ptr<ds::GuestGl> native_gl;
 
     bool mapped(uint32_t a) const {
         return threads.mapped(a) || (a>=heap && a<guest_heap.high_water()) ||
-               (a>=arena && a<arena_end) ||
-               (a>=0x10000000u && a<0x20200000u);
+               arena_memory.contains(a);
+    }
+    uint64_t direct_read_bytes=0,direct_write_bytes=0;
+    bool read_span(uint32_t address,void* output,size_t count) {
+        if(!count)return true;
+        if(uint64_t(address)+count>0x100000000ull)return false;
+        const uint32_t last=address+uint32_t(count-1);
+        if((address>>12)==(last>>12)&&mapped(address)&&mapped(last)) {
+            const auto it=pages.find(address>>12);
+            if(it==pages.end())std::memset(output,0,count);
+            else std::memcpy(output,it->second.data()+(address&4095),count);
+        } else if(!image.read(address,output,count))return false;
+        direct_read_bytes+=count;return true;
+    }
+    bool write_span(uint32_t address,const void* input,size_t count) {
+        if(!count)return true;
+        if(uint64_t(address)+count>0x100000000ull)return false;
+        const uint32_t last=address+uint32_t(count-1);
+        if((address>>12)==(last>>12)&&mapped(address)&&mapped(last))
+            std::memcpy(pages[address>>12].data()+(address&4095),input,count);
+        else if(!image.write(address,input,count))return false;
+        direct_write_bytes+=count;return true;
+    }
+    void MemoryReadBytes(uint32_t address,void* output,size_t count) override {
+        ds::read_guest_bytes(address,output,count,[&](uint32_t p,void* out,size_t n){return read_span(p,out,n);},[&](uint32_t p){return MemoryRead8(p);});
+    }
+    void MemoryWriteBytes(uint32_t address,const void* input,size_t count) override {
+        ds::write_guest_bytes(address,input,count,[&](uint32_t p,const void* in,size_t n){return write_span(p,in,n);},[&](uint32_t p,uint8_t v){MemoryWrite8(p,v);});
+    }
+    void fill_bytes(uint32_t address,uint8_t value,uint32_t count) {
+        ds::transfer_range(address,count);
+        std::array<uint8_t,4096> bytes;bytes.fill(value);
+        while(count){const auto n=std::min<uint32_t>(count,4096);MemoryWriteBytes(address,bytes.data(),n);address+=n;count-=n;}
     }
     void fail(const std::string& message) {
         if(fault.empty()){
@@ -96,13 +145,6 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         MemoryWrite8(p+uint32_t(v.size()),0);
         return p;
     }
-    std::string resolve_path(const std::string& raw) {
-        std::string name=raw;
-        if(name.rfind("appbundle:",0)==0)name=data_root+"/assets/"+name.substr(10);
-        else if(name.empty()||name[0]!='/')name=data_root+"/"+name;
-        if(name.find("..")!=std::string::npos)throw std::runtime_error("Guest path escapes data root");
-        return name;
-    }
     uint64_t java_delegate(uint32_t obj,const MethodKey& m,const std::vector<uint64_t>& values) {
         ++jni_calls;
         const std::string& cls=objects[obj].cls;
@@ -120,6 +162,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             if(m.name=="GetInstance"){const uint32_t r=singleton("com/ea/blast/MainActivity");trace.push_back("  GetInstance -> "+to_hex(r));return r;}
             if(m.name=="getAssets"){const uint32_t r=singleton("android/content/res/AssetManager");trace.push_back("  getAssets -> "+to_hex(r));return r;}
         }
+        if(const auto result=audio_delegate(obj,m,values))return *result;
         if(const auto result=asset_delegate(obj,m,values,data_root))return *result;
         if(cls=="com/ea/EAIO/EAIO"&&m.name=="Startup"){
             const auto it=image.exports.find("Java_com_ea_EAIO_EAIO_Startup");
@@ -143,11 +186,12 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             const auto it=props.find(m.name);if(it!=props.end())return java_string(it->second);
         }
         if(cls=="com/ea/blast/GetAppDataDirectoryDelegate"){
-            if(m.name=="GetAppDataDirectory"||m.name=="GetExternalStorageDirectory")return java_string(data_root);
+            if(m.name=="GetAppDataDirectory"||m.name=="GetExternalStorageDirectory")return java_string(storage.save_root.empty()?data_root:storage.save_root);
         }
         if(cls=="com/ea/blast/DisplayAndroidDelegate"){
-            if(m.name=="GetDefaultWidth")return 480;
-            if(m.name=="GetDefaultHeight")return 640;
+            // Android reports natural portrait dimensions; the engine swaps them.
+            if(m.name=="GetDefaultWidth")return graphics.height;
+            if(m.name=="GetDefaultHeight")return graphics.width;
             if(m.name=="GetStdOrientation")return 0;
             if(m.name=="GetDpiX"||m.name=="GetDpiY"){const float v=229.0f;uint32_t bits=0;std::memcpy(&bits,&v,4);return bits;}
             if(m.name=="SetStdOrientation")return 0;
@@ -171,6 +215,8 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
     uint32_t guest_call(uint32_t address,const std::vector<uint32_t>& args,const std::string& label,bool top_level=false) {
         struct Depth {unsigned& d;Depth(unsigned& v):d(v){++d;}~Depth(){--d;}} depth(call_depth);
         struct Quantum {uint64_t& q;uint64_t old;Quantum(uint64_t& v):q(v),old(v){}~Quantum(){q=old;}} saved_quantum(quantum);
+        const bool diagnostic=top_level&&label!="constructor"&&label.rfind("NativeOnDrawFrame",0)!=0;
+        if(diagnostic&&graphics.progress)graphics.progress("BEGIN: "+label);
         const bool outer=call_depth==1;
         if(outer)jumps.clear_owner(threads.current());
         ds::GuestCallScope scope(*cpu,returned,pending,budget,fault);
@@ -184,10 +230,24 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         budget=6000000000;returned=false;pending=0;
         unsigned calls=0;
         unsigned beats=0;
+        auto last_checkpoint=std::chrono::steady_clock::now();
         while(!returned&&fault.empty()&&budget){
             quantum=std::min<uint64_t>(budget,100000);
             cpu->Run();
-            if((++beats&1023)==0)fprintf(stderr,"HB %s instr=%llu left=%llu reads=%u bytes=%u pc=0x%x sp=0x%x\n",label.c_str(),(unsigned long long)(2000000000ull-budget),(unsigned long long)budget,asset_reads,asset_read_bytes,cpu->Regs()[15],cpu->Regs()[13]);
+            const auto& active=threads.thread();
+            const auto sp=cpu->Regs()[13];
+            if(fault.empty() && (sp<active.stack_begin || uint64_t(sp)>uint64_t(active.stack_begin)+active.stack_size)) {
+                throw std::runtime_error("Guest stack escaped thread mapping: sp="+to_hex(sp)+" pc="+to_hex(cpu->Regs()[15])+" lr="+to_hex(cpu->Regs()[14])+" last="+last_service);
+            }
+            if((++beats&1023)==0)fprintf(stderr,"HB %s instr=%llu left=%llu reads=%u bytes=%llu pc=0x%x sp=0x%x\n",label.c_str(),(unsigned long long)(6000000000ull-budget),(unsigned long long)budget,asset_reads,(unsigned long long)asset_read_bytes,cpu->Regs()[15],cpu->Regs()[13]);
+            if((beats&1023)==0&&graphics.progress) {
+                const auto now=std::chrono::steady_clock::now();
+                if(now-last_checkpoint>=std::chrono::seconds(10)) {
+                    const std::string current=pending&&pending<=functions.size()?functions[pending-1]:last_service;
+                    graphics.progress("HEARTBEAT: "+label+" pc=0x"+to_hex(cpu->Regs()[15])+" service="+current+" instructions_left="+std::to_string(budget)+" asset_bytes="+std::to_string(asset_read_bytes)+" guest_gl="+std::to_string(gl_calls)+" direct_rw_bytes="+std::to_string(direct_read_bytes+direct_write_bytes));
+                    last_checkpoint=now;
+                }
+            }
             if(pending){const auto id=pending;pending=0;if(id>functions.size()||++calls>50000000)throw std::runtime_error("Import dispatch limit "+label);++service_calls;if(cpu->Regs()[15]>=0x10235800u&&cpu->Regs()[15]<0x10235960u&&++svc_log<=40)trace.push_back("  SVC "+functions[id-1]+" guest_pc=0x"+to_hex(cpu->Regs()[15]-8)+" a=0x"+to_hex(cpu->Regs()[0])+" b=0x"+to_hex(cpu->Regs()[1])+" c=0x"+to_hex(cpu->Regs()[2])+" d=0x"+to_hex(cpu->Regs()[3]));service(functions[id-1]);}
             if(!outer)continue;
             if(!fault.empty())break;
@@ -216,41 +276,42 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
                 ++thread_switches;cpu->ClearExclusiveState();threads.thread().cpu.load(*cpu);
                 jni_exception=threads.thread().exception;errno_address=threads.thread().error;
             }
+            if(threads.thread().timed_out){MemoryWrite32(errno_address,110);threads.thread().timed_out=false;}
             rotate=false;
         }
         if(!fault.empty())throw std::runtime_error(label+": "+fault);
         if(!returned)throw std::runtime_error(label+": instruction budget exhausted");
         const uint32_t result=cpu->Regs()[0];
         if(label=="EAIO_Startup"||label=="NativeOnDrawFrame")trace.push_back("RET "+label+" pc=0x"+to_hex(cpu->Regs()[14]-8));
+        if(diagnostic&&graphics.progress)graphics.progress("END: "+label);
         if(top_level)scope.keep_top_level_result();
         return result;
     }
 
-    void write_stat(uint32_t p,long size){
-        MemoryWrite64(p+0,0);MemoryWrite32(p+12,0);MemoryWrite32(p+16,0x81a4);
-        MemoryWrite32(p+20,1);MemoryWrite32(p+24,0);MemoryWrite32(p+28,0);
-        MemoryWrite64(p+32,0);MemoryWrite64(p+48,uint64_t(size));
-        MemoryWrite32(p+56,4096);MemoryWrite64(p+64,0);
-        const uint32_t now=uint32_t(std::time(nullptr));
-        MemoryWrite32(p+72,now);MemoryWrite32(p+76,0);
-        MemoryWrite32(p+80,now);MemoryWrite32(p+84,0);
-        MemoryWrite32(p+88,now);MemoryWrite32(p+92,0);
-        MemoryWrite64(p+96,0);
+    void write_stat(uint32_t p,const struct stat& st) {
+        const auto bytes=ds::guest_stat(st);
+        for(unsigned i=0;i<bytes.size();++i)MemoryWrite8(p+i,bytes[i]);
     }
+
 
     void service(const std::string& name) {last_service=name;
         ++service_counts[name];
         const auto a=arg(0),b=arg(1),c=arg(2),d=arg(3);
         uint32_t result=0;
-        static const std::array<const char*,14> float_imports={"acosf","asinf","atanf","atan2f","ceilf","cosf","expf","floorf","fmodf","logf","log10f","powf","sinf","sqrtf"};
+        static const std::array<const char*,15> float_imports={"acosf","asinf","atanf","atan2f","ceilf","cosf","expf","floorf","fmodf","logf","log10f","powf","sinf","sqrtf","tanf"};
         const bool floating=std::find(float_imports.begin(),float_imports.end(),name)!=float_imports.end();
         const std::string base=floating?name.substr(0,name.size()-1):name;
-        if(base=="memset"){bounded(c);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,b);result=a;}
-        else if(base=="memcpy"||base=="memmove"){bounded(c);std::vector<uint8_t> v(c);for(uint32_t i=0;i<c;++i)v[i]=MemoryRead8(b+i);for(uint32_t i=0;i<c;++i)MemoryWrite8(a+i,v[i]);result=a;}
+        if(base=="memset"){bounded(c);fill_bytes(a,uint8_t(b),c);result=a;}
+        else if(base=="memcpy"||base=="memmove"){bounded(c);std::vector<uint8_t> v(c);MemoryReadBytes(b,v.data(),c);MemoryWriteBytes(a,v.data(),c);result=a;}
         else if(base=="memcmp"){bounded(c);int cmp=0;for(uint32_t i=0;i<c;++i){uint8_t x=MemoryRead8(a+i),y=MemoryRead8(b+i);if(x!=y){cmp=x>y?1:-1;break;}}result=cmp;}
+        else if(base=="qsort") {
+            if(b>1&&!image.executable(d&~1u,4))throw std::runtime_error("Invalid qsort comparator");
+            ds::guest_sort(a,b,c,[&](uint32_t p){return MemoryRead8(p);},[&](uint32_t p,uint8_t v){MemoryWrite8(p,v);},
+                [&](uint32_t x,uint32_t y){return int32_t(guest_call(d,{x,y},"qsort comparator",false));});
+        }
         else if(base=="malloc")result=alloc(a);
-        else if(base=="calloc")result=guest_heap.zeroed(a,b,[&](uint32_t p,uint32_t n){for(uint32_t i=0;i<n;++i)MemoryWrite8(p+i,0);});
-        else if(base=="realloc")result=guest_heap.reallocate(a,b,[&](uint32_t dst,uint32_t src,uint32_t n){for(uint32_t i=0;i<n;++i)MemoryWrite8(dst+i,MemoryRead8(src+i));});
+        else if(base=="calloc")result=guest_heap.zeroed(a,b,[&](uint32_t p,uint32_t n){fill_bytes(p,0,n);});
+        else if(base=="realloc")result=guest_heap.reallocate(a,b,[&](uint32_t dst,uint32_t src,uint32_t n){std::vector<uint8_t> bytes(n);MemoryReadBytes(src,bytes.data(),n);MemoryWriteBytes(dst,bytes.data(),n);});
         else if(base=="free")guest_heap.release(a);
         else if(base=="strlen")result=uint32_t(guest_text(a).size());
         else if(base=="strcmp"||base=="strncmp"){std::string x=guest_text(a),y=guest_text(b);if(base=="strncmp"){x=x.substr(0,c);y=y.substr(0,c);}result=(x>y)-(x<y);}
@@ -259,6 +320,12 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="strstr"){if(!a||!b){trace.push_back("  STRSTR-NULL a="+to_hex(a)+" b="+to_hex(b)+" lr="+to_hex(cpu->Regs()[14]-8));result=0;}else{const std::string x=guest_text(a),n=guest_text(b);const auto p=x.find(n);result=p==std::string::npos?0:a+uint32_t(p);}}
         else if(base=="strdup")result=guest_string(guest_text(a));
         else if(base=="atoi"){const std::string t=guest_text(a);result=0;bool neg=false;size_t i=0;if(i<t.size()&&(t[i]=='-'||t[i]=='+')){neg=t[i]=='-';++i;}while(i<t.size()&&t[i]>='0'&&t[i]<='9'){result=result*10+uint32_t(t[i]-'0');++i;}if(neg)result=uint32_t(0)-result;}
+        else if(base=="strtod"){
+            const auto parsed=ds::parse_guest_double(guest_text(a));
+            if(b)MemoryWrite32(b,a+parsed.consumed);
+            if(parsed.error)MemoryWrite32(errno_address,parsed.error);
+            cpu->Regs()[0]=parsed.low;cpu->Regs()[1]=parsed.high;goto done;
+        }
         else if(base=="__errno")result=errno_address;
         else if(base=="setjmp"||base=="_setjmp"||base=="sigsetjmp") {
             if(base=="sigsetjmp"&&b)throw std::runtime_error("Guest signal masks unsupported");
@@ -267,9 +334,26 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="longjmp"||base=="_longjmp"||base=="siglongjmp") {
             jumps.restore(*cpu,a,b,threads.current(),call_depth,[&](uint32_t p){return MemoryRead32(p);});goto done;
         }
-        else if(base=="sbrk"){const int64_t end=int64_t(brk)+int32_t(a);if(end<arena||end>mmap_top){MemoryWrite32(errno_address,12);result=0xffffffff;}else{result=brk;brk=uint32_t(end);}}
-        else if(base=="mmap"){if(a||!b||(d&0x20)==0)throw std::runtime_error("Unsupported guest mmap");const uint64_t size=(uint64_t(b)+4095)&~uint64_t(4095);if(!size||size>mmap_top-brk){MemoryWrite32(errno_address,12);result=0xffffffff;}else{mmap_top-=uint32_t(size);result=mmap_top;}}
-        else if(base=="munmap")result=0;
+        else if(base=="sbrk") {
+            const auto pointer=arena_memory.grow(int32_t(a));
+            if(!pointer){MemoryWrite32(errno_address,12);result=UINT32_MAX;}else result=*pointer;
+        }
+        else if(base=="mmap") {
+            if(a||!b||(d&0x20)==0||int32_t(arg(4))!=-1||arg(5)!=0)throw std::runtime_error("Unsupported guest mmap");
+            const auto pointer=arena_memory.map(b);
+            if(!pointer){MemoryWrite32(errno_address,12);result=UINT32_MAX;}
+            else {
+                result=*pointer;const uint64_t end=uint64_t(result)+((uint64_t(b)+4095)&~uint64_t(4095));
+                for(auto it=pages.begin();it!=pages.end();){const uint64_t at=uint64_t(it->first)<<12;if(at>=result&&at<end)it=pages.erase(it);else ++it;}
+            }
+        }
+        else if(base=="munmap") {
+            if(!arena_memory.unmap(a,b)){MemoryWrite32(errno_address,22);result=UINT32_MAX;}
+            else {
+                const uint64_t end=uint64_t(a)+((uint64_t(b)+4095)&~uint64_t(4095));
+                for(auto it=pages.begin();it!=pages.end();){const uint64_t at=uint64_t(it->first)<<12;if(at>=a&&at<end)it=pages.erase(it);else ++it;}
+            }
+        }
         else if(base=="getenv")result=0;
         else if(base=="__aeabi_atexit")destructors.insert(destructors.end(),{a,b,c});
         else if(base=="__cxa_guard_acquire")result=MemoryRead8(a)==0;
@@ -298,6 +382,15 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="pthread_attr_setstacksize") {if(!thread_attrs.count(a)||b<16384||b>0x200000)result=22;else thread_attrs.at(a).stack_size=b;}
         else if(base=="pthread_attr_setdetachstate") {if(!thread_attrs.count(a)||b>1)result=22;else thread_attrs.at(a).detached=b;}
         else if(base=="pthread_attr_getstacksize"||base=="pthread_attr_getdetachstate") {if(!thread_attrs.count(a)||!b)result=22;else MemoryWrite32(b,base=="pthread_attr_getstacksize"?thread_attrs.at(a).stack_size:thread_attrs.at(a).detached);}
+        else if(base=="pthread_attr_setschedparam") {
+            if(!thread_attrs.count(a)||!b||MemoryRead32(b)!=0)result=22;
+        }
+        else if(base=="pthread_attr_getschedparam"||base=="pthread_attr_getschedpolicy") {
+            if(!thread_attrs.count(a)||!b)result=22;else MemoryWrite32(b,0);
+        }
+        else if(base=="pthread_attr_setschedpolicy") {
+            if(!thread_attrs.count(a))result=22;else if(b!=0)result=95;
+        }
         else if(base=="pthread_attr_destroy") {if(!thread_attrs.erase(a))result=22;}
         else if(base=="pthread_create") {
             if(!a || (b&&!thread_attrs.count(b)) || !image.executable(c&~1u,4))result=22;
@@ -318,6 +411,23 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="sem_destroy"){if(!semaphores.erase(a))throw std::runtime_error("Unknown semaphore");}
         else if(base=="sem_post"){auto& v=semaphores.at(a);const auto waiter=threads.waiter(ds::GuestThreads::State::semaphore,a);if(waiter)threads.wake(waiter);else{if(v==0x7fffffff)throw std::runtime_error("Semaphore overflow");++v;}}
         else if(base=="sem_wait"||base=="sem_trywait"){if(semaphores[a]){--semaphores[a];}else if(base=="sem_trywait"){MemoryWrite32(errno_address,11);result=0xffffffff;}else {if(call_depth!=1)throw std::runtime_error("Semaphore wait across host callback boundary");threads.block(ds::GuestThreads::State::semaphore,a);rotate=true;}}
+        else if(base=="sem_timedwait") {
+            const auto it=semaphores.find(a);
+            if(it==semaphores.end()){MemoryWrite32(errno_address,22);result=UINT32_MAX;}
+            else if(it->second)--it->second;
+            else {
+                const int32_t sec=int32_t(MemoryRead32(b)),ns=int32_t(MemoryRead32(b+4));
+                if(sec<0||ns<0||ns>=1000000000){MemoryWrite32(errno_address,22);result=UINT32_MAX;}
+                else {
+                    const uint64_t absolute=uint64_t(sec)*1000000000+uint32_t(ns);
+                    if(absolute<=epoch_ns+guest_time()){MemoryWrite32(errno_address,110);result=UINT32_MAX;}
+                    else {
+                        if(call_depth!=1)throw std::runtime_error("Timed semaphore wait across host callback boundary");
+                        threads.wait_until(ds::GuestThreads::State::semaphore,a,absolute-epoch_ns);rotate=true;
+                    }
+                }
+            }
+        }
         else if(base=="sem_getvalue")MemoryWrite32(b,semaphores[a]);
         else if(base=="pthread_key_create"){if(next_tls_key>=4096)result=11;else{const auto key=next_tls_key++;tls[key]=b;MemoryWrite32(a,key);}}
         else if(base=="pthread_getspecific")result=threads.thread().tls.count(a)?threads.thread().tls.at(a):0;
@@ -336,28 +446,113 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         else if(base=="__atomic_inc"||base=="__atomic_dec"){result=MemoryRead32(a);MemoryWrite32(a,result+(base=="__atomic_inc"?1:-1));}
         else if(base=="__atomic_cmpxchg"){result=MemoryRead32(c)!=a;if(!result)MemoryWrite32(c,b);}
         else if(base=="clock")result=uint32_t(uint64_t(std::clock())*1000000/CLOCKS_PER_SEC);
-        else if(base=="time"){result=uint32_t(std::time(nullptr));if(a)MemoryWrite32(a,result);}
-        else if(base=="gettimeofday"){if(a){const uint32_t now=uint32_t(std::time(nullptr));MemoryWrite32(a,now);MemoryWrite32(a+4,0);}if(b)MemoryWrite64(b,0);result=0;}
-        else if(base=="clock_gettime"){const auto ns=threads.time();MemoryWrite32(b,uint32_t(ns/1000000000));MemoryWrite32(b+4,uint32_t(ns%1000000000));result=0;}
-        else if(base=="stat"||base=="lstat"){
-            const std::string path=resolve_path(guest_text(a));
-            std::FILE* fp=std::fopen(path.c_str(),"rb");
-            if(!fp){MemoryWrite32(errno_address,2);result=0xffffffff;}
-            else{std::fseek(fp,0,SEEK_END);const long sz=std::ftell(fp);std::fclose(fp);write_stat(b,sz);result=0;}
+        else if(base=="time"){result=uint32_t((epoch_ns+guest_time())/1000000000);if(a)MemoryWrite32(a,result);}
+        else if(base=="gettimeofday"){const auto ns=epoch_ns+guest_time();if(a){MemoryWrite32(a,uint32_t(ns/1000000000));MemoryWrite32(a+4,uint32_t(ns%1000000000/1000));}if(b)MemoryWrite64(b,0);result=0;}
+        else if(base=="clock_gettime"){if(a>1){MemoryWrite32(errno_address,22);result=UINT32_MAX;}else{const auto ns=guest_time()+(a==0?epoch_ns:0);MemoryWrite32(b,uint32_t(ns/1000000000));MemoryWrite32(b+4,uint32_t(ns%1000000000));}}
+        else if(base=="stat"||base=="lstat"||base=="fstat") {
+            struct stat st{};
+            int rc;
+            if(base=="fstat")rc=files.stat(a,st);
+            else {
+                const auto path=storage.metadata(guest_text(a)).path;
+                rc=base=="lstat"? ::lstat(path.c_str(),&st) : ::stat(path.c_str(),&st);
+            }
+            if(rc){MemoryWrite32(errno_address,errno);result=UINT32_MAX;}
+            else write_stat(b,st);
         }
-        else if(base=="fstat"){auto it=files.find(a);if(it==files.end()){MemoryWrite32(errno_address,9);result=0xffffffff;}else{std::fseek(it->second.fp,0,SEEK_END);const long sz=std::ftell(it->second.fp);write_stat(b,sz);result=0;}}
-        else if(base=="open"||base=="open64"){const std::string path=resolve_path(guest_text(a));std::FILE* fp=std::fopen(path.c_str(),"rb");if(!fp){MemoryWrite32(errno_address,2);result=0xffffffff;}else{const uint32_t fd=uint32_t(files.size()+1);files[fd].fp=fp;result=fd;}}
-        else if(base=="close"){auto it=files.find(a);if(it!=files.end()){std::fclose(it->second.fp);files.erase(it);}result=0;}
-        else if(base=="read"){auto it=files.find(a);if(it==files.end())throw std::runtime_error("read of unknown fd");std::vector<uint8_t> v(c);const size_t got=std::fread(v.data(),1,c,it->second.fp);for(size_t i=0;i<got;++i)MemoryWrite8(b+uint32_t(i),v[i]);result=uint32_t(got);}
-        else if(base=="lseek"){auto it=files.find(a);if(it==files.end())throw std::runtime_error("lseek unknown fd");if(c==1){const long cur=std::ftell(it->second.fp);std::fseek(it->second.fp,long(int32_t(b))+cur,SEEK_SET);}else if(c==2){std::fseek(it->second.fp,0,SEEK_END);std::fseek(it->second.fp,long(int32_t(b)),SEEK_CUR);}else std::fseek(it->second.fp,long(int32_t(b)),SEEK_SET);result=uint32_t(std::ftell(it->second.fp));}
-        else if(base=="fopen"){const std::string path=resolve_path(guest_text(a));std::FILE* fp=std::fopen(path.c_str(),"rb");result=uint32_t(reinterpret_cast<uintptr_t>(fp));}
-        else if(base=="fread"){const auto fp=reinterpret_cast<std::FILE*>(uintptr_t(d));if(!fp)throw std::runtime_error("fread null stream");std::vector<uint8_t> v(uint64_t(b)*c);const size_t got=std::fread(v.data(),1,uint64_t(b)*c,fp);for(size_t i=0;i<got;++i)MemoryWrite8(a+uint32_t(i),v[i]);result=uint32_t(got);}
-        else if(base=="fseek"){const auto fp=reinterpret_cast<std::FILE*>(uintptr_t(a));if(!fp)throw std::runtime_error("fseek null stream");std::fseek(fp,long(int32_t(b)),int(c));result=0;}
-        else if(base=="ftell"){const auto fp=reinterpret_cast<std::FILE*>(uintptr_t(a));result=uint32_t(std::ftell(fp));}
-        else if(base=="fclose"){const auto fp=reinterpret_cast<std::FILE*>(uintptr_t(a));if(fp)std::fclose(fp);result=0;}
+        else if(base=="mkdir") {
+            const auto path=storage.metadata(guest_text(a));
+            if(!path.writable){
+                struct stat st{};
+                MemoryWrite32(errno_address,::stat(path.path.c_str(),&st)==0&&S_ISDIR(st.st_mode)?EEXIST:EROFS);result=UINT32_MAX;
+            }
+            else {result=uint32_t(::mkdir(path.path.c_str(),b&0777));if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);}
+        }
+        else if(base=="open"||base=="open64") {
+            const auto path=storage.resolve(guest_text(a));
+            const bool writing=(b&3)||(b&(64|128|512|1024));
+            if(writing&&!path.writable){MemoryWrite32(errno_address,EROFS);result=UINT32_MAX;}
+            else {result=files.open(path.path.c_str(),b,c);if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);else if(path.writable){save_descriptors.insert(result);++save_opens;}}
+        }
+        else if(base=="remove"||base=="unlink"||base=="rename") {
+            const auto from=storage.resolve(guest_text(a));
+            if(!from.writable){MemoryWrite32(errno_address,EROFS);result=UINT32_MAX;}
+            else if(base=="rename") {
+                const auto to=storage.resolve(guest_text(b));
+                if(!to.writable){errno=EROFS;result=UINT32_MAX;}
+                else result=uint32_t(std::rename(from.path.c_str(),to.path.c_str()));
+            } else result=uint32_t(base=="remove"?std::remove(from.path.c_str()): ::unlink(from.path.c_str()));
+            if(result==UINT32_MAX&&from.writable)MemoryWrite32(errno_address,errno);
+        }
+        else if(base=="fflush") {result=uint32_t(files.flush(a));if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);}
+        else if(base=="write"||base=="fwrite") {
+            const bool stdio=base=="fwrite";
+            const uint64_t bytes=stdio?uint64_t(b)*c:c;
+            const uint32_t src=stdio?a:b;
+            if(bytes>64*1024*1024||uint64_t(src)+bytes>0x100000000ull)throw std::runtime_error("File write guest range/size limit");
+            auto* fp=stdio?files.stream(d):files.descriptor(a);
+            if(!fp){MemoryWrite32(errno_address,errno);result=stdio?0:UINT32_MAX;}
+            else if(bytes) {
+                std::vector<uint8_t> data(static_cast<size_t>(bytes));
+                MemoryReadBytes(src,data.data(),data.size());
+                const size_t written=std::fwrite(data.data(),1,data.size(),fp);
+                if(stdio?save_streams.count(d):save_descriptors.count(a))save_written_bytes+=written;
+                result=stdio?uint32_t(written/b):uint32_t(written);
+                if(std::ferror(fp)){MemoryWrite32(errno_address,errno);if(!stdio&&!written)result=UINT32_MAX;}
+            }
+        }
+        else if(base=="close"||base=="fclose") {
+            result=uint32_t(base=="close"?files.close(a):files.fclose(a));
+            if(result==UINT32_MAX)MemoryWrite32(errno_address,errno);
+            if(base=="close")save_descriptors.erase(a);else save_streams.erase(a);
+        }
+        else if(base=="read"||base=="fread") {
+            const bool stdio=base=="fread";
+            const uint64_t bytes=stdio?uint64_t(b)*c:c;
+            if(bytes>64*1024*1024)throw std::runtime_error("File read operation limit");
+            const uint32_t dst=stdio?a:b;
+            if(uint64_t(dst)+bytes>0x100000000ull)throw std::runtime_error("File read guest range wraps");
+            auto* fp=stdio?files.stream(d):files.descriptor(a);
+            if(!fp){MemoryWrite32(errno_address,errno);result=stdio?0:UINT32_MAX;}
+            else if(bytes) {
+                std::vector<uint8_t> data(static_cast<size_t>(bytes));
+                const size_t got=std::fread(data.data(),1,data.size(),fp);
+                if(stdio?save_streams.count(d):save_descriptors.count(a))save_read_bytes+=got;
+                MemoryWriteBytes(dst,data.data(),got);
+                if(std::ferror(fp))MemoryWrite32(errno_address,errno);
+                result=stdio?uint32_t(got/b):uint32_t(got);
+            }
+        }
+        else if(base=="lseek"||base=="fseek"||base=="ftell") {
+            auto* fp=base=="lseek"?files.descriptor(a):files.stream(a);
+            long position=-1;
+            if(fp) {
+                if(base=="ftell")position=std::ftell(fp);
+                else if(c>2)errno=EINVAL;
+                else if(std::fseek(fp,long(int32_t(b)),int(c))==0)position=base=="fseek"?0:std::ftell(fp);
+                if(position>INT32_MAX){errno=EOVERFLOW;position=-1;}
+            }
+            result=uint32_t(position);if(position<0)MemoryWrite32(errno_address,errno);
+        }
+        else if(base=="fopen") {
+            const std::string mode=guest_text(b);
+            static const std::array<const char*,15> modes={"r","rb","r+","rb+","r+b","w","wb","w+","wb+","w+b","a","ab","a+","ab+","a+b"};
+            if(std::find(modes.begin(),modes.end(),mode)==modes.end()){MemoryWrite32(errno_address,EINVAL);result=0;}
+            else {
+                const auto path=storage.resolve(guest_text(a));const bool writing=mode!="r"&&mode!="rb";
+                if(writing&&!path.writable){MemoryWrite32(errno_address,EROFS);result=0;}
+                else {result=files.fopen(path.path.c_str(),mode.c_str());if(!result)MemoryWrite32(errno_address,errno);else if(path.writable){save_streams.insert(result);++save_opens;}}
+            }
+        }
         else if(name.rfind("JNI:",0)==0){
             ++jni_calls;
-            const auto value=GuestJni::jni_dispatch(name.substr(4),env_addr,vm_addr);
+            uint64_t value;
+            try {value=GuestJni::jni_dispatch(name.substr(4),env_addr,vm_addr);}
+            catch(const ds::AudioBackpressure&) {
+                if(call_depth!=1)throw std::runtime_error("Audio wait across nested host callback boundary");
+                // No bytes queued: yield and retry the same ARM SVC arguments.
+                threads.sleep(1000000);rotate=true;cpu->Regs()[15]-=4;return;
+            }
             cpu->Regs()[0]=uint32_t(value);
             if(name.find("LongMethod")!=std::string::npos || name.find("DoubleMethod")!=std::string::npos)cpu->Regs()[1]=uint32_t(value>>32);
             goto done;
@@ -368,16 +563,16 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
             else if(op=="DetachCurrentThread")result=0;
             else throw std::runtime_error("Unsupported VM: "+op);
         }
-        else if(base=="acos"||base=="asin"||base=="atan"||base=="atan2"||base=="ceil"||base=="cos"||base=="exp"||base=="floor"||base=="fmod"||base=="log"||base=="log10"||base=="pow"||base=="sin"||base=="sqrt"){
+        else if(base=="acos"||base=="asin"||base=="atan"||base=="atan2"||base=="ceil"||base=="cos"||base=="exp"||base=="floor"||base=="fmod"||base=="log"||base=="log10"||base=="pow"||base=="sin"||base=="sqrt"||base=="tan"){
             const bool single=name==base+"f";
             if(single){
                 float x=0,y=0;std::memcpy(&x,&a,4);if(base=="atan2"||base=="fmod"||base=="pow")std::memcpy(&y,&b,4);
-                float r=base=="atan2"?std::atan2(x,y):base=="fmod"?std::fmod(x,y):base=="pow"?std::pow(x,y):base=="acos"?std::acos(x):base=="asin"?std::asin(x):base=="atan"?std::atan(x):base=="ceil"?std::ceil(x):base=="cos"?std::cos(x):base=="exp"?std::exp(x):base=="floor"?std::floor(x):base=="log"?std::log(x):base=="log10"?std::log10(x):base=="sin"?std::sin(x):std::sqrt(x);
+                float r=base=="atan2"?std::atan2(x,y):base=="fmod"?std::fmod(x,y):base=="pow"?std::pow(x,y):base=="acos"?std::acos(x):base=="asin"?std::asin(x):base=="atan"?std::atan(x):base=="ceil"?std::ceil(x):base=="cos"?std::cos(x):base=="exp"?std::exp(x):base=="floor"?std::floor(x):base=="log"?std::log(x):base=="log10"?std::log10(x):base=="sin"?std::sin(x):base=="tan"?std::tan(x):std::sqrt(x);
                 std::memcpy(&result,&r,4);
             } else {
                 uint64_t vx=uint64_t(a)|uint64_t(b)<<32;double dx;std::memcpy(&dx,&vx,8);
                 uint64_t vy=uint64_t(c)|uint64_t(d)<<32;double dy;std::memcpy(&dy,&vy,8);
-                double r=base=="atan2"?std::atan2(dx,dy):base=="fmod"?std::fmod(dx,dy):base=="pow"?std::pow(dx,dy):base=="acos"?std::acos(dx):base=="asin"?std::asin(dx):base=="atan"?std::atan(dx):base=="ceil"?std::ceil(dx):base=="cos"?std::cos(dx):base=="exp"?std::exp(dx):base=="floor"?std::floor(dx):base=="log"?std::log(dx):base=="log10"?std::log10(dx):base=="sin"?std::sin(dx):std::sqrt(dx);
+                double r=base=="atan2"?std::atan2(dx,dy):base=="fmod"?std::fmod(dx,dy):base=="pow"?std::pow(dx,dy):base=="acos"?std::acos(dx):base=="asin"?std::asin(dx):base=="atan"?std::atan(dx):base=="ceil"?std::ceil(dx):base=="cos"?std::cos(dx):base=="exp"?std::exp(dx):base=="floor"?std::floor(dx):base=="log"?std::log(dx):base=="log10"?std::log10(dx):base=="sin"?std::sin(dx):base=="tan"?std::tan(dx):std::sqrt(dx);
                 uint64_t bits=0;std::memcpy(&bits,&r,8);
                 cpu->Regs()[0]=uint32_t(bits);cpu->Regs()[1]=uint32_t(bits>>32);
                 goto done;
@@ -385,7 +580,7 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         }
         else if(name.rfind("gl",0)==0)result=gl_dispatch(name,a,b,c,d);
         else {
-            trace.push_back("UNSUP-IMPORT "+name+" a=0x"+to_hex(a)+" b=0x"+to_hex(b)+" c=0x"+to_hex(c)+" d=0x"+to_hex(d)+" pc=0x"+to_hex(cpu->Regs()[15]-8)+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" got088="+to_hex(MemoryRead32(0x1043f088))+" canary=0x"+to_hex(MemoryRead32(0x104a1000))+" sym30007540=0x"+to_hex(MemoryRead32(0x30007540)));
+            trace.push_back("UNSUP-IMPORT "+name+" a=0x"+to_hex(a)+" b=0x"+to_hex(b)+" c=0x"+to_hex(c)+" d=0x"+to_hex(d)+" pc=0x"+to_hex(cpu->Regs()[15])+" lr=0x"+to_hex(cpu->Regs()[14])+" sp=0x"+to_hex(cpu->Regs()[13]));
             throw std::runtime_error("Unsupported import: "+name);
         }
         cpu->Regs()[0]=result;
@@ -399,9 +594,10 @@ class LifecycleRuntime final: public Dynarmic::A32::UserCallbacks, public ds::Gu
         ++gl_calls;
         if(native_gl)return native_gl->call(name);
         if(name=="glGetIntegerv"){
-            if(a==0x0BA2){MemoryWrite32(b,0);MemoryWrite32(b+4,0);MemoryWrite32(b+8,480);MemoryWrite32(b+12,640);}
-            else if(a==0x0D33||a==0x0D34){MemoryWrite32(b,0);MemoryWrite32(b+4,0);MemoryWrite32(b+8,480);MemoryWrite32(b+12,640);}
-            else if(a==0x0BA0){MemoryWrite32(b,2048);}
+            if(a==0x0BA2){MemoryWrite32(b,0);MemoryWrite32(b+4,0);MemoryWrite32(b+8,graphics.width);MemoryWrite32(b+12,graphics.height);}
+            else if(a==0x0D33)MemoryWrite32(b,2048);
+            else if(a==0x0D34){MemoryWrite32(b,graphics.width);MemoryWrite32(b+4,graphics.height);}
+            else if(a==0x0BA0){MemoryWrite32(b,0x1700);}
             else if(a==0x0C23||a==0x0BDF||a==0x0BDE||a==0x0BDD||a==0x0BDA){MemoryWrite32(b,1);}
             else if(a==0x0B21){MemoryWrite32(b,0xFFFFFFFF);}
             else MemoryWrite32(b,0);
@@ -427,16 +623,18 @@ public:
         if(a==0&&++guard_log<=20)trace.push_back("  RD0 pc=0x"+to_hex(cpu->Regs()[15]-8)+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" sp=0x"+to_hex(cpu->Regs()[13])+" r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7]));
         if(a==0x1044bb6c&&++guard_log<=40)trace.push_back("  RD 0x1044bb6c pc=0x"+to_hex(cpu->Regs()[15]-8)+" lr=0x"+to_hex(cpu->Regs()[14]-8)+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6]));
         if((a==0x10450b68u||a==0x10450b69u||a==0x10450b6au||a==0x10450b6bu)&&++guard_log<=40)trace.push_back("  RD 0x10450b68 pc=0x"+to_hex(cpu->Regs()[15]-8)+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7]));
-        if(mapped(a)){const auto it=pages.find(a>>12);if(it!=pages.end())return it->second[a&4095];uint8_t rv=0;if(!image.read(a,&rv,1)){if(!(a>=arena&&a<arena_end)&&!(a>=heap&&a<heap+0x4000000))fail("Unmapped guest read at "+std::to_string(a));return rv;}return rv;}
+        if(mapped(a)){const auto it=pages.find(a>>12);return it==pages.end()?0:it->second[a&4095];}
         if(a>=thunks && uint64_t(a)-thunks<functions.size()*4) return uint8_t((0xef000001u+((a-thunks)/4))>>(8*((a-thunks)%4)));
         if(a>=stop && a-stop<4)return uint8_t(0xef00ffffu>>(8*(a-stop)));
-        uint8_t v=0;if(!image.read(a,&v,1)){uint32_t sp=cpu->Regs()[13];std::string st="  STACK@0x"+to_hex(sp-0x20)+":";for(int i=0;i<24;i++){uint32_t w=0;if(mapped(sp-0x20+i*4)&&image.read(sp-0x20+i*4,&w,4))st+=" "+to_hex(w);else st+=" ?";}trace.push_back(st);fail("Unmapped guest read at "+std::to_string(a)+" img="+std::to_string(image.memory.size()));}return v;
+        uint8_t v=0;
+        if(!image.read(a,&v,1))fail("Unmapped guest read at "+std::to_string(a));
+        return v;
     }
-    uint16_t MemoryRead16(uint32_t a) override {return MemoryRead8(a)|uint16_t(MemoryRead8(a+1))<<8;}
+    uint16_t MemoryRead16(uint32_t a) override {uint8_t b[2];if(read_span(a,b,2))return b[0]|uint16_t(b[1])<<8;return MemoryRead8(a)|uint16_t(MemoryRead8(a+1))<<8;}
     uint32_t MemoryRead32(uint32_t a) override {
-        const uint32_t v=MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;
-        if(a==0x10444100u&&trace.size()<6000)trace.push_back("  RD32 0x10444100="+to_hex(v)+" @"+to_hex(cpu->Regs()[15])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4]));
-        if(cpu&&v==0x1031e5a4u&&trace.size()<6000)trace.push_back("  GOT 0x1031e5a4 read @"+to_hex(cpu->Regs()[15]));
+        uint8_t b[4];const uint32_t v=read_span(a,b,4)?uint32_t(b[0])|uint32_t(b[1])<<8|uint32_t(b[2])<<16|uint32_t(b[3])<<24:MemoryRead16(a)|uint32_t(MemoryRead16(a+2))<<16;
+        if(a==0x10444100u&&trace.total()<6000)trace.push_back("  RD32 0x10444100="+to_hex(v)+" @"+to_hex(cpu->Regs()[15])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4]));
+        if(cpu&&v==0x1031e5a4u&&trace.total()<6000)trace.push_back("  GOT 0x1031e5a4 read @"+to_hex(cpu->Regs()[15]));
         return v;
     }
     uint64_t MemoryRead64(uint32_t a) override {return MemoryRead32(a)|uint64_t(MemoryRead32(a+4))<<32;}
@@ -451,23 +649,11 @@ public:
         if(a==0x1043f088u&&++svc_log<=20)trace.push_back("  WR088 v="+to_hex(v)+" mapped="+std::to_string(mapped(a))+" pcount="+std::to_string(pages.count(a>>12)));
         if((a>=0x1044bb58u&&a<0x1044bb90u||a>=0x10450b60u&&a<0x10450b90u)&&++guard_log<=500)trace.push_back("  WR 0x"+to_hex(a)+"=0x"+to_hex(v)+" svc="+last_service+" pc=0x"+to_hex(cpu->Regs()[15])+" sp=0x"+to_hex(cpu->Regs()[13])+" r6=0x"+to_hex(cpu->Regs()[6])+" r7=0x"+to_hex(cpu->Regs()[7])+" r3=0x"+to_hex(cpu->Regs()[3])+" r2=0x"+to_hex(cpu->Regs()[2]));
         if(a==0x1043f100u&&++svc_log<=80)trace.push_back("  WRF100 0x"+to_hex(v)+" svc="+last_service+" pc=0x"+to_hex(cpu->Regs()[15]-8)+" r0=0x"+to_hex(cpu->Regs()[0])+" r1=0x"+to_hex(cpu->Regs()[1])+" r2=0x"+to_hex(cpu->Regs()[2])+" r3=0x"+to_hex(cpu->Regs()[3])+" r4=0x"+to_hex(cpu->Regs()[4])+" r5=0x"+to_hex(cpu->Regs()[5])+" r6=0x"+to_hex(cpu->Regs()[6]));
-        if(mapped(a)){
-            if(a==0x1043f088u)trace.push_back("  WR88-PATH mapped-branch page=0x"+to_hex(a>>12)+" memsize=0x"+to_hex(image.memory.size()));
-            const uint32_t page=a>>12;
-            if(!pages.count(page)){
-                auto& arr=pages[page];
-                const uint32_t imbase=0x10000000u,gp=page<<12;
-                if(gp>=imbase && uint64_t(gp)-imbase<image.memory.size()){
-                    const uint32_t off=gp-imbase,n=std::min<uint32_t>(4096,uint32_t(image.memory.size()-off));
-                    std::memcpy(arr.data(),image.memory.data()+off,n);
-                }
-            }
-            pages[a>>12][a&4095]=v;return;
-        }
+        if(mapped(a)){pages[a>>12][a&4095]=v;return;}
         if(!image.write(a,&v,1))fail("Write outside writable guest mapping at "+std::to_string(a));
     }
-    void MemoryWrite16(uint32_t a,uint16_t v) override {MemoryWrite8(a,v);MemoryWrite8(a+1,v>>8);}
-    void MemoryWrite32(uint32_t a,uint32_t v) override {MemoryWrite16(a,v);MemoryWrite16(a+2,v>>16);}
+    void MemoryWrite16(uint32_t a,uint16_t v) override {const uint8_t b[2]={uint8_t(v),uint8_t(v>>8)};if(!write_span(a,b,2)){MemoryWrite8(a,v);MemoryWrite8(a+1,v>>8);}}
+    void MemoryWrite32(uint32_t a,uint32_t v) override {const uint8_t b[4]={uint8_t(v),uint8_t(v>>8),uint8_t(v>>16),uint8_t(v>>24)};if(!write_span(a,b,4)){MemoryWrite16(a,v);MemoryWrite16(a+2,v>>16);}}
     void MemoryWrite64(uint32_t a,uint64_t v) override {MemoryWrite32(a,v);MemoryWrite32(a+4,v>>32);}
     void InterpreterFallback(uint32_t,size_t) override {fail("Unavailable instruction interpreter");}
     void ExceptionRaised(uint32_t,Dynarmic::A32::Exception) override {fail("Guest CPU exception");}
@@ -492,19 +678,23 @@ public:
         return p;
     }
 
-    void initialize(const std::string& data,ds::GraphicsBackend backend) {
+    void initialize(const std::string& data,ds::GraphicsBackend backend,ds::AudioBackend audio_backend,const std::string& save_root) {
+        audio.set_backend(std::move(audio_backend));
         data_root=data;
+        storage={data,save_root};
         graphics=std::move(backend);
+        guest_time(); // anchor the optional monotonic source before guest startup
+        if(!graphics.width||!graphics.height||graphics.width>4096||graphics.height>4096)throw std::runtime_error("Surface dimensions invalid");
         if(graphics.resolve)native_gl=std::make_unique<ds::GuestGl>(graphics,ds::GlGuestMemory{
             [&](unsigned n){return arg(n);},[&](uint32_t n){return alloc(n);},
             [&](uint32_t p,void* out,size_t n){
                 if(uint64_t(p)+n>0x100000000ull)throw std::runtime_error("GL guest read wraps");
-                auto* bytes=static_cast<uint8_t*>(out);for(size_t i=0;i<n;++i)bytes[i]=MemoryRead8(p+uint32_t(i));
+                MemoryReadBytes(p,out,n);
                 if(!fault.empty())throw std::runtime_error(fault);
             },
             [&](uint32_t p,const void* input,size_t n){
                 if(uint64_t(p)+n>0x100000000ull)throw std::runtime_error("GL guest write wraps");
-                const auto* bytes=static_cast<const uint8_t*>(input);for(size_t i=0;i<n;++i)MemoryWrite8(p+uint32_t(i),bytes[i]);
+                MemoryWriteBytes(p,input,n);
                 if(!fault.empty())throw std::runtime_error(fault);
             }});
         errno_address=alloc(4);threads.thread().error=errno_address;
@@ -549,17 +739,11 @@ public:
         vm_addr=alloc(4);MemoryWrite32(vm_addr,vm_table);
     }
 
-    void install_stack_chk_guard() {
-        // GOT 槽 0x1043f088 由 bind_imports 指向符号 __stack_chk_guard（0x30007540），
-        // guest bionic 已写入默认金丝雀 0xa5a55a5a。此函数仅兜底：符号位置为空时补默认值。
-        // 注意：不得把金丝雀放到 0x104a1000 附近——那是 guest 调用桥栈活动区（sp 实测 0x104a1010），会被覆盖。
-        if(MemoryRead32(0x30007540)==0){MemoryWrite32(0x30007540,0xa5a55a5a);}
-    }
-
     void run_constructors() {
         trace.push_back("pre-ctor GOT 0x1043f100="+to_hex(MemoryRead32(0x1043f100))+" raw="+to_hex(image.memory[0x43f100]|image.memory[0x43f101]<<8|image.memory[0x43f102]<<16|image.memory[0x43f103]<<24));
         for(const auto fn:image.constructors){
             if(!image.executable(fn&~1u,4))throw std::runtime_error("Invalid constructor address");
+            if(graphics.progress&&constructors_completed%32==0)graphics.progress("CONSTRUCTOR: index="+std::to_string(constructors_completed));
             guest_call(fn,{},"constructor",true);
             ++constructors_completed;
         }
@@ -576,9 +760,21 @@ public:
         const uint32_t version=guest_call(onload->second,{vm_addr,0},"JNI_OnLoad",true);
         trace.push_back("JNI_OnLoad returned: 0x"+to_hex(version));
         if(version!=0x10004)throw std::runtime_error("Unexpected JNI version");
+        // EAIO_Startup must run before audio/Create so EASTL's default allocator
+        // interface and the EA file-system are constructed. Without it, EASTL
+        // containers see a null allocator (this=null) inside the first frame.
+        const auto eaio=image.exports.find("Java_com_ea_EAIO_EAIO_Startup");
+        if(eaio!=image.exports.end()){
+            const uint32_t am=singleton("android/content/res/AssetManager");
+            guest_call(eaio->second,{env_addr,0,am},"EAIO_Startup",true);
+            trace.push_back("EAIO_Startup returned");
+        } else {
+            trace.push_back("EAIO_Startup export not found; skipping explicit pre-Start");
+        }
         const auto audio=image.exports.find("Java_com_ea_EAAudioCore_AndroidEAAudioCore_Init");
         if(audio==image.exports.end())throw std::runtime_error("Audio init export missing");
         const uint32_t track=alloc(4);objects[track].cls="android/media/AudioTrack";
+        GuestJni::audio.attach(track,44100,2);
         guest_call(audio->second,{env_addr,0x42424242,track,1024*1024,2,44100},"EAAudioCore_Init",true);
         trace.push_back("EAAudioCore_Init returned");
         const auto create=image.exports.find("Java_com_ea_blast_MainActivity_NativeOnCreate");
@@ -596,13 +792,47 @@ public:
         }
         const auto frame=image.exports.find("Java_com_ea_blast_AndroidRenderer_NativeOnDrawFrame");
         if(frame==image.exports.end())throw std::runtime_error("NativeOnDrawFrame export missing");
-        for(unsigned i=0;i<frames;++i){
+        if(!frames&&!graphics.keep_running)throw std::runtime_error("Interactive session requires a stop callback");
+        auto last_frame_checkpoint=std::chrono::steady_clock::now();
+        for(unsigned i=0;!frames||i<frames;++i){
+            guest_time();
+            if(i<3&&graphics.progress)graphics.progress("FRAME BEGIN: "+std::to_string(i));
+            if(graphics.keep_running&&!graphics.keep_running())break;
+            if(i<3&&graphics.progress)graphics.progress("FRAME INPUT: "+std::to_string(i));
+            if(graphics.input) {
+                const auto events=graphics.input(i);if(events.size()>64)throw std::runtime_error("Input event budget");
+                for(const auto& event:events) {
+                    if(event.kind==ds::InputEvent::touch_down||event.kind==ds::InputEvent::touch_move||event.kind==ds::InputEvent::touch_up) {
+                        const auto words=ds::pointer_arguments(event,graphics.width,graphics.height);
+                        const auto entry=image.exports.find("Java_com_ea_blast_TouchSurfaceAndroid_NativeOnPointerEvent");
+                        if(entry==image.exports.end())throw std::runtime_error("Guest pointer export missing");
+                        guest_call(entry->second,{env_addr,0x42424242,words[0],words[1],words[2],words[3],words[4]},"pointer input",true);
+                    } else {
+                        if(event.kind!=ds::InputEvent::key_down&&event.kind!=ds::InputEvent::key_up)throw std::runtime_error("Invalid key event kind");
+                        if(!event.code||event.code>255)throw std::runtime_error("Guest key code invalid");
+                        const auto name=event.kind==ds::InputEvent::key_down?"Java_com_ea_blast_KeyboardAndroid_NativeOnKeyDown":"Java_com_ea_blast_KeyboardAndroid_NativeOnKeyUp";
+                        const auto entry=image.exports.find(name);if(entry==image.exports.end())throw std::runtime_error("Guest keyboard export missing");
+                        guest_call(entry->second,{env_addr,0x42424242,600,event.code,1},"key input",true);
+                    }
+                    trace.push_back("Input kind="+std::to_string(event.kind)+" frame="+std::to_string(i));
+                }
+            }
+
+            if(graphics.keep_running&&!graphics.keep_running())break;
+            if(i<3&&graphics.progress)graphics.progress("FRAME DRAW: "+std::to_string(i));
+            if(i==0&&graphics.progress)graphics.progress("BEGIN: first guest DrawFrame");
             guest_call(frame->second,{},"NativeOnDrawFrame["+std::to_string(i)+"]",true);
+            if(i==0&&graphics.progress)graphics.progress("END: first guest DrawFrame");
             ++frames_done;
             if(graphics.present)graphics.present();
+            const auto frame_now=std::chrono::steady_clock::now();
+            if(graphics.progress&&(i<3||frame_now-last_frame_checkpoint>=std::chrono::seconds(5))) {
+                graphics.progress("FRAME COMPLETE: "+std::to_string(frames_done)+" guest_ns="+std::to_string(guest_time())+" clock="+(graphics.monotonic_ns?"host-monotonic-floor":"instruction-only")+"\n"+graphics_report());
+                last_frame_checkpoint=frame_now;
+            }
             trace.push_back("NativeOnDrawFrame["+std::to_string(i)+"] returned");
         }
-        frames_done=frames;
+
     }
 
     static std::string to_hex(uint32_t v){char buf[16];std::snprintf(buf,sizeof(buf),"%08x",v);return buf;}
@@ -617,16 +847,24 @@ public:
     std::string report() const {
         std::string out="PASS: "+std::to_string(constructors_completed)+" constructors; JNI_OnLoad+audio+create+surface+visibility OK; "+std::to_string(frames_done)+" DrawFrame returned; "+std::to_string(jni_calls)+" JNI/Java calls; "+std::to_string(gl_calls)+" GL calls.\n";
         out+=native_gl?"Native GL bridge active; lifecycle returns alone do not verify game rendering, audio or gameplay.\n":"Diagnostic result only: GL calls are mocked; no game rendering, audible audio or gameplay verified.\n";
+        out+="Clock: "+std::string(graphics.monotonic_ns?"host monotonic floor":"instruction-only")+"; guest_ns="+std::to_string(threads.time())+"\n";
         out+="Threads: cooperative scheduler; created="+std::to_string(threads_created)+" context switches="+std::to_string(thread_switches)+" (not native parallel execution).\n";
         out+=graphics_report();
+        out+="Storage: "+std::to_string(save_opens)+" save opens, "+std::to_string(save_read_bytes)+" bytes read, "+std::to_string(save_written_bytes)+" bytes written.\n";
+        out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_lists)+" directories listed; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
         for(const auto& kv:service_counts)if(kv.second)out+="  svc "+kv.first+" "+std::to_string(kv.second)+"\n";
+        out+="Trace: "+std::to_string(trace.dropped())+" older entries discarded.\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;
     }
     std::string trace_report() const {
         std::string out=graphics_report();
+        out+="Storage: "+std::to_string(save_opens)+" save opens, "+std::to_string(save_read_bytes)+" bytes read, "+std::to_string(save_written_bytes)+" bytes written.\n";
+        out+="PCM: "+std::to_string(audio.write_calls)+" writes, "+std::to_string(audio.submitted_bytes)+" bytes queued; nonzero samples="+std::to_string(audio.nonzero_samples)+" peak="+std::to_string(audio.peak)+" (speaker unverified).\n";
+        out+="Arena brk="+to_hex(arena_memory.program_break())+" lowest mapping="+to_hex(arena_memory.lowest_mapping())+"\n";
         out+="Assets: "+std::to_string(asset_opens)+" streams opened; "+std::to_string(asset_read_bytes)+" bytes delivered to guest.\n";
+        out+="Trace: "+std::to_string(trace.dropped())+" older entries discarded.\n";
         for(const auto& t:trace)out+=t+"\n";
         return out;
     }
@@ -634,22 +872,29 @@ public:
 };
 }
 
-std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics) {
+std::string lifecycle_probe(const std::string& library,const std::string& data_root,unsigned frames,ds::GraphicsBackend graphics,ds::AudioBackend audio,std::string save_root) {
     LifecycleRuntime env;
+    const auto progress=graphics.progress;
+    auto checkpoint=[&](const std::string& message){if(progress)progress(message);};
     try {
+        checkpoint("BEGIN: load guest ELF");
         std::string error;if(!env.image.load(library,error))throw std::runtime_error(error);
         //env.trace.push_back("image memory bytes="+std::to_string(env.image.memory.size()));
-        env.initialize(data_root,std::move(graphics));
+        checkpoint("END: load guest ELF; BEGIN: runtime initialization");
+        env.initialize(data_root,std::move(graphics),std::move(audio),save_root);
         Dynarmic::A32::UserConfig conf;conf.callbacks=&env;conf.arch_version=Dynarmic::A32::ArchVersion::v6K;
         conf.code_cache_size=32*1024*1024;conf.page_table=nullptr;conf.fastmem_pointer=std::nullopt;
+        checkpoint("END: runtime initialization; BEGIN: Dynarmic JIT construction");
         Dynarmic::A32::Jit cpu(conf);env.cpu=&cpu;
-        env.install_stack_chk_guard();
+        checkpoint("END: Dynarmic JIT construction; BEGIN: guest constructors");
         env.run_constructors();
+        checkpoint("END: guest constructors; BEGIN: guest lifecycle");
         env.run_lifecycle(frames);
         return env.report();
     } catch(const std::exception& e) {
         std::string out="BLOCKED after "+std::to_string(env.done())+" constructors: "+e.what()+"\n";
         out+=env.trace_report();
+        checkpoint(out);
         return out;
     }
 }
