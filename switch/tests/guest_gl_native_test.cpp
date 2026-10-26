@@ -36,7 +36,7 @@ struct Fixture {
     std::array<uint32_t,16> args{};
     uint32_t next=1024;
     ds::GuestGl bridge;
-    Fixture(Egl& egl,std::function<std::vector<uint8_t>(const std::string&)> hd={},uint64_t budget=128*1024*1024):bridge([&]{ds::GraphicsBackend b;b.resolve=[&](const char* n){return egl.resolve(n);};b.desktop_compatibility=true;b.hd_texture=std::move(hd);b.hd_budget_bytes=budget;return b;}(),
+    Fixture(Egl& egl,std::function<std::vector<uint8_t>(const std::string&)> hd={},uint64_t budget=128*1024*1024,bool base_mip=false):bridge([&]{ds::GraphicsBackend b;b.resolve=[&](const char* n){return egl.resolve(n);};b.desktop_compatibility=true;b.hd_texture=std::move(hd);b.hd_budget_bytes=budget;b.base_mip_only=base_mip;return b;}(),
         {[&](unsigned n){return args.at(n);},[&](uint32_t n){return allocate(n);},
          [&](uint32_t p,void* out,size_t n){read(p,out,n);},[&](uint32_t p,const void* data,size_t n){write(p,data,n);}}){}
     uint32_t allocate(uint32_t n){if(uint64_t(next)+n+16>memory.size())throw std::runtime_error("Fixture memory exhausted");auto p=next;next+=(n+15)&~15u;return p;}
@@ -60,11 +60,12 @@ static std::vector<uint8_t> blue_ktx() {
     for(unsigned level=0;level<3;++level){word(16);out.insert(out.end(),block,block+16);}
     return out;
 }
-int main(){
+int main(int argc,char**){
+    const bool base_mip=argc>1;
     try {
         Egl egl;std::map<std::string,std::vector<uint8_t>> hd_files;
         const auto load=[&](const std::string& key){auto it=hd_files.find(key);return it==hd_files.end()?std::vector<uint8_t>{}:it->second;};
-        Fixture r(egl,load);
+        Fixture r(egl,load,128*1024*1024,base_mip);
         std::cout<<"Native renderer: "<<r.text(r.call("glGetString",{0x1f01}))<<'\n';
         std::cout<<"Native version: "<<r.text(r.call("glGetString",{0x1f02}))<<'\n';
         require(r.text(r.call("glGetString",{0x1f03})).empty(),"Advertised unimplemented extensions");
@@ -126,7 +127,7 @@ int main(){
         r.call("glVertexPointer",{2,0x1406,0,0xfffffff0});reject([&]{r.call("glDrawArrays",{4,0,6});});
         require(r.call("glGetError")==0,"Native GL reports error");
         hd_files[redkey]=blue_ktx();
-        Fixture limited(egl,load,80);const auto q=limited.upload(quad),t=limited.upload(coords),source=limited.upload(red),limited_ids=limited.allocate(4);
+        Fixture limited(egl,load,80,base_mip);const auto q=limited.upload(quad),t=limited.upload(coords),source=limited.upload(red),limited_ids=limited.allocate(4);
         limited.call("glEnableClientState",{0x8074});limited.call("glVertexPointer",{2,0x1406,0,q});limited.call("glEnableClientState",{0x8078});limited.call("glTexCoordPointer",{2,0x1406,0,t});limited.call("glGenTextures",{1,limited_ids});limited.call("glBindTexture",{0x0de1,limited.word(limited_ids)});limited.call("glTexParameteri",{0x0de1,0x2801,0x2600});limited.call("glTexImage2D",{0x0de1,0,0x1908,2,2,0,0x1908,0x1401,source});limited.call("glDrawArrays",{4,0,6});pixel=limited.pixel();require(pixel[0]>250&&pixel[2]<3&&limited.bridge.hd_budget_skips==1&&limited.bridge.hd_matches==0,"HD budget did not preserve original rendering");
         require(limited.call("glGetError")==0,"Native GL error after budget fallback");
         reinterpret_cast<void(*)(unsigned)>(egl.resolve("glEnable"))(0xdeadbeef);

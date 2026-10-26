@@ -26,9 +26,9 @@ static void* resolve(const char* name){
     throw std::runtime_error(name);
 }
 int main(){
-    for(bool fail:{false,true}){
+    for(bool production:{false,true})for(bool fail:{false,true}){
         throwing=fail;std::array<unsigned,4> args{};
-        ds::GraphicsBackend backend;backend.resolve=resolve;backend.render_test_mode=3;
+        ds::GraphicsBackend backend;backend.resolve=resolve;backend.render_test_mode=production?0:3;backend.base_mip_only=production;
         ds::GlGuestMemory memory;memory.arg=[&](unsigned n){return args.at(n);};
         ds::GuestGl gl(backend,memory);
         for(unsigned u=0;u<2;++u){

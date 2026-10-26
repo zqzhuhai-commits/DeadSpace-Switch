@@ -217,7 +217,7 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
             changed.push_back(binding);fn<void(*)(U,U)>("glBindTexture")(0x0de1,it->second.shadow);
             if(dirty){for(unsigned i=0;i<4;++i)fn<void(*)(U,U,I)>("glTexParameteri")(0x0de1,names[i],values[i]);hd_parameters_dirty.erase(binding.second);}
         }
-        if(backend.render_test_mode==3){
+        if(backend.base_mip_only||backend.render_test_mode==3){
             for(U unit:textured_units){
                 const auto binding=texture_bindings.find(unit);
                 if(binding==texture_bindings.end()||!binding->second)continue;

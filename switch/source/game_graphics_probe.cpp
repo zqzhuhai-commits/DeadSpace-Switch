@@ -3,7 +3,8 @@
 #include "lifecycle_probe.hpp"
 #include "app_paths.hpp"
 #include "startup_log.hpp"
-#include "render_test.hpp"
+#include "runtime_settings.hpp"
+#include "hd_texture.hpp"
 #include <SDL2/SDL.h>
 #include <cstdio>
 #include <stdexcept>
@@ -44,7 +45,9 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     ds::GraphicsBackend graphics;
     graphics.realtime_clock=true;
     graphics.gpu_client_arrays=true;
-    graphics.render_test_mode=ds::read_render_test_mode();
+    const auto settings=ds::read_runtime_settings();
+    graphics.base_mip_only=settings.base_mip_only;
+    graphics.render_test_mode=0; // Ignore leftover diagnostic modes, including A/B.
     SDL_GL_SetSwapInterval(1);
     int drawable_width=1280,drawable_height=720;SDL_GL_GetDrawableSize(window,&drawable_width,&drawable_height);
     graphics.surface_width=uint32_t(drawable_width);graphics.surface_height=uint32_t(drawable_height);
@@ -53,7 +56,6 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     graphics.record("Native surface: "+std::to_string(drawable_width)+"x"+std::to_string(drawable_height));
     const uint32_t startup_started=SDL_GetTicks();bool startup_recorded=false;
     graphics.startup_complete=[&,record=graphics.record]{if(!startup_recorded){startup_recorded=true;record("Native player HUD ready; elapsed_ms="+std::to_string(uint32_t(SDL_GetTicks()-startup_started)));}};
-    graphics.record(std::string("Render isolation build room-test-1; mode=")+std::to_string(graphics.render_test_mode)+"; "+ds::render_test_name(graphics.render_test_mode));
     graphics.record("Custom loading overlay: disabled");
     graphics.record("GPU client buffers: enabled; driver-owned vertex/index uploads");
     graphics.lighting_strength=0.25f;
@@ -129,7 +131,11 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         }
         SDL_GL_SwapWindow(window);
     };
-    graphics.record("HD replacements: disabled; original textures only");
+    graphics.record(std::string("Mipmap compatibility: ")+(settings.base_mip_only?"enabled":"disabled"));
+    if(settings.hd_enabled){
+        graphics.hd_texture=[](const std::string& key){return ds::read_hd_texture(ds::paths::packaged_hd_directory,key);};
+        graphics.record("HD replacements: enabled; exact-key packaged selection; 128 MiB GPU budget; original fallback");
+    }else graphics.record("HD replacements: disabled; original textures only");
     log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,frames,std::move(graphics));
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
     if(get_error){char text[80];std::snprintf(text,sizeof(text),"Native context GL error after probe: 0x%x\n",get_error());log+=text;}
