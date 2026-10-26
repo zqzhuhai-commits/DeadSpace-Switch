@@ -1,6 +1,7 @@
 #include "guest_gl.hpp"
 #include "hd_texture.hpp"
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <stdexcept>
 
@@ -276,6 +277,7 @@ GuestGl::U GuestGl::call(const std::string& name) {
         std::vector<B> bytes(n);
         fn<void(*)(I,I,I,I,U,U,void*)>(name)(I(a),I(b),I(c),I(d),format,type,bytes.data());if(n)memory.write(p,bytes.data(),n);return 0;
     }
+    if(one_of(name,{"glLoadMatrixx","glMultMatrixx"})) {const auto raw=copy(a,64);std::array<F,16> v{};for(unsigned i=0;i<16;++i){I x=0;std::memcpy(&x,raw.data()+i*4,4);v[i]=F(x)/65536.0f;}fn<void(*)(const F*)>(name=="glLoadMatrixx"?"glLoadMatrixf":"glMultMatrixf")(v.data());return 0;}
     if(one_of(name,{"glLoadMatrixf","glMultMatrixf"})) {std::vector<F> v(16);memory.read(a,v.data(),64);fn<void(*)(const F*)>(name)(v.data());return 0;}
     if(one_of(name,{"glFogfv","glLightModelfv","glLightfv","glMaterialfv","glTexEnvfv","glTexParameterfv","glTexEnviv","glTexParameteriv"})) {
         const bool single=name=="glFogfv"||name=="glLightModelfv";
@@ -292,6 +294,18 @@ GuestGl::U GuestGl::call(const std::string& name) {
         return 0;
     }
     if(one_of(name,{"glLoadIdentity","glPushMatrix","glPopMatrix","glFinish","glFlush"})){fn<void(*)()>(name)();return 0;}
+    const auto fixed=[&](unsigned n){return F(I(arg(n)))/65536.0f;};
+    if(name=="glOrthox"||name=="glFrustumx") {
+        if(backend.desktop_compatibility)fn<void(*)(double,double,double,double,double,double)>(name=="glOrthox"?"glOrtho":"glFrustum")(fixed(0),fixed(1),fixed(2),fixed(3),fixed(4),fixed(5));
+        else fn<void(*)(F,F,F,F,F,F)>(name=="glOrthox"?"glOrthof":"glFrustumf")(fixed(0),fixed(1),fixed(2),fixed(3),fixed(4),fixed(5));
+        return 0;
+    }
+    if(one_of(name,{"glTranslatex","glScalex","glNormal3x"})){fn<void(*)(F,F,F)>(name=="glTranslatex"?"glTranslatef":name=="glScalex"?"glScalef":"glNormal3f")(fixed(0),fixed(1),fixed(2));return 0;}
+    if(one_of(name,{"glClearColorx","glColor4x","glRotatex"})){fn<void(*)(F,F,F,F)>(name=="glClearColorx"?"glClearColor":name=="glColor4x"?"glColor4f":"glRotatef")(fixed(0),fixed(1),fixed(2),fixed(3));return 0;}
+    if(name=="glAlphaFuncx"){fn<void(*)(U,F)>("glAlphaFunc")(a,fixed(1));return 0;}
+    if(name=="glClearDepthx"){if(backend.desktop_compatibility)fn<void(*)(double)>("glClearDepth")(fixed(0));else fn<void(*)(F)>("glClearDepthf")(fixed(0));return 0;}
+    if(name=="glDepthRangex"){if(backend.desktop_compatibility)fn<void(*)(double,double)>("glDepthRange")(fixed(0),fixed(1));else fn<void(*)(F,F)>("glDepthRangef")(fixed(0),fixed(1));return 0;}
+    if(name=="glLineWidthx"||name=="glPointSizex"){fn<void(*)(F)>(name=="glLineWidthx"?"glLineWidth":"glPointSize")(fixed(0));return 0;}
     if(name=="glOrthof"||name=="glFrustumf") {
         if(backend.desktop_compatibility)fn<void(*)(double,double,double,double,double,double)>(name=="glOrthof"?"glOrtho":"glFrustum")(number(0),number(1),number(2),number(3),number(4),number(5));
         else fn<void(*)(F,F,F,F,F,F)>(name)(number(0),number(1),number(2),number(3),number(4),number(5));
@@ -310,6 +324,17 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(name=="glDepthMask"){fn<void(*)(B)>(name)(B(a));return 0;}
     if(one_of(name,{"glViewport","glScissor"})){fn<void(*)(I,I,I,I)>(name)(I(a),I(b),I(c),I(d));return 0;}
     if(one_of(name,{"glTexParameteri","glTexEnvi"})){fn<void(*)(U,U,I)>(name)(a,b,I(c));return 0;}
+    if(name=="glTexParameterx") {
+        // Texture filter/wrap enums and GENERATE_MIPMAP are integer tokens,
+        // even in the GLES1 fixed-point entry point.
+        if(b!=0x2800&&b!=0x2801&&b!=0x2802&&b!=0x2803&&b!=0x8191)throw std::runtime_error("Unsupported fixed texture parameter");
+        fn<void(*)(U,U,I)>("glTexParameteri")(a,b,I(c));return 0;
+    }
+    if(name=="glTexEnvx") {
+        if(b==0x8573||b==0x0d1c)fn<void(*)(U,U,F)>("glTexEnvf")(a,b,F(I(c))/65536.0f);
+        else fn<void(*)(U,U,I)>("glTexEnvi")(a,b,I(c));
+        return 0;
+    }
     if(one_of(name,{"glTexParameterf","glTexEnvf"})){fn<void(*)(U,U,F)>(name)(a,b,number(2));return 0;}
     if(name=="glBindTexture") {if(a!=0x0de1)throw std::runtime_error("Unsupported GL texture target");fn<void(*)(U,U)>(name)(a,b);texture_bindings[active_unit]=b;return 0;}
     if(name=="glActiveTexture") {I units=0;fn<void(*)(U,I*)>("glGetIntegerv")(0x84e2,&units);if(a<0x84c0||a>=0x84c0+std::min(4u,U(std::max(0,units))))throw std::runtime_error("GL active texture unit bound");fn<void(*)(U)>(name)(a);active_unit=a-0x84c0;return 0;}

@@ -47,5 +47,20 @@ int main(){try{
  reject([&]{jumps.restore(cpu,4,2,2,1,[&](auto p){return mem[p];});});
  reject([&]{jumps.restore(cpu,4,2,1,2,[&](auto p){return mem[p];});});
  jumps.clear_owner(1);reject([&]{jumps.restore(cpu,4,2,1,1,[&](auto p){return mem[p];});});
+ // A timed semaphore must not become a success merely because time advances.
+ T timed;timed.thread().error=0x30000010;timed.thread().cpu.regs[0]=0;
+ timed.timed_semaphore(0x1000,500);
+ require(timed.select()==1&&timed.time()==500,"Idle timed semaphore did not advance to deadline");
+ require(timed.thread().cpu.regs[0]==0xffffffffu&&timed.thread().completion_errno==110&&timed.thread().error==0x30000010,"Timeout did not return -1/ETIMEDOUT in waiting thread");
+ require(!timed.waiter(T::State::semaphore,0x1000),"Expired waiter consumed a late post");
+ T posted;const auto worker=posted.create(0x10001000,0,65536,false,0x70000000);
+ posted.timed_semaphore(0x2000,1000);require(posted.select()==worker,"Timed wait did not run producer");
+ posted.tick(999);posted.expire_timers();require(posted.waiter(T::State::semaphore,0x2000)==1,"Wait expired early");
+ posted.wake(1);posted.tick(2);posted.expire_timers();
+ require(posted.select()==1&&posted.thread().cpu.regs[0]==0&&!posted.thread().completion_errno,"Post before deadline did not cancel timeout");
+ T late;late.create(0x10001000,0,65536,false,0x70000000);late.timed_semaphore(0x3000,1000);late.select();late.tick(1000);late.expire_timers();
+ require(!late.waiter(T::State::semaphore,0x3000)&&late.find(1)->completion_errno==110,"Post at deadline found stale waiter");
+ require(!late.thread().completion_errno,"Timeout errno leaked to producer thread");
  std::cout<<"PASS: guest context/VFP/TLS isolation, round-robin, blocking/wake, sleep deadlines, join results, detached exit, stack reuse, deadlock and opaque jump guards\n";
+ std::cout<<"PASS: timed semaphore deadline, idle advancement, -1/ETIMEDOUT, post cancellation, late-post retention and errno isolation\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
