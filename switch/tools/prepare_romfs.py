@@ -9,9 +9,10 @@ import shutil
 import tempfile
 from prepare_data import import_data
 import reanimated_hd
+from set_save_language import localize
 
 
-def prepare(source, output, hd_apk=None):
+def prepare(source, output, hd_apk=None, settings=None):
     source, output = Path(source).resolve(), Path(output).absolute()
     if output.exists() or output.is_symlink():
         raise ValueError("Output already exists")
@@ -21,6 +22,9 @@ def prepare(source, output, hd_apk=None):
     stage = Path(tempfile.mkdtemp(prefix=".deadspacemobile-romfs-", dir=output.parent))
     try:
         import_data(source, stage / "gamedata")
+        if settings is not None:
+            preferences=stage/"gamedata/preferences";preferences.mkdir()
+            (preferences/"settings.sb").write_bytes(localize(Path(settings).read_bytes(),"zh-cn"))
         hd_summary = None
         if hd_apk is not None:
             pack = reanimated_hd.extract(hd_apk, stage / "texture_hd")
@@ -70,6 +74,7 @@ if __name__ == "__main__":
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--hd-apk", type=Path, help="Pinned Reanimated v1.3 APK; embed HD-only files after matching the donor")
+    parser.add_argument("--settings", type=Path, help="Game-generated settings.sb; seed a new save with Simplified Chinese")
     args = parser.parse_args()
-    report = prepare(args.source, args.output, args.hd_apk)
+    report = prepare(args.source, args.output, args.hd_apk,args.settings)
     print(f"Staged {report['file_count']} files, {report['total_bytes']} bytes. Not a playable build.")

@@ -1,34 +1,153 @@
 #include "platform_probe.hpp"
 #ifdef DS_CPU_PROBE
 #include "lifecycle_probe.hpp"
-#include "hd_texture.hpp"
 #include "app_paths.hpp"
+#include "startup_log.hpp"
 #include <SDL2/SDL.h>
 #include <cstdio>
+#include <stdexcept>
+#include <switch.h>
+#include "controller_input.hpp"
+#include "gyro_input.hpp"
+#include <memory>
 
-std::string game_graphics_probe(const std::string& root) {
+std::string game_graphics_probe(const std::string& root,unsigned frames) {
     std::string log="Original-library lifecycle with native GLES1 subset (not verified gameplay)\n";
-    if(SDL_Init(SDL_INIT_VIDEO)<0){log+=SDL_GetError();SDL_Quit();return log;}
+    ds::startup_log("BEGIN: SDL video/audio init");
+    if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)<0){log+=SDL_GetError();ds::startup_log("FAIL: SDL init: %s",SDL_GetError());SDL_Quit();return log;}
+    ds::startup_log("END: SDL init; BEGIN: GLES1 window/context");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE,24);
+#ifdef DS_GAME_LAUNCHER
+    int requested_width=1280,requested_height=720;
+    if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/display.cfg","r")){
+        int w=0,h=0;if(std::fscanf(config,"%d %d",&w,&h)==2&&((w==1280&&h==720)||(w==960&&h==540))){requested_width=w;requested_height=h;}std::fclose(config);
+    }else if(auto* created=std::fopen("sdmc:/switch/deadspacemobile/display.cfg","w")){std::fputs("1280 720\n",created);std::fclose(created);}
+    ds::startup_log("Requested surface: %dx%d",requested_width,requested_height);
+    SDL_Window* window=SDL_CreateWindow("Dead Space Mobile",0,0,requested_width,requested_height,SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN);
+#else
     SDL_Window* window=SDL_CreateWindow("Dead Space Mobile native GL diagnostics",0,0,1280,720,SDL_WINDOW_OPENGL|SDL_WINDOW_SHOWN);
+#endif
     SDL_GLContext context=window?SDL_GL_CreateContext(window):nullptr;
-    if(!context){log+="Native GLES1 context unavailable: "+std::string(SDL_GetError())+"\n";if(window)SDL_DestroyWindow(window);SDL_Quit();return log;}
+    if(!context){log+="Native GLES1 context unavailable: "+std::string(SDL_GetError())+"\n";ds::startup_log("FAIL: GLES1 context: %s",SDL_GetError());if(window)SDL_DestroyWindow(window);SDL_Quit();return log;}
+    ds::startup_log("END: GLES1 context");
+    if(auto query=reinterpret_cast<void(*)(unsigned,int*)>(SDL_GL_GetProcAddress("glGetIntegerv"))){
+        int depth=0,stencil=0;query(0x0d56,&depth);query(0x0d57,&stencil);
+        ds::startup_log("Framebuffer precision: depth=%d stencil=%d (requested depth=24)",depth,stencil);
+    }
     auto get_string=reinterpret_cast<const unsigned char*(*)(unsigned)>(SDL_GL_GetProcAddress("glGetString"));
     if(get_string){const auto* renderer=get_string(0x1f01);log+="Renderer: "+std::string(renderer?reinterpret_cast<const char*>(renderer):"unknown")+"\n";}
     ds::GraphicsBackend graphics;
+    graphics.realtime_clock=true;
+    graphics.gpu_client_arrays=true;
+    SDL_GL_SetSwapInterval(1);
+    int drawable_width=1280,drawable_height=720;SDL_GL_GetDrawableSize(window,&drawable_width,&drawable_height);
+    graphics.surface_width=uint32_t(drawable_width);graphics.surface_height=uint32_t(drawable_height);
+    std::unique_ptr<std::FILE,int(*)(std::FILE*)> progress(std::fopen(ds::paths::log_file,"a"),std::fclose);
+    graphics.record=[&](const std::string& text){ds::startup_log("%s",text.c_str());if(progress){std::fprintf(progress.get(),"%s\n",text.c_str());std::fflush(progress.get());}};
+    graphics.record("Native surface: "+std::to_string(drawable_width)+"x"+std::to_string(drawable_height));
+    const uint32_t startup_started=SDL_GetTicks();bool startup_recorded=false;
+    graphics.startup_complete=[&,record=graphics.record]{if(!startup_recorded){startup_recorded=true;record("Native player HUD ready; elapsed_ms="+std::to_string(uint32_t(SDL_GetTicks()-startup_started)));}};
+    graphics.record("Custom loading overlay: disabled");
+    graphics.record("GPU client buffers: enabled; driver-owned vertex/index uploads");
+    graphics.lighting_strength=0.25f;
+    if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/lighting.cfg","r")){
+        float strength=0;char extra=0;if(std::fscanf(config,"%f %c",&strength,&extra)==1&&strength>=0&&strength<=1)graphics.lighting_strength=strength;std::fclose(config);
+    }else if(auto* config=std::fopen("sdmc:/switch/deadspacemobile/lighting.cfg","w")){std::fputs("0.25\n",config);std::fclose(config);}
+    graphics.record("Lighting compatibility strength="+std::to_string(graphics.lighting_strength)+" (1=original exposure)");
+    SDL_AudioSpec desired{};desired.freq=44100;desired.format=AUDIO_S16LSB;desired.channels=2;desired.samples=1024;
+    ds::startup_log("BEGIN: SDL audio device");
+    SDL_AudioSpec actual{};const auto audio=SDL_OpenAudioDevice(nullptr,0,&desired,&actual,0);
+    if(!audio){log+="Audio device unavailable: "+std::string(SDL_GetError())+"\n";ds::startup_log("FAIL: audio device: %s",SDL_GetError());SDL_GL_DeleteContext(context);SDL_DestroyWindow(window);SDL_Quit();return log;}
+    ds::startup_log("END: SDL audio device");
+    graphics.audio_playing=[audio](bool enabled){if(!enabled)SDL_ClearQueuedAudio(audio);SDL_PauseAudioDevice(audio,enabled?0:1);};
+    graphics.audio_write=[audio](const std::vector<int16_t>& pcm)->std::optional<uint32_t>{
+        if(SDL_GetQueuedAudioSize(audio)>44100*4/4)return std::nullopt;
+        if(SDL_QueueAudio(audio,pcm.data(),uint32_t(pcm.size()*2))<0)throw std::runtime_error(SDL_GetError());
+        return uint32_t(pcm.size());
+    };
     graphics.resolve=[](const char* name){return SDL_GL_GetProcAddress(name);};
-    graphics.present=[&]{SDL_GL_SwapWindow(window);SDL_Event event;while(SDL_PollEvent(&event)){};};
-    const std::string hd_root=root==ds::paths::packaged_game_directory?ds::paths::packaged_hd_directory:ds::paths::hd_directory;
-    graphics.hd_texture=[hd_root](const std::string& key){return ds::read_hd_texture(hd_root,key);};
-    log+="Optional HD root: "+hd_root+" (missing files use original textures)\n";
-    log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,8,std::move(graphics));
+    PadState pad;padConfigureInput(1,HidNpadStyleSet_NpadStandard);padInitializeDefault(&pad);hidInitializeTouchScreen();
+    ds::ControllerInput input;
+    graphics.input_mode=[&](bool menu){input.set_menu(menu);};
+    struct Sensors {
+        HidSixAxisSensorHandle handles[4]{};bool active[4]{};ds::GyroInput filter;
+        Sensors(){
+            const Result a=hidGetSixAxisSensorHandles(handles,1,HidNpadIdType_Handheld,HidNpadStyleTag_NpadHandheld);
+            const Result b=hidGetSixAxisSensorHandles(handles+1,1,HidNpadIdType_No1,HidNpadStyleTag_NpadFullKey);
+            const Result c=hidGetSixAxisSensorHandles(handles+2,2,HidNpadIdType_No1,HidNpadStyleTag_NpadJoyDual);
+            for(int i=0;i<4;++i)if(R_SUCCEEDED(i==0?a:i==1?b:c))active[i]=R_SUCCEEDED(hidStartSixAxisSensor(handles[i]));
+            ds::startup_log("Motion sensors: handheld=%u Pro=%u JoyConR=%u",unsigned(active[0]),unsigned(active[1]),unsigned(active[3]));
+        }
+        ~Sensors(){for(int i=0;i<4;++i)if(active[i])hidStopSixAxisSensor(handles[i]);}
+        std::pair<float,float> read(bool handheld,uint32_t style,float dt){
+            const int i=handheld?0:(style&HidNpadStyleTag_NpadJoyDual)?3:1;HidSixAxisSensorState state{};
+            if(!active[i]||hidGetSixAxisSensorStates(handles[i],&state,1)<1)return {0,0};
+            return filter.update(state.acceleration.x,state.acceleration.y,state.acceleration.z,state.angular_velocity.x,state.angular_velocity.y,state.angular_velocity.z,dt);
+        }
+    } sensors;
+    bool motion_was_enabled=false;
+    uint32_t last_tick=SDL_GetTicks();bool touched=false;float touch_x=0,touch_y=0;
+    graphics.poll_input=[&]{
+        using C=ds::ControllerInput;
+        std::vector<ds::GuestInput> events;
+        SDL_Event event;bool quit=!appletMainLoop();while(SDL_PollEvent(&event))if(event.type==SDL_QUIT)quit=true;
+        padUpdate(&pad);const auto buttons=padGetButtons(&pad);uint32_t held=0;
+        const std::pair<uint64_t,uint32_t> map[]={{HidNpadButton_A,C::A},{HidNpadButton_B,C::B},{HidNpadButton_X,C::X},{HidNpadButton_Y,C::Y},{HidNpadButton_L,C::L},{HidNpadButton_R,C::R},{HidNpadButton_ZL,C::ZL},{HidNpadButton_ZR,C::ZR},{HidNpadButton_Plus,C::Plus},{HidNpadButton_Minus,C::Minus},{HidNpadButton_Up,C::Up},{HidNpadButton_Down,C::Down},{HidNpadButton_Left,C::Left},{HidNpadButton_Right,C::Right},{HidNpadButton_StickR,C::RStick},{HidNpadButton_StickL,C::LStick}};
+        for(const auto& binding:map)if(buttons&binding.first)held|=binding.second;
+        const auto left=padGetStickPos(&pad,0),right=padGetStickPos(&pad,1);const uint32_t now=SDL_GetTicks();
+        const float dt=std::clamp((now-last_tick)/1000.0f,.001f,.05f);
+        events=input.update({held,left.x/32767.0f,-left.y/32767.0f,right.x/32767.0f,-right.y/32767.0f,padIsConnected(&pad)},dt);last_tick=now;
+        if(input.motion_enabled()!=motion_was_enabled){motion_was_enabled=input.motion_enabled();ds::startup_log("Motion aiming: %s",motion_was_enabled?"enabled (aim only)":"disabled");}
+        if(input.motion_enabled()&&!input.is_menu()&&(held&C::ZL)){const auto delta=sensors.read(padIsHandheld(&pad),padGetStyleSet(&pad),dt);if(delta.first||delta.second){ds::GuestInput e;e.kind=ds::GuestInput::Kind::look;e.x=delta.first;e.y=delta.second;events.push_back(e);}}
+        HidTouchScreenState touch{};hidGetTouchScreenStates(&touch,1);
+        if(touch.count||touched){ds::GuestInput e;e.kind=ds::GuestInput::Kind::pointer;e.module=1000;e.id=0;e.code=touch.count?(touched?0x4000c:0x6000c):0x8000c;if(touch.count){touch_x=touch.touches[0].x/1280.0f*640;touch_y=touch.touches[0].y/720.0f*480;}e.x=touch_x;e.y=touch_y;events.push_back(e);touched=touch.count!=0;}
+        if(quit){ds::GuestInput e;e.kind=ds::GuestInput::Kind::quit;events.push_back(e);}
+        for(auto& e:events)if(e.kind==ds::GuestInput::Kind::pointer){e.x*=drawable_width/640.0f;e.y*=drawable_height/480.0f;}
+        return events;
+    };
+    uint64_t previous_present=0,frame_ticks=0,present_ticks=0,max_frame_ticks=0;
+    unsigned timing_frames=0;
+    const double performance_frequency=double(SDL_GetPerformanceFrequency());
+    graphics.record("Render optimization: context procedure cache; reusable client staging; timing windows=120 frames");
+    graphics.present=[&]{
+        const uint64_t present_started=SDL_GetPerformanceCounter();
+        if(input.cursor_visible()){
+            const auto resolve=[](const char* name){auto* p=SDL_GL_GetProcAddress(name);if(!p)throw std::runtime_error(std::string("Cursor GL unavailable: ")+name);return p;};
+            auto get_int=reinterpret_cast<void(*)(unsigned,int*)>(resolve("glGetIntegerv"));
+            auto get_float=reinterpret_cast<void(*)(unsigned,float*)>(resolve("glGetFloatv"));
+            auto get_bool=reinterpret_cast<void(*)(unsigned,unsigned char*)>(resolve("glGetBooleanv"));
+            auto is_enabled=reinterpret_cast<unsigned char(*)(unsigned)>(resolve("glIsEnabled"));
+            auto enable=reinterpret_cast<void(*)(unsigned)>(resolve("glEnable"));auto disable=reinterpret_cast<void(*)(unsigned)>(resolve("glDisable"));
+            auto scissor=reinterpret_cast<void(*)(int,int,int,int)>(resolve("glScissor"));auto color=reinterpret_cast<void(*)(float,float,float,float)>(resolve("glClearColor"));
+            auto mask=reinterpret_cast<void(*)(unsigned char,unsigned char,unsigned char,unsigned char)>(resolve("glColorMask"));auto clear=reinterpret_cast<void(*)(unsigned)>(resolve("glClear"));
+            int box[4]{};float saved[4]{};unsigned char channels[4]{};get_int(0x0c10,box);get_float(0x0c22,saved);get_bool(0x0c23,channels);const auto enabled=is_enabled(0x0c11);
+            const int x=int(input.x()*drawable_width/640.0f),y=drawable_height-1-int(input.y()*drawable_height/480.0f);
+            enable(0x0c11);mask(1,1,1,1);color(0,0,0,1);scissor(x-7,y-1,15,3);clear(0x4000);scissor(x-1,y-7,3,15);clear(0x4000);color(1,1,1,1);scissor(x-6,y,13,1);clear(0x4000);scissor(x,y-6,1,13);clear(0x4000);
+            color(saved[0],saved[1],saved[2],saved[3]);mask(channels[0],channels[1],channels[2],channels[3]);scissor(box[0],box[1],box[2],box[3]);if(!enabled)disable(0x0c11);
+        }
+        SDL_GL_SwapWindow(window);
+        const uint64_t finished=SDL_GetPerformanceCounter();
+        if(previous_present){
+            const uint64_t elapsed=finished-previous_present;
+            frame_ticks+=elapsed;present_ticks+=finished-present_started;
+            if(elapsed>max_frame_ticks)max_frame_ticks=elapsed;
+            if(++timing_frames==120){
+                char timing[192];std::snprintf(timing,sizeof(timing),"Frame timing (120): mean_ms=%.2f max_ms=%.2f present_mean_ms=%.2f",frame_ticks*1000.0/performance_frequency/120,max_frame_ticks*1000.0/performance_frequency,present_ticks*1000.0/performance_frequency/120);
+                graphics.record(timing);frame_ticks=present_ticks=max_frame_ticks=0;timing_frames=0;
+            }
+        }
+        previous_present=finished;
+    };
+    graphics.record("HD replacements: disabled; original textures only");
+    log+=lifecycle_probe(root+"/lib/armeabi/libEAMGameDeadSpace.so",root,frames,std::move(graphics));
     auto get_error=reinterpret_cast<unsigned(*)()>(SDL_GL_GetProcAddress("glGetError"));
     if(get_error){char text[80];std::snprintf(text,sizeof(text),"Native context GL error after probe: 0x%x\n",get_error());log+=text;}
-    SDL_GL_DeleteContext(context);SDL_DestroyWindow(window);SDL_Quit();return log;
+    SDL_CloseAudioDevice(audio);SDL_GL_DeleteContext(context);SDL_DestroyWindow(window);SDL_Quit();return log;
 }
 #else
-std::string game_graphics_probe(const std::string&) {return "Native game graphics requires the CPU build.\n";}
+std::string game_graphics_probe(const std::string&,unsigned) {return "Native game graphics requires the CPU build.\n";}
 #endif

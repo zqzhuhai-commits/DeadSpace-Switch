@@ -143,4 +143,7 @@ bool GuestImage::write(uint32_t address,const void* in,size_t length) {
 bool GuestImage::executable(uint32_t address,size_t length) const {
     return image_range(segments,memory.size(),address,length,1).has_value();
 }
+bool GuestImage::writable(uint32_t address,size_t length) const {
+    return image_range(segments,memory.size(),address,length,2).has_value();
+}
 }

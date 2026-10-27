@@ -131,8 +131,8 @@ int main() {
         check(r.values==std::vector<uint64_t>{0x3fc00000},"jvalue float incorrectly promoted");
         reject([&]{r.method(recv,"echo","([BII");});
         reject([&]{r.method(recv,"echo","([V)V");});
-        char pattern[]="/tmp/deadspacemobile-jni-XXXXXX";
-        char* dir=mkdtemp(pattern);check(dir!=nullptr,"mkdtemp failed");
+        const auto pattern_name=(std::filesystem::temp_directory_path()/"deadspacemobile-jni-XXXXXX").string();std::vector<char> pattern(pattern_name.begin(),pattern_name.end());pattern.push_back(0);
+        char* dir=mkdtemp(pattern.data());check(dir!=nullptr,"mkdtemp failed");
         struct Cleanup {std::filesystem::path p;~Cleanup(){std::filesystem::remove_all(p);}} cleanup{dir};
         r.root=dir;std::filesystem::create_directories(r.root+"/assets/nested");
         std::ofstream(r.root+"/assets/b.bin",std::ios::binary)<<"abcdef";

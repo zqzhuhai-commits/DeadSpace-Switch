@@ -10,6 +10,7 @@ from collections import Counter
 import ctypes
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import struct
@@ -30,7 +31,7 @@ class BootProbe:
         if hashlib.sha1(self.raw).hexdigest() != EXPECTED:
             raise ValueError("Unsupported game library")
         self.data_root = Path(data_root).resolve()
-        self.libm = ctypes.CDLL("libm.so.6")
+        self.libm = ctypes.CDLL("ucrtbase.dll" if os.name == "nt" else "libm.so.6")
         self.sandbox = tempfile.TemporaryDirectory(prefix="deadspacemobile-boot-")
         self.save_root = Path(self.sandbox.name)
         self.files = {}
@@ -64,7 +65,7 @@ class BootProbe:
         self.stage = "load"
         self.error = None
         self.load()
-        header = (Path(__file__).parents[2] / "jni/jni.h").read_text()
+        header = (Path(__file__).parents[2] / "jni/jni.h").read_text(encoding="utf-8")
         body = header.split("struct JNINativeInterface {")[1].split("};")[0]
         names = ["reserved0", "reserved1", "reserved2", "reserved3"] + re.findall(r"\(\*(\w+)\)\s*\(", body)
         self.jni_table = self.alloc(len(names) * 4)
@@ -254,7 +255,7 @@ class BootProbe:
                 self.put32(self.errno, e.errno)
                 return -1
             raw = bytearray(104)
-            for offset, fmt, value in [(0,"Q",st.st_dev),(12,"I",st.st_ino & 0xffffffff),(16,"I",st.st_mode),(20,"I",st.st_nlink),(24,"I",st.st_uid),(28,"I",st.st_gid),(32,"Q",st.st_rdev),(48,"q",st.st_size),(56,"I",st.st_blksize),(64,"Q",st.st_blocks),(96,"Q",st.st_ino)]:
+            for offset, fmt, value in [(0,"Q",st.st_dev),(12,"I",st.st_ino & 0xffffffff),(16,"I",st.st_mode),(20,"I",st.st_nlink),(24,"I",st.st_uid),(28,"I",st.st_gid),(32,"Q",st.st_rdev),(48,"q",st.st_size),(56,"I",getattr(st, "st_blksize", 4096)),(64,"Q",getattr(st, "st_blocks", (st.st_size + 511) // 512)),(96,"Q",st.st_ino)]:
                 struct.pack_into("<" + fmt, raw, offset, value)
             for offset, value in [(72,st.st_atime_ns),(80,st.st_mtime_ns),(88,st.st_ctime_ns)]:
                 struct.pack_into("<II", raw, offset, (value // 10**9) & 0xffffffff, value % 10**9)
@@ -438,7 +439,7 @@ class BootProbe:
                 if cls == "com/ea/EAIO/EAIO" and method == "Startup":
                     return ("forward", self.symbols["Java_com_ea_EAIO_EAIO_Startup"], [self.env, 0, values[0]])
                 if cls == "com/ea/blast/SystemAndroidDelegate":
-                    props = dict(re.findall(r'X\((\w+),\s*"([^"]*)"\)', (Path(__file__).parents[2] / "jni/classes/ea_SystemAndroidDelegate.h").read_text()))
+                    props = dict(re.findall(r'X\((\w+),\s*"([^"]*)"\)', (Path(__file__).parents[2] / "jni/classes/ea_SystemAndroidDelegate.h").read_text(encoding="utf-8")))
                     props["GetDeviceModel"] = "Host ARM32 boot probe"
                     if method in props:
                         return self.java_string(props[method])

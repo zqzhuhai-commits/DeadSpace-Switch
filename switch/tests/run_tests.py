@@ -49,6 +49,15 @@ def run(native_gl=False):
                         str(ROOT.parent / "src/atc_decompress.cpp"), str(ROOT.parent / "third_party/powervr/PVRTDecompress.cpp"),
                         str(ROOT / "tests/hd_texture_test.cpp"), "-o", str(hd_exe)], check=True)
         subprocess.run([str(hd_exe)], check=True)
+        for kind in ['files','storage','arena','input']:
+            executable=work/(kind+'-test')
+            source=ROOT/'tests'/('controller_input_test.cpp' if kind=='input' else 'guest_'+kind+'_test.cpp')
+            subprocess.run(['g++','-std=c++17','-O1','-g','-Wall','-Wextra','-Werror',
+                            '-fsanitize=address,undefined','-fno-omit-frame-pointer',
+                            '-I'+str(ROOT/'runtime'),str(source),'-o',str(executable)],check=True)
+            arguments=[str(executable)]
+            if kind in ['files','storage']:arguments.append(str(work/(kind+'-data')))
+            subprocess.run(arguments,check=True)
         if native_gl:
             gl_exe = work / "native-gl-test"
             subprocess.run(["g++", "-std=c++17", "-O1", "-g", "-Wall", "-Wextra", "-Werror",

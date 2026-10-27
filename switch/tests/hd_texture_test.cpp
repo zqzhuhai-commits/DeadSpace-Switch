@@ -33,7 +33,7 @@ int main(){
         reject([&]{auto bad=input;put(bad,52,6);ds::HdTexture::parse(bad);});
         reject([&]{ds::read_hd_texture("/nonexistent","../escape");});
         require(ds::read_hd_texture("/nonexistent","0123456789abcdef").empty(),"Missing texture not distinguishable");
-        char pattern[]="/tmp/deadspacemobile-hd-XXXXXX";char* directory=mkdtemp(pattern);require(directory!=nullptr,"Temporary directory failed");
+        const auto pattern_name=(std::filesystem::temp_directory_path()/"deadspacemobile-hd-XXXXXX").string();std::vector<char> pattern(pattern_name.begin(),pattern_name.end());pattern.push_back(0);char* directory=mkdtemp(pattern.data());require(directory!=nullptr,"Temporary directory failed");
         struct Cleanup {std::filesystem::path path;~Cleanup(){std::filesystem::remove_all(path);}} cleanup{directory};
         const auto filename=std::string(directory)+"/0123456789abcdef.ktx";
         {std::ofstream file(filename,std::ios::binary);file.write(reinterpret_cast<const char*>(input.data()),input.size());}

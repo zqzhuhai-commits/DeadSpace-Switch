@@ -103,14 +103,20 @@ std::optional<uint64_t> GuestJni::asset_delegate(uint32_t receiver,const MethodK
         if(std::fseek(file.get(),0,SEEK_END)!=0)return raise_exception("java/io/IOException","Asset seek failed");
         const long size=std::ftell(file.get());
         if(size<0 || uint64_t(size)>64*1024*1024 || std::fseek(file.get(),0,SEEK_SET)!=0)return raise_exception("java/io/IOException","Asset size/seek bound");
-        std::vector<uint8_t> bytes(static_cast<size_t>(size));
-        if(!bytes.empty() && std::fread(bytes.data(),1,bytes.size(),file.get())!=bytes.size())return raise_exception("java/io/IOException","Asset read failed");
-        const auto ref=alloc(4);objects[ref].cls=m.name=="open"?"java/io/InputStream":"android/content/res/AssetFileDescriptor";objects[ref].bytes=std::move(bytes);++asset_opens;if(++open_log<=40){FILE*fl=std::fopen("/tmp/open_log.txt","a");if(fl){std::fprintf(fl,"%s %s size=%ld\n",m.name.c_str(),name.c_str(),size);std::fclose(fl);}}return ref;
+        // The engine enumerates the tree with openFd()+getLength(). Android
+        // does not read each asset into RAM merely to return its length.
+        std::vector<uint8_t> bytes;
+        if(m.name=="open"){
+            bytes.resize(static_cast<size_t>(size));
+            if(!bytes.empty() && std::fread(bytes.data(),1,bytes.size(),file.get())!=bytes.size())return raise_exception("java/io/IOException","Asset read failed");
+        }
+        const auto ref=alloc(4);objects[ref].cls=m.name=="open"?"java/io/InputStream":"android/content/res/AssetFileDescriptor";objects[ref].length=uint32_t(size);objects[ref].bytes=std::move(bytes);asset_paths.insert(name);++asset_opens;return ref;
     }
     if(o.cls!="java/io/InputStream" && o.cls!="android/content/res/AssetFileDescriptor")return std::nullopt;
-    if(m.name=="close"){o.closed=true;return 0;}
+    if(m.name=="close"){o.closed=true;std::vector<uint8_t>().swap(o.bytes);return 0;}
     if(o.closed)return raise_exception("java/io/IOException","Asset stream is closed");
-    if(m.name=="getLength")return o.bytes.size();
+    if(m.name=="getLength")return o.length;
+    if(o.cls=="android/content/res/AssetFileDescriptor")return std::nullopt;
     if(m.name=="available")return o.bytes.size()-o.position;
     if(m.name=="skip") {
         const int64_t requested=int64_t(values.at(0));
@@ -128,7 +134,7 @@ std::optional<uint64_t> GuestJni::asset_delegate(uint32_t receiver,const MethodK
         if(off>array.length || count>array.length-off)return raise_exception("java/lang/IndexOutOfBoundsException","Asset read outside array");
         if(!count)return 0; // zero-sized read also returns zero at EOF
         const uint32_t n=uint32_t(std::min<uint64_t>(count,o.bytes.size()-o.position));
-        for(uint32_t i=0;i<n;++i)MemoryWrite8(array.elements.at(0)+off+i,o.bytes[o.position+i]);
+        MemoryWriteBlock(array.elements.at(0)+off,o.bytes.data()+o.position,n);
         o.position+=n;asset_read_bytes+=n;return n?n:uint32_t(-1);
     }
     return std::nullopt;
