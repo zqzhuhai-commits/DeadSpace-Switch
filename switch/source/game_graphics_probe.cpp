@@ -4,6 +4,7 @@
 #include "app_paths.hpp"
 #include "startup_log.hpp"
 #include "runtime_settings.hpp"
+#include "frame_timing.hpp"
 #include "hd_texture.hpp"
 #include <SDL2/SDL.h>
 #include <cstdio>
@@ -114,9 +115,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         for(auto& e:events)if(e.kind==ds::GuestInput::Kind::pointer){e.x*=drawable_width/640.0f;e.y*=drawable_height/480.0f;}
         return events;
     };
-    uint64_t previous_present=0,frame_ticks=0,present_ticks=0,max_frame_ticks=0;
-    unsigned timing_frames=0;
-    const double performance_frequency=double(SDL_GetPerformanceFrequency());
+    ds::FrameTiming frame_timing(double(SDL_GetPerformanceFrequency()),graphics.record);
     graphics.record("Render optimization: context procedure cache; reusable client staging; timing windows=120 frames");
     graphics.present=[&]{
         const uint64_t present_started=SDL_GetPerformanceCounter();
@@ -136,16 +135,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         }
         SDL_GL_SwapWindow(window);
         const uint64_t finished=SDL_GetPerformanceCounter();
-        if(previous_present){
-            const uint64_t elapsed=finished-previous_present;
-            frame_ticks+=elapsed;present_ticks+=finished-present_started;
-            if(elapsed>max_frame_ticks)max_frame_ticks=elapsed;
-            if(++timing_frames==120){
-                char timing[192];std::snprintf(timing,sizeof(timing),"Frame timing (120): mean_ms=%.2f max_ms=%.2f present_mean_ms=%.2f",frame_ticks*1000.0/performance_frequency/120,max_frame_ticks*1000.0/performance_frequency,present_ticks*1000.0/performance_frequency/120);
-                graphics.record(timing);frame_ticks=present_ticks=max_frame_ticks=0;timing_frames=0;
-            }
-        }
-        previous_present=finished;
+        frame_timing.complete(present_started,finished);
     };
     graphics.record(std::string("Mipmap compatibility: ")+(settings.base_mip_only?"enabled":"disabled"));
     if(settings.hd_enabled){

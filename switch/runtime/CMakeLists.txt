@@ -16,6 +16,8 @@ add_library(ds_cpu_probe STATIC hd_texture.cpp ../../third_party/powervr/PVRTDec
 target_include_directories(ds_cpu_probe PUBLIC . ../include)
 target_link_libraries(ds_cpu_probe PUBLIC dynarmic)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
+  add_executable(ds-frame-timing-test ../tests/frame_timing_test.cpp)
+  target_include_directories(ds-frame-timing-test PRIVATE . ../include)
   add_executable(ds-runtime-settings-test ../tests/runtime_settings_test.cpp)
   target_include_directories(ds-runtime-settings-test PRIVATE ../include)
   add_executable(ds-mip-isolation-test ../tests/mip_isolation_test.cpp)
@@ -66,3 +68,4 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
   add_executable(ds-loader-test ../tests/runtime_loader_test.cpp)
   target_link_libraries(ds-loader-test PRIVATE ds_cpu_probe)
 endif()
+
