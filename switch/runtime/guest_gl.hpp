@@ -45,6 +45,9 @@ class GuestGl {
     using U=uint32_t;using I=int32_t;using F=float;using B=uint8_t;
     GraphicsBackend backend;
     GlGuestMemory memory;
+    // Entries belong to this context and die with it; never cache across contexts.
+    std::map<std::string,void*> procedures;
+    std::vector<uint8_t> index_staging;
     U array_buffer=0,element_buffer=0,client_unit=0,unpack=4,pack=4,client_indices=0;
     struct Array {U size=0,type=0,stride=0,pointer=0,buffer=0,upload_buffer=0;bool enabled=false;std::vector<uint8_t> staging;};
     std::map<U,Array> arrays;
@@ -68,6 +71,7 @@ class GuestGl {
     U arg(unsigned n) const {return memory.arg(n);}
     F number(unsigned n) const;
     std::vector<uint8_t> copy(U pointer,size_t length);
+    void copy_into(U pointer,size_t length,std::vector<uint8_t>& bytes);
     static size_t checked(uint64_t length);
     static U components(U pname);
     static U type_size(U type);

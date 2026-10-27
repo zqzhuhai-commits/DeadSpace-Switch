@@ -10,17 +10,23 @@ constexpr uint32_t vertex=0x8074,normal=0x8075,color=0x8076,texcoord=0x8078;
 bool one_of(const std::string& n,std::initializer_list<const char*> names){for(const auto* s:names)if(n==s)return true;return false;}
 }
 void* GuestGl::proc(const std::string& raw) {
+    const auto cached=procedures.find(raw);
+    if(cached!=procedures.end())return cached->second;
     std::string name=raw;
     if(backend.desktop_compatibility && one_of(name,{"glBindFramebufferOES","glBindRenderbufferOES","glGenFramebuffersOES","glGenRenderbuffersOES","glDeleteFramebuffersOES","glDeleteRenderbuffersOES","glCheckFramebufferStatusOES","glFramebufferTexture2DOES","glFramebufferRenderbufferOES","glRenderbufferStorageOES","glGenerateMipmapOES","glBlendEquationOES","glBlendEquationSeparateOES","glBlendFuncSeparateOES"}))name.resize(name.size()-3);
     auto* p=backend.resolve?backend.resolve(name.c_str()):nullptr;
     if(!p)throw std::runtime_error("Native GL entry unavailable: "+name);
+    procedures.emplace(raw,p);
     return p;
 }
 GuestGl::F GuestGl::number(unsigned n) const {const auto bits=arg(n);F f;std::memcpy(&f,&bits,4);return f;}
 size_t GuestGl::checked(uint64_t n){if(n>64*1024*1024)throw std::runtime_error("GL transfer exceeds 64 MiB bound");return size_t(n);}
 std::vector<uint8_t> GuestGl::copy(U p,size_t n) {
+    std::vector<uint8_t> bytes;copy_into(p,n,bytes);return bytes;
+}
+void GuestGl::copy_into(U p,size_t n,std::vector<uint8_t>& bytes) {
     checked(n);if(n&&(!p || uint64_t(p)+n>0x100000000ull))throw std::runtime_error("Invalid GL guest range");
-    std::vector<uint8_t> bytes(n);if(n)memory.read(p,bytes.data(),n);return bytes;
+    bytes.resize(n);if(n)memory.read(p,bytes.data(),n);
 }
 GuestGl::U GuestGl::type_size(U type) {
     if(type==0x1400||type==0x1401)return 1;
@@ -80,7 +86,7 @@ void GuestGl::prepare_arrays(U last) {
             if(it==buffers.end() || uint64_t(a.pointer)+length>it->second.size())throw std::runtime_error("GL vertex buffer range exceeded");
             data=reinterpret_cast<const void*>(uintptr_t(a.pointer)); // native GL buffer OFFSET, never host address
         } else {
-            a.staging=copy(a.pointer,length);data=a.staging.data();
+            copy_into(a.pointer,length,a.staging);data=a.staging.data();
             if(backend.gpu_client_arrays){
                 if(!a.upload_buffer)fn<void(*)(I,U*)>("glGenBuffers")(1,&a.upload_buffer);
                 if(!a.upload_buffer)throw std::runtime_error("Client vertex buffer allocation failed");
@@ -320,10 +326,10 @@ GuestGl::U GuestGl::call(const std::string& name) {
     }
     if(name=="glDrawElements") {
         if(b>1000000 || (c!=0x1401&&c!=0x1403))throw std::runtime_error("GL index count/type bound");
-        const size_t n=checked(uint64_t(b)*type_size(c));std::vector<uint8_t> indices;
+        const size_t n=checked(uint64_t(b)*type_size(c));auto& indices=index_staging;
         const void* data;
         if(element_buffer){if(b&&!index_contents_known.at(element_buffer))throw std::runtime_error("GL index buffer contents are uninitialized");const auto& shadow=buffers.at(element_buffer);if(uint64_t(d)+n>shadow.size())throw std::runtime_error("GL index buffer range exceeded");indices.assign(shadow.begin()+d,shadow.begin()+d+n);data=reinterpret_cast<const void*>(uintptr_t(d));}
-        else {indices=copy(d,n);data=indices.data();}
+        else {copy_into(d,n,indices);data=indices.data();}
         U last=0;for(U i=0;i<b;++i){const U value=c==0x1401?indices[i]:U(indices[2*i])|U(indices[2*i+1])<<8;last=std::max(last,value);}
         if(b)prepare_arrays(last);
         const bool upload=backend.gpu_client_arrays&&!element_buffer&&b;
