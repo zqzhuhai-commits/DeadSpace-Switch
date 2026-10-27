@@ -10,17 +10,23 @@ constexpr uint32_t vertex=0x8074,normal=0x8075,color=0x8076,texcoord=0x8078;
 bool one_of(const std::string& n,std::initializer_list<const char*> names){for(const auto* s:names)if(n==s)return true;return false;}
 }
 void* GuestGl::proc(const std::string& raw) {
+    const auto cached=procedures.find(raw);
+    if(cached!=procedures.end())return cached->second;
     std::string name=raw;
     if(backend.desktop_compatibility && one_of(name,{"glBindFramebufferOES","glBindRenderbufferOES","glGenFramebuffersOES","glGenRenderbuffersOES","glDeleteFramebuffersOES","glDeleteRenderbuffersOES","glCheckFramebufferStatusOES","glFramebufferTexture2DOES","glFramebufferRenderbufferOES","glRenderbufferStorageOES","glGenerateMipmapOES","glBlendEquationOES","glBlendEquationSeparateOES","glBlendFuncSeparateOES"}))name.resize(name.size()-3);
     auto* p=backend.resolve?backend.resolve(name.c_str()):nullptr;
     if(!p)throw std::runtime_error("Native GL entry unavailable: "+name);
+    procedures.emplace(raw,p);
     return p;
 }
 GuestGl::F GuestGl::number(unsigned n) const {const auto bits=arg(n);F f;std::memcpy(&f,&bits,4);return f;}
 size_t GuestGl::checked(uint64_t n){if(n>64*1024*1024)throw std::runtime_error("GL transfer exceeds 64 MiB bound");return size_t(n);}
 std::vector<uint8_t> GuestGl::copy(U p,size_t n) {
+    std::vector<uint8_t> bytes;copy_into(p,n,bytes);return bytes;
+}
+void GuestGl::copy_into(U p,size_t n,std::vector<uint8_t>& bytes) {
     checked(n);if(n&&(!p || uint64_t(p)+n>0x100000000ull))throw std::runtime_error("Invalid GL guest range");
-    std::vector<uint8_t> bytes(n);if(n)memory.read(p,bytes.data(),n);return bytes;
+    bytes.resize(n);if(n)memory.read(p,bytes.data(),n);
 }
 GuestGl::U GuestGl::type_size(U type) {
     if(type==0x1400||type==0x1401)return 1;
@@ -80,7 +86,7 @@ void GuestGl::prepare_arrays(U last) {
             if(it==buffers.end() || uint64_t(a.pointer)+length>it->second.size())throw std::runtime_error("GL vertex buffer range exceeded");
             data=reinterpret_cast<const void*>(uintptr_t(a.pointer)); // native GL buffer OFFSET, never host address
         } else {
-            a.staging=copy(a.pointer,length);data=a.staging.data();
+            copy_into(a.pointer,length,a.staging);data=a.staging.data();
             if(backend.gpu_client_arrays){
                 if(!a.upload_buffer)fn<void(*)(I,U*)>("glGenBuffers")(1,&a.upload_buffer);
                 if(!a.upload_buffer)throw std::runtime_error("Client vertex buffer allocation failed");
@@ -222,7 +228,12 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
                 const auto binding=texture_bindings.find(unit);
                 if(binding==texture_bindings.end()||!binding->second)continue;
                 fn<void(*)(U)>("glActiveTexture")(0x84c0+unit);
-                I filter=0;fn<void(*)(U,U,I*)>("glGetTexParameteriv")(0x0de1,0x2801,&filter);
+                auto known=min_filters.find(binding->second);
+                if(known==min_filters.end()){
+                    I actual=0;fn<void(*)(U,U,I*)>("glGetTexParameteriv")(0x0de1,0x2801,&actual);
+                    known=min_filters.emplace(binding->second,actual).first;
+                }
+                const I filter=known->second;
                 // Only override mipmapped filters; preserve nearest/linear filters.
                 if(filter>=0x2700&&filter<=0x2703){
                     mip_filters.emplace_back(unit,U(filter));
@@ -244,7 +255,9 @@ void GuestGl::draw_textured(const std::function<void()>& draw) {
         restore_color();restore_mips();restore();
     } catch(...){restore_mips();restore();throw;}
 }
+
 GuestGl::U GuestGl::call(const std::string& name) {
+    if(name.rfind("glTexParameter",0)==0)min_filters.erase(texture_bindings[active_unit]);
     if(backend.hd_texture&&name.rfind("glTexParameter",0)==0)hd_parameters_dirty.insert(texture_bindings[active_unit]);
     ++calls;const U a=arg(0),b=arg(1),c=arg(2),d=arg(3);
     const auto fixed=[&](unsigned n){return F(I(arg(n)))/65536.0f;};
@@ -261,8 +274,7 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(name=="glDepthRangex"){if(backend.desktop_compatibility)fn<void(*)(double,double)>("glDepthRange")(fixed(0),fixed(1));else fn<void(*)(F,F)>("glDepthRangef")(fixed(0),fixed(1));return 0;}
     if(name=="glOrthox"||name=="glFrustumx"){
         if(backend.desktop_compatibility)fn<void(*)(double,double,double,double,double,double)>(name=="glOrthox"?"glOrtho":"glFrustum")(fixed(0),fixed(1),fixed(2),fixed(3),fixed(4),fixed(5));
-        else fn<void(*)(F,F,F,F,F,F)>(name=="glOrthox"?"glOrthof":"glFrustumf")(fixed(0),fixed(1),fixed(2),fixed(3),fixed(4),fixed(5));
-        return 0;
+        else fn<void(*)(F,F,F,F,F,F)>(name=="glOrthox"?"glOrthof":"glFrustumf")(fixed(0),fixed(1),fixed(2),fixed(3),fixed(4),fixed(5));return 0;
     }
     if(name=="glLoadMatrixx"||name=="glMultMatrixx"){
         I source[16];F matrix[16];memory.read(a,source,sizeof(source));for(unsigned i=0;i<16;++i)matrix[i]=F(source[i])/65536.0f;
@@ -321,7 +333,7 @@ GuestGl::U GuestGl::call(const std::string& name) {
     if(one_of(name,{"glGenTextures","glGenBuffers","glGenFramebuffersOES","glGenRenderbuffersOES","glDeleteTextures","glDeleteBuffers","glDeleteFramebuffersOES","glDeleteRenderbuffersOES"})) {
         if(a>65536 || (a&&!b))throw std::runtime_error("GL object list bound");
         std::vector<U> v(a);
-        if(name.rfind("glDelete",0)==0){if(a)memory.read(b,v.data(),a*4);if(name=="glDeleteTextures")for(U id:v){invalidate_hd(id);dynamic_textures.erase(id);for(auto& binding:texture_bindings)if(binding.second==id)binding.second=0;}fn<void(*)(I,const U*)>(name)(I(a),v.data());if(name=="glDeleteBuffers")for(U id:v){buffers.erase(id);index_contents_known.erase(id);if(array_buffer==id)array_buffer=0;if(element_buffer==id)element_buffer=0;for(auto& entry:arrays)if(entry.second.buffer==id){entry.second.pointer=0;entry.second.buffer=0;}}}
+        if(name.rfind("glDelete",0)==0){if(a)memory.read(b,v.data(),a*4);if(name=="glDeleteTextures")for(U id:v){min_filters.erase(id);invalidate_hd(id);dynamic_textures.erase(id);for(auto& binding:texture_bindings)if(binding.second==id)binding.second=0;}fn<void(*)(I,const U*)>(name)(I(a),v.data());if(name=="glDeleteBuffers")for(U id:v){buffers.erase(id);index_contents_known.erase(id);if(array_buffer==id)array_buffer=0;if(element_buffer==id)element_buffer=0;for(auto& entry:arrays)if(entry.second.buffer==id){entry.second.pointer=0;entry.second.buffer=0;}}}
         else {fn<void(*)(I,U*)>(name)(I(a),v.data());if(a)memory.write(b,v.data(),a*4);}
         return 0;
     }
@@ -357,10 +369,10 @@ GuestGl::U GuestGl::call(const std::string& name) {
     }
     if(name=="glDrawElements") {
         if(b>1000000 || (c!=0x1401&&c!=0x1403))throw std::runtime_error("GL index count/type bound");
-        const size_t n=checked(uint64_t(b)*type_size(c));std::vector<uint8_t> indices;
+        const size_t n=checked(uint64_t(b)*type_size(c));auto& indices=index_staging;
         const void* data;
         if(element_buffer){if(b&&!index_contents_known.at(element_buffer))throw std::runtime_error("GL index buffer contents are uninitialized");const auto& shadow=buffers.at(element_buffer);if(uint64_t(d)+n>shadow.size())throw std::runtime_error("GL index buffer range exceeded");indices.assign(shadow.begin()+d,shadow.begin()+d+n);data=reinterpret_cast<const void*>(uintptr_t(d));}
-        else {indices=copy(d,n);data=indices.data();}
+        else {copy_into(d,n,indices);data=indices.data();}
         U last=0;for(U i=0;i<b;++i){const U value=c==0x1401?indices[i]:U(indices[2*i])|U(indices[2*i+1])<<8;last=std::max(last,value);}
         if(b)prepare_arrays(last);
         const bool upload=backend.gpu_client_arrays&&!element_buffer&&b;

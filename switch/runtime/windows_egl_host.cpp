@@ -68,7 +68,8 @@ static Context* egl_context=nullptr;
 #define EGL_GL(name) reinterpret_cast<decltype(&::name)>(egl_context->proc(#name))
 static void check_fixed_bridge(Context& context,bool gpu_arrays){
     std::array<uint32_t,12> args{};std::vector<uint8_t> memory(4096);
-    ds::GraphicsBackend backend;backend.desktop_compatibility=false;backend.resolve=[&](const char* name){return context.proc(name);};backend.lighting_strength=.25f;backend.gpu_client_arrays=gpu_arrays;
+    std::map<std::string,unsigned> resolutions;
+    ds::GraphicsBackend backend;backend.desktop_compatibility=false;backend.resolve=[&](const char* name){++resolutions[name];return context.proc(name);};backend.lighting_strength=.25f;backend.gpu_client_arrays=gpu_arrays;
     ds::GuestGl bridge(backend,{
         [&](unsigned n){return args.at(n);},[&](uint32_t){return 2048u;},
         [&](uint32_t p,void* out,size_t n){if(uint64_t(p)+n>memory.size())throw std::runtime_error("Test read bound");std::memcpy(out,memory.data()+p,n);},
@@ -109,6 +110,11 @@ static void check_fixed_bridge(Context& context,bool gpu_arrays){
 
     const uint16_t triangle_indices[]={0,1,2};std::memcpy(memory.data()+512,triangle_indices,sizeof(triangle_indices));
     clear_sample();call("glDrawElements",{GL_TRIANGLES,3,GL_UNSIGNED_SHORT,512});sample(102);
+    // Same guest address, new contents: retained capacity must never mean stale data.
+    std::memset(memory.data()+512,0,sizeof(triangle_indices));
+    clear_sample();call("glDrawElements",{GL_TRIANGLES,3,GL_UNSIGNED_SHORT,512});sample(51);
+    std::memcpy(memory.data()+512,triangle_indices,sizeof(triangle_indices));
+    clear_sample();call("glDrawElements",{GL_TRIANGLES,3,GL_UNSIGNED_SHORT,512});sample(102);
     GLint array_binding=0,index_binding=0;EGL_GL(glGetIntegerv)(0x8894,&array_binding);EGL_GL(glGetIntegerv)(0x8895,&index_binding);
     if(array_binding||index_binding)throw std::runtime_error("Internal upload buffer leaked into guest bindings");
     call("glGenBuffers",{1,768});uint32_t guest_vertex=0;std::memcpy(&guest_vertex,memory.data()+768,4);
@@ -126,6 +132,8 @@ static void check_fixed_bridge(Context& context,bool gpu_arrays){
     call("glActiveTexture",{0x84c0});call("glDisable",{GL_BLEND});call("glDisable",{GL_DEPTH_TEST});call("glDisableClientState",{GL_VERTEX_ARRAY});call("glColor4f",{0x3f800000,0x3f800000,0x3f800000,0x3f800000});call("glDepthFunc",{GL_LESS});call("glBlendFunc",{GL_ONE,GL_ZERO});
     if(EGL_GL(glGetError)()!=GL_NO_ERROR)throw std::runtime_error("Lighting compatibility GL error");EGL_GL(glClearColor)(0,0,0,1);EGL_GL(glClear)(GL_COLOR_BUFFER_BIT);
     std::cout<<"PASS: real GL lighting gain pixel, color/active-unit restoration, alpha-fade/textured/depth-tested bypass\n";
+    for(const auto& entry:resolutions)if(entry.second!=1)throw std::runtime_error("GL procedure resolved more than once in a context");
+    std::cout<<"PASS: per-context procedure cache and changed client-index contents; GPU arrays="<<gpu_arrays<<"\n";
 
 }
 int main(int argc,char** argv){
@@ -137,10 +145,12 @@ int main(int argc,char** argv){
         if(const auto* strength=std::getenv("DS_LIGHTING_STRENGTH")){char* end=nullptr;const float v=std::strtof(strength,&end);if(end==strength||*end||!(v>=0&&v<=1))throw std::runtime_error("Invalid lighting strength");backend.lighting_strength=v;}
         std::cout<<"Host lighting strength="<<backend.lighting_strength<<"\n";
         backend.gpu_client_arrays=std::getenv("DS_GPU_CLIENT_ARRAYS")&&std::string(std::getenv("DS_GPU_CLIENT_ARRAYS"))=="1";
+        backend.base_mip_only=std::getenv("DS_BASE_MIP_ONLY")&&std::string(std::getenv("DS_BASE_MIP_ONLY"))=="1";
+        std::cout<<"Host base mip compatibility="<<backend.base_mip_only<<"\n";
         std::cout<<"Host GPU client arrays="<<backend.gpu_client_arrays<<"\n";
         const auto host_started=std::chrono::steady_clock::now();
         backend.record=[&](const std::string& text){if(text.rfind("Game frame returned: ",0)==0||text.rfind("INPUT:",0)==0)std::cerr<<"HOST elapsed ms="<<std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-host_started).count()<<'\n';std::cerr<<text<<'\n';};
-        if(argc>6&&std::string(argv[6]).rfind("--hd=",0)==0){const auto hd=std::string(argv[6]).substr(5);backend.hd_budget_bytes=192*1024*1024;backend.hd_texture=[hd](const std::string& key){return ds::read_hd_texture(hd,key);};}
+        if(argc>6&&std::string(argv[6]).rfind("--hd=",0)==0){const auto hd=std::string(argv[6]).substr(5);backend.hd_budget_bytes=128*1024*1024;backend.hd_texture=[hd](const std::string& key){return ds::read_hd_texture(hd,key);};}
         uint64_t loading_callbacks=0;bool startup_done=false;
         backend.loading=[&](const std::string&,uint64_t,uint64_t){++loading_callbacks;};
         backend.startup_complete=[&]{if(!startup_done){startup_done=true;std::cerr<<"Native player HUD available\n";}};

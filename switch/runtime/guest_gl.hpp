@@ -33,8 +33,8 @@ struct GraphicsBackend {
     std::function<std::vector<GuestInput>()> poll_input;
     std::function<void(bool)> input_mode;
     std::function<void(const std::string&)> record;
-    bool base_mip_only=false; // Compatibility selected by the production launcher
-    unsigned render_test_mode=0; // 0 baseline, 1 omit blended draws, 2 synchronize draws, 3 base mip only
+    bool base_mip_only=false;
+    unsigned render_test_mode=0;
 };
 struct GlGuestMemory {
     std::function<uint32_t(unsigned)> arg;
@@ -47,6 +47,9 @@ class GuestGl {
     using U=uint32_t;using I=int32_t;using F=float;using B=uint8_t;
     GraphicsBackend backend;
     GlGuestMemory memory;
+    // Entries belong to this context and die with it; never cache across contexts.
+    std::map<std::string,void*> procedures;
+    std::vector<uint8_t> index_staging;
     U array_buffer=0,element_buffer=0,client_unit=0,unpack=4,pack=4,client_indices=0;
     struct Array {U size=0,type=0,stride=0,pointer=0,buffer=0,upload_buffer=0;bool enabled=false;std::vector<uint8_t> staging;};
     std::map<U,Array> arrays;
@@ -58,6 +61,8 @@ class GuestGl {
     U blend_source=1,blend_destination=0;
     std::set<U> textured_units;
     std::map<U,U> texture_bindings;
+    // Guest setters/deletion invalidate this lazily queried filter state.
+    std::map<U,I> min_filters;
     struct Replacement {U shadow,width,height;uint64_t bytes;std::string key;};
     std::map<U,Replacement> replacements;
     std::set<U> hd_parameters_dirty;
@@ -70,6 +75,7 @@ class GuestGl {
     U arg(unsigned n) const {return memory.arg(n);}
     F number(unsigned n) const;
     std::vector<uint8_t> copy(U pointer,size_t length);
+    void copy_into(U pointer,size_t length,std::vector<uint8_t>& bytes);
     static size_t checked(uint64_t length);
     static U components(U pname);
     static U type_size(U type);

@@ -47,7 +47,7 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
     graphics.gpu_client_arrays=true;
     const auto settings=ds::read_runtime_settings();
     graphics.base_mip_only=settings.base_mip_only;
-    graphics.render_test_mode=0; // Ignore leftover diagnostic modes, including A/B.
+    graphics.render_test_mode=0;
     SDL_GL_SetSwapInterval(1);
     int drawable_width=1280,drawable_height=720;SDL_GL_GetDrawableSize(window,&drawable_width,&drawable_height);
     graphics.surface_width=uint32_t(drawable_width);graphics.surface_height=uint32_t(drawable_height);
@@ -114,7 +114,12 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
         for(auto& e:events)if(e.kind==ds::GuestInput::Kind::pointer){e.x*=drawable_width/640.0f;e.y*=drawable_height/480.0f;}
         return events;
     };
+    uint64_t previous_present=0,frame_ticks=0,present_ticks=0,max_frame_ticks=0;
+    unsigned timing_frames=0;
+    const double performance_frequency=double(SDL_GetPerformanceFrequency());
+    graphics.record("Render optimization: context procedure cache; reusable client staging; timing windows=120 frames");
     graphics.present=[&]{
+        const uint64_t present_started=SDL_GetPerformanceCounter();
         if(input.cursor_visible()){
             const auto resolve=[](const char* name){auto* p=SDL_GL_GetProcAddress(name);if(!p)throw std::runtime_error(std::string("Cursor GL unavailable: ")+name);return p;};
             auto get_int=reinterpret_cast<void(*)(unsigned,int*)>(resolve("glGetIntegerv"));
@@ -130,6 +135,17 @@ std::string game_graphics_probe(const std::string& root,unsigned frames) {
             color(saved[0],saved[1],saved[2],saved[3]);mask(channels[0],channels[1],channels[2],channels[3]);scissor(box[0],box[1],box[2],box[3]);if(!enabled)disable(0x0c11);
         }
         SDL_GL_SwapWindow(window);
+        const uint64_t finished=SDL_GetPerformanceCounter();
+        if(previous_present){
+            const uint64_t elapsed=finished-previous_present;
+            frame_ticks+=elapsed;present_ticks+=finished-present_started;
+            if(elapsed>max_frame_ticks)max_frame_ticks=elapsed;
+            if(++timing_frames==120){
+                char timing[192];std::snprintf(timing,sizeof(timing),"Frame timing (120): mean_ms=%.2f max_ms=%.2f present_mean_ms=%.2f",frame_ticks*1000.0/performance_frequency/120,max_frame_ticks*1000.0/performance_frequency,present_ticks*1000.0/performance_frequency/120);
+                graphics.record(timing);frame_ticks=present_ticks=max_frame_ticks=0;timing_frames=0;
+            }
+        }
+        previous_present=finished;
     };
     graphics.record(std::string("Mipmap compatibility: ")+(settings.base_mip_only?"enabled":"disabled"));
     if(settings.hd_enabled){
